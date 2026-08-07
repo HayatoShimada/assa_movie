@@ -152,6 +152,7 @@ class TransformersWhisperEngine:
                 {"array": piece, "sampling_rate": SAMPLE_RATE},
                 return_timestamps="word",
                 chunk_length_s=30,
+                ignore_warning=True,  # chunk_length_sの実験的警告(既知・許容)を抑制
                 generate_kwargs=generate_kwargs,
             )
 
