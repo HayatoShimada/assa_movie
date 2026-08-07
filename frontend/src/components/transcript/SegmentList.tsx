@@ -73,7 +73,16 @@ export function SegmentList({ segments }: { segments: Segment[] }) {
                 {formatTime(seg.start)}
               </span>
               {seg.speaker && <SpeakerBadge name={seg.speaker} />}
-              <span className="min-w-0 flex-1 break-words">
+              <span
+                className={[
+                  'min-w-0 flex-1 break-words',
+                  // 置換・修正が入った行は点線下線+ホバーで原文表示
+                  seg.text !== seg.original_text
+                    ? 'underline decoration-blue-400 decoration-dotted underline-offset-4'
+                    : '',
+                ].join(' ')}
+                title={seg.text !== seg.original_text ? `原文: ${seg.original_text}` : undefined}
+              >
                 {seg.text.replace(/^[^:]+: /, '')}
                 {seg.edited_by_user && (
                   <span className="ml-1 align-middle text-xs text-amber-600">(編集済)</span>

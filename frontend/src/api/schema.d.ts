@@ -352,6 +352,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/segments/{segment_id}/assist": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Assist */
+        post: operations["assist_api_segments__segment_id__assist_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -377,6 +394,20 @@ export interface components {
         Answer: {
             /** Text */
             text: string;
+        };
+        /** AssistRequest */
+        AssistRequest: {
+            /** Message */
+            message: string;
+        };
+        /** AssistResponse */
+        AssistResponse: {
+            /** Reply */
+            reply: string;
+            /** Edits */
+            edits: components["schemas"]["Edit"][];
+            /** Instruction Suggestion */
+            instruction_suggestion?: string | null;
         };
         /** Edit */
         Edit: {
@@ -1441,6 +1472,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Question"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    assist_api_segments__segment_id__assist_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                segment_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssistRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssistResponse"];
                 };
             };
             /** @description Validation Error */

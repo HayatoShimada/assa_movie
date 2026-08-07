@@ -1,18 +1,32 @@
-/** エディタ: 動画プレビュー + 右パネル(トランスクリプト / 設定)。 */
+/** エディタ: 動画プレビュー + 右パネル(トランスクリプト / レビュー / 質問 / 設定)。 */
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api } from '../api/client'
 import { VideoPlayer } from '../components/player/VideoPlayer'
+import { AssistChat } from '../components/transcript/AssistChat'
 import { SegmentList } from '../components/transcript/SegmentList'
+import { ReviewTab } from '../components/edits/ReviewTab'
+import { QuestionsTab } from '../components/questions/QuestionsTab'
 import { SettingsForm } from '../components/settings/SettingsForm'
 import { Button } from '../components/ui'
 import { navigate } from '../hooks/useHashRoute'
+import { usePlayback } from '../stores/playback'
 
-type Tab = 'transcript' | 'settings'
+type Tab = 'transcript' | 'review' | 'questions' | 'settings'
+
+function Badge({ count }: { count: number }) {
+  if (count === 0) return null
+  return (
+    <span className="ml-1 rounded-full bg-blue-600 px-1.5 text-xs font-semibold text-white">
+      {count}
+    </span>
+  )
+}
 
 export function Editor({ mediaId }: { mediaId: number }) {
   const [tab, setTab] = useState<Tab>('transcript')
   const [showAizuchi, setShowAizuchi] = useState(true)
+  const selectedSegmentId = usePlayback((s) => s.selectedSegmentId)
 
   const media = useQuery({
     queryKey: ['mediaItem', mediaId],
@@ -22,10 +36,24 @@ export function Editor({ mediaId }: { mediaId: number }) {
     queryKey: ['segments', mediaId, showAizuchi],
     queryFn: () => api.listSegments(mediaId, showAizuchi),
   })
+  const edits = useQuery({
+    queryKey: ['edits', mediaId],
+    queryFn: () => api.listEdits(mediaId),
+  })
+  const questions = useQuery({
+    queryKey: ['questions', mediaId],
+    queryFn: () => api.listQuestions(mediaId),
+  })
 
-  const tabs: { key: Tab; label: string }[] = [
-    { key: 'transcript', label: 'トランスクリプト' },
-    { key: 'settings', label: '設定' },
+  const proposedCount = (edits.data ?? []).filter((e) => e.status === 'proposed').length
+  const openQuestions = (questions.data ?? []).length
+  const selectedSegment = (segments.data ?? []).find((s) => s.id === selectedSegmentId)
+
+  const tabs: { key: Tab; label: string; badge: number }[] = [
+    { key: 'transcript', label: 'トランスクリプト', badge: 0 },
+    { key: 'review', label: 'レビュー', badge: proposedCount },
+    { key: 'questions', label: '質問', badge: openQuestions },
+    { key: 'settings', label: '設定', badge: 0 },
   ]
 
   return (
@@ -39,7 +67,7 @@ export function Editor({ mediaId }: { mediaId: number }) {
         </h1>
       </header>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[1fr_420px]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[1fr_440px]">
         <section className="min-w-0 p-4">
           <VideoPlayer mediaId={mediaId} segments={segments.data ?? []} />
         </section>
@@ -50,14 +78,16 @@ export function Editor({ mediaId }: { mediaId: number }) {
               <button
                 key={t.key}
                 type="button"
+                data-testid={`tab-${t.key}`}
                 onClick={() => setTab(t.key)}
-                className={`px-4 py-2 text-sm ${
+                className={`px-3 py-2 text-sm ${
                   tab === t.key
                     ? 'border-b-2 border-blue-600 font-semibold'
                     : 'text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200'
                 }`}
               >
                 {t.label}
+                <Badge count={t.badge} />
               </button>
             ))}
             {tab === 'transcript' && (
@@ -72,15 +102,29 @@ export function Editor({ mediaId }: { mediaId: number }) {
             )}
           </nav>
 
-          <div className="min-h-0 flex-1">
-            {tab === 'transcript' &&
-              (segments.data?.length ? (
-                <SegmentList segments={segments.data} />
-              ) : (
-                <p className="p-4 text-sm text-neutral-500">
-                  {segments.isPending ? '読み込み中...' : 'セグメントがありません。文字起こしを実行してください。'}
-                </p>
-              ))}
+          <div className="flex min-h-0 flex-1 flex-col">
+            {tab === 'transcript' && (
+              <>
+                <div className="min-h-0 flex-1">
+                  {segments.data?.length ? (
+                    <SegmentList segments={segments.data} />
+                  ) : (
+                    <p className="p-4 text-sm text-neutral-500">
+                      {segments.isPending
+                        ? '読み込み中...'
+                        : 'セグメントがありません。文字起こしを実行してください。'}
+                    </p>
+                  )}
+                </div>
+                {selectedSegment && (
+                  <AssistChat segment={selectedSegment} projectId={media.data?.project_id} />
+                )}
+              </>
+            )}
+            {tab === 'review' && (
+              <ReviewTab mediaId={mediaId} projectId={media.data?.project_id} />
+            )}
+            {tab === 'questions' && <QuestionsTab mediaId={mediaId} />}
             {tab === 'settings' && (
               <div className="h-full overflow-y-auto">
                 <SettingsForm />

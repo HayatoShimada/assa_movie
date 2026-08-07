@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from backend.api import assist as assist_api
 from backend.api import edits as edits_api
 from backend.api import jobs as jobs_api
 from backend.api import projects as projects_api
@@ -35,6 +36,7 @@ app.include_router(transcripts_api.router)
 app.include_router(settings_api.router)
 app.include_router(edits_api.router)
 app.include_router(questions_api.router)
+app.include_router(assist_api.router)
 
 
 @app.get("/api/health")

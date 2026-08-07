@@ -46,9 +46,20 @@ SEED_SEGMENTS = [
 ]
 
 
+FAKE_ASSIST = {
+    "reply": "『反動体』は半導体の誤認識と判断し、注釈を提案しました。",
+    "edits": [
+        {"original": "反動体", "replacement": "半導体", "referent": "半導体"}
+    ],
+    "instruction_suggestion": "「反動体」は「半導体」の誤認識として扱う",
+}
+
+
 def _fake_llm(system: str, user: str) -> dict:
     """呼び出し内容で応答を出し分ける(プロンプトの種類で判別)"""
-    if "固有名詞" in system:
+    if "編集アシスタント" in system:
+        return FAKE_ASSIST
+    if "音は合っているが漢字表記が誤っている" in system:
         return FAKE_QUESTIONS
     return FAKE_EDITS
 

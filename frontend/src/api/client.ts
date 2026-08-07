@@ -73,6 +73,14 @@ export const api = {
   rejectEdit: (editId: number, note?: string) => post<Edit>(`/api/edits/${editId}/reject`, { note }),
   revertEdit: (editId: number) => post<Edit>(`/api/edits/${editId}/revert`),
 
+  assistSegment: (segmentId: number, message: string) =>
+    post<AssistResponse>(`/api/segments/${segmentId}/assist`, { message }),
+  createInstruction: (projectId: number, text: string, mediaId?: number) =>
+    post<{ id: number; text: string }>(`/api/projects/${projectId}/instructions`, {
+      text,
+      media_id: mediaId ?? null,
+    }),
+
   listQuestions: (mediaId: number, status = 'open') =>
     request<Question[]>(`/api/media/${mediaId}/questions?status=${status}`),
   answerQuestion: (questionId: number, text: string) =>
@@ -82,6 +90,12 @@ export const api = {
   getSettings: () => request<SettingsResponse>('/api/settings'),
   updateSettings: (patch: Record<string, unknown>) =>
     request<SettingsResponse>('/api/settings', { method: 'PATCH', body: JSON.stringify(patch) }),
+}
+
+export interface AssistResponse {
+  reply: string
+  edits: Edit[]
+  instruction_suggestion: string | null
 }
 
 export interface SettingsResponse {
