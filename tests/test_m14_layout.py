@@ -78,8 +78,8 @@ def test_portrait_to_landscape_blur_pad():
 def test_face_single_uses_face_center():
     plan = FacePlan(mode="single", centers=(0.25,))
     f = build_layout_filter(1920, 1080, 1080, 1920, "face", face_plan=plan)
-    # crop_x=0.25相当: (1920-608)*0.25=328
-    assert "crop=608:1080:328:0" in f
+    # クロップ窓の中心=顔中心: x = 0.25*1920 - 608/2 = 176
+    assert "crop=608:1080:176:0" in f
 
 
 def test_face_stack_two_speakers():
@@ -89,6 +89,35 @@ def test_face_stack_two_speakers():
     assert "split[a][b]" in f
     assert "vstack" in f
     assert f.endswith("[vlay]")
+
+
+def test_face_stack_portrait_source_keeps_aspect():
+    """縦長ソースで段の幅がクランプされたら高さも再計算する(歪み防止)"""
+    import re
+
+    plan = FacePlan(mode="stack", centers=(0.3, 0.7), centers_y=(0.42, 0.42))
+    f = build_layout_filter(1912, 2940, 1080, 1920, "face", face_plan=plan)
+    m = re.search(r"crop=(\d+):(\d+):(\d+):(\d+),scale=1080:960", f)
+    assert m, f
+    cw, ch = int(m.group(1)), int(m.group(2))
+    # 段のアスペクト(1080:960=1.125)がクロップ窓でも維持される
+    assert cw / ch == pytest.approx(1080 / 960, abs=0.01)
+    assert ch < 2940  # ソース全高を潰していない
+    # 顔のy中心(0.42)に合わせて縦位置が決まる
+    y = int(m.group(4))
+    assert y == pytest.approx(0.42 * 2940 - ch / 2, abs=2)
+
+
+def test_face_single_portrait_to_landscape_uses_y_center():
+    """高さを切る変換(縦→横)ではx中心ではなくy中心で位置決めする"""
+    plan = FacePlan(mode="single", centers=(0.3,), centers_y=(0.4,))
+    f = build_layout_filter(1080, 1920, 1920, 1080, "face", face_plan=plan)
+    # crop高さ608、y = clamp((1920-608)*位置)。y中心0.4 → 0.4*1920-304=464
+    assert "crop=1080:608:0:" in f
+    import re
+
+    y = int(re.search(r"crop=1080:608:0:(\d+)", f).group(1))
+    assert 440 <= y <= 490
 
 
 def test_face_none_falls_back_to_blur_pad():

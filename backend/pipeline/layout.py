@@ -21,6 +21,7 @@ class FacePlan:
 
     mode: str                    # 'single' | 'stack' | 'none'
     centers: tuple[float, ...]   # 正規化x中心(0..1)。stackは左→右順で2つ
+    centers_y: tuple[float, ...] = ()  # 正規化y中心(縦方向のクロップ位置決めに使う)
 
 
 def _even(v: float) -> int:
@@ -73,7 +74,7 @@ def _blur_pad_filter(out_w: int, out_h: int) -> str:
 
 
 def _stack_filter(
-    src_w: int, src_h: int, out_w: int, out_h: int, centers: tuple[float, ...]
+    src_w: int, src_h: int, out_w: int, out_h: int, face_plan: FacePlan
 ) -> str:
     """2人対談の上下分割: 各話者の顔を中心に切り出して縦に積む"""
     half_h = _even(out_h / 2)
@@ -81,13 +82,18 @@ def _stack_filter(
     ch = src_h - (src_h % 2)
     cw = _even(ch * pane_ar)
     if cw > src_w:
+        # 幅が足りない(縦長ソース等)場合は幅基準にして高さを縮める
         cw = src_w - (src_w % 2)
+        ch = _even(cw / pane_ar)
+    centers_y = face_plan.centers_y or (0.5, 0.5)
     chains = ["[0:v]split[a][b]"]
-    for label, out_label, center in zip("ab", ("ta", "tb"), centers[:2]):
-        x = max(0, min(src_w - cw, int(round(center * src_w - cw / 2))))
+    for label, out_label, cx, cy in zip(
+        "ab", ("ta", "tb"), face_plan.centers[:2], centers_y[:2]
+    ):
+        x = max(0, min(src_w - cw, int(round(cx * src_w - cw / 2))))
+        y = max(0, min(src_h - ch, int(round(cy * src_h - ch / 2))))
         chains.append(
-            f"[{label}]crop={cw}:{ch}:{x}:{(src_h - ch) // 2},"
-            f"scale={out_w}:{half_h}[{out_label}]"
+            f"[{label}]crop={cw}:{ch}:{x}:{y},scale={out_w}:{half_h}[{out_label}]"
         )
     chains.append("[ta][tb]vstack[vlay]")
     return ";".join(chains)
@@ -118,8 +124,18 @@ def build_layout_filter(
         if face_plan is None or face_plan.mode == "none" or not face_plan.centers:
             return _blur_pad_filter(out_w, out_h)  # 検出できなければ安全側へ
         if face_plan.mode == "stack" and len(face_plan.centers) >= 2:
-            return _stack_filter(src_w, src_h, out_w, out_h, face_plan.centers)
-        return _crop_filter(src_w, src_h, out_w, out_h, face_plan.centers[0])
+            return _stack_filter(src_w, src_h, out_w, out_h, face_plan)
+        # クロップ窓の中心を顔の中心に合わせる(切り落とす軸: 横長すぎ→x、縦長すぎ→y)。
+        # crop_x(0..1)は「移動量に対する比率」なので、顔中心座標から換算する
+        cw, ch, _, _ = _crop_window(src_w, src_h, out_w, out_h, 0.5)
+        if src_w / src_h > out_w / out_h:
+            travel = src_w - cw
+            pos = 0.5 if travel <= 0 else (face_plan.centers[0] * src_w - cw / 2) / travel
+        else:
+            cy = face_plan.centers_y[0] if face_plan.centers_y else 0.5
+            travel = src_h - ch
+            pos = 0.5 if travel <= 0 else (cy * src_h - ch / 2) / travel
+        return _crop_filter(src_w, src_h, out_w, out_h, pos)
     if method == "crop":
         return _crop_filter(src_w, src_h, out_w, out_h, crop_x)
     return _blur_pad_filter(out_w, out_h)

@@ -34,6 +34,8 @@ def run_transcribe(
 
     s = resolve_settings(conn, media_id=media_id)
     language = params.get("language", s.asr_language)
+    # 長尺のデコードや初回のモデルDL中に0%のまま見えないよう、開始を即時通知する
+    progress(0.01)
     audio = audio_io.decode(Path(row["path"]))
     progress(0.05)
 

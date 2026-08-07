@@ -11,8 +11,9 @@ dependencies = [
     "faster-whisper>=1.1.0",
     # ROCm環境用ASRエンジン(CTranslate2がROCm非対応のためtransformers版Whisperを使う)
     "transformers>=4.44",
-    # 顔検出(M14の縦型レイアウト)とフレーム抽出。ffmpeg同梱のheadless版
-    "opencv-python-headless>=4.10",
+    # 顔検出(M14の縦型レイアウト)とフレーム抽出。ffmpeg同梱のheadless版。
+    # OpenCV 5はCascadeClassifierと同梱Haarカスケードxmlが削除されているため4系固定
+    "opencv-python-headless>=4.10,<5",
     # 4.x系は同意済みでないpyannote/speaker-diarization-community-1を要求するため3.x系に固定
     "pyannote-audio>=3.3,<4",
     # pyannote-audio 3.x はhuggingface_hub 1.0で削除されたuse_auth_token引数を使うため0.x系に固定

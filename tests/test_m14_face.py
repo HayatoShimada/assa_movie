@@ -1,8 +1,27 @@
-"""M14: 顔検出の後処理(顔ボックス→クロップ計画)のテスト。検出自体は実行しない。"""
+"""M14: 顔検出の後処理(顔ボックス→クロップ計画)のテストと検出器のスモーク。"""
 
+import numpy as np
 import pytest
 
-from backend.pipeline.face import make_face_plan
+from backend.pipeline.face import detect_faces, make_face_plan
+
+
+def test_detect_faces_smoke():
+    """検出器が実際にロード・実行できること。
+
+    OpenCV 5でCascadeClassifierとHaar xmlが削除されておりv0.2.0で実行時に
+    壊れた回帰(pyproject.tomlで4系固定)。黒画面なら検出ゼロのlistが返る。
+    """
+    result = detect_faces(np.zeros((480, 640, 3), dtype=np.uint8))
+    assert result == []
+
+
+def test_haarcascade_file_exists():
+    import cv2
+    from pathlib import Path
+
+    xml = Path(cv2.data.haarcascades) / "haarcascade_frontalface_default.xml"
+    assert xml.exists(), "Haarカスケードxmlが同梱されていない(OpenCVのバージョン要確認)"
 
 W, H = 1920, 1080
 
@@ -18,6 +37,8 @@ def test_single_person():
     plan = make_face_plan(samples, W, H)
     assert plan.mode == "single"
     assert plan.centers[0] == pytest.approx(0.3, abs=0.02)
+    # y中心(300+100)/1080も返す(縦方向クロップの位置決めに使う)
+    assert plan.centers_y[0] == pytest.approx(400 / 1080, abs=0.01)
 
 
 def test_two_person_interview():

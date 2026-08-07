@@ -164,7 +164,7 @@ function RerunBar({ mediaId, projectId }: { mediaId: number; projectId?: number 
       <div className="flex items-center gap-2">
         <input
           className="flex-1 rounded border border-neutral-300 px-2 py-1 text-xs dark:border-neutral-700 dark:bg-neutral-900"
-          placeholder="追加指示(例: 『あれ』はAIハッカソンを指す)"
+          placeholder="追加指示(例: 『あれ』は先月のイベントを指す)"
           value={instruction}
           onChange={(e) => setInstruction(e.target.value)}
         />

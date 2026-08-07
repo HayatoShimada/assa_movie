@@ -171,8 +171,8 @@ export function SettingsFields({
             value={String(v.pronoun_form)}
             onChange={(e) => set('pronoun_form')(e.target.value)}
           >
-            <option value="annotate">注釈: それ(去年のハッカソン)(推奨)</option>
-            <option value="replace">置換: 去年のハッカソン</option>
+            <option value="annotate">注釈: それ(先月のイベント)(推奨)</option>
+            <option value="replace">置換: 先月のイベント</option>
             <option value="complete">補完(全件レビュー必須)</option>
           </select>
         </Row>

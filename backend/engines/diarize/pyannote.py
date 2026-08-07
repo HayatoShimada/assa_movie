@@ -58,6 +58,11 @@ def run_diarization(
         pipeline = Pipeline.from_pretrained(model, use_auth_token=token)
     # ROCmのHIPビルドもtorch上では"cuda"を名乗るのでこの判定で両対応になる
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if getattr(torch.version, "hip", None):
+        # torch(rocm wheel)同梱のMIOpenはDropoutカーネルの実行時コンパイルに失敗する
+        # (rocrandヘッダ不整合)。cudnn APIを無効化しLSTMを通常のHIPカーネルで
+        # 実行する(RX 7900 XTX実測: CPU比 約2.8倍高速で結果は同一)
+        torch.backends.cudnn.enabled = False
     pipeline.to(device)
 
     inputs = {"waveform": torch.from_numpy(audio).unsqueeze(0), "sample_rate": SAMPLE_RATE}
