@@ -1,21 +1,5 @@
-import { expect, test, type APIRequestContext } from '@playwright/test'
-
-const API = 'http://localhost:8001'
-
-async function seedTranscribed(request: APIRequestContext): Promise<number> {
-  await request.post(`${API}/api/e2e/reset`)
-  const seed = await (await request.post(`${API}/api/e2e/seed`)).json()
-  await request.post(`${API}/api/media/${seed.media_id}/jobs`, {
-    data: { type: 'transcribe_fake', params: {} },
-  })
-  await expect
-    .poll(
-      async () => (await (await request.get(`${API}/api/media/${seed.media_id}`)).json()).status,
-      { timeout: 15000 },
-    )
-    .toBe('transcribed')
-  return seed.media_id
-}
+import { expect, test } from '@playwright/test'
+import { API, seedTranscribed } from './helpers'
 
 test('クリップ: 候補生成→カード表示→編集モード', async ({ page, request }) => {
   const mediaId = await seedTranscribed(request)
@@ -23,7 +7,6 @@ test('クリップ: 候補生成→カード表示→編集モード', async ({ 
   await page.getByTestId('tab-clips').click()
 
   await page.getByTestId('run-suggest').click()
-  const card = page.locator('[data-testid^="clip-"][data-testid$="1"]').first()
   await expect(page.getByText('ハッカソンの話')).toBeVisible({ timeout: 15000 })
   await expect(page.getByText('完結した話題')).toBeVisible()
 

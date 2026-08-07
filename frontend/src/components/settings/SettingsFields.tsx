@@ -6,24 +6,17 @@
  * overriddenKeys/onResetで「既定に戻す」を出す。
  */
 import { useQuery } from '@tanstack/react-query'
-import { api, type SettingsResponse } from '../../api/client'
+import { api, machineQueryOptions, type SettingsResponse } from '../../api/client'
+import { CONVERT_METHOD_LABELS } from '../../lib/catalogs'
+import { selectCls } from '../ui'
 
-export function Row({ label, children }: { label: string; children: React.ReactNode }) {
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="flex items-center justify-between gap-4 py-2 text-sm">
       <span className="text-neutral-600 dark:text-neutral-400">{label}</span>
       {children}
     </label>
   )
-}
-
-export const selectCls =
-  'rounded-md border border-neutral-300 bg-transparent px-2 py-1 text-sm dark:border-neutral-700 dark:bg-neutral-900'
-
-export const CONVERT_METHOD_LABELS: Record<string, string> = {
-  crop: '中央クロップ(位置調整可)',
-  blur_pad: 'ぼかし背景(全体表示)',
-  face: '顔検出(1人=追従クロップ / 2人=上下分割)',
 }
 
 export function SettingsFields({
@@ -42,8 +35,12 @@ export function SettingsFields({
   overriddenKeys?: Set<string>
   onReset?: (key: string) => void
 }) {
-  const fonts = useQuery({ queryKey: ['fonts'], queryFn: api.getFonts })
-  const env = useQuery({ queryKey: ['environment'], queryFn: api.getEnvironment })
+  const fonts = useQuery({ queryKey: ['fonts'], queryFn: api.getFonts, ...machineQueryOptions })
+  const env = useQuery({
+    queryKey: ['environment'],
+    queryFn: api.getEnvironment,
+    ...machineQueryOptions,
+  })
   const v = values
   const set = (key: string) => (value: unknown) => onSet(key, value)
   const asrNote = meta.asr_models.find((m) => m.id === v.asr_model)?.note
@@ -268,8 +265,9 @@ export function SettingsFields({
             <input
               data-testid={`${idPrefix}-subtitle-text-color`}
               type="color"
-              value={String(v.subtitle_text_color ?? '#FFFFFF')}
-              onChange={(e) => set('subtitle_text_color')(e.target.value.toUpperCase())}
+              // color入力はドラッグ中も連続でchangeが飛ぶため、確定時にだけ保存する
+              defaultValue={String(v.subtitle_text_color ?? '#FFFFFF')}
+              onBlur={(e) => set('subtitle_text_color')(e.target.value.toUpperCase())}
             />
             {resetBtn('subtitle_text_color')}
           </span>
@@ -301,8 +299,8 @@ export function SettingsFields({
               <input
                 data-testid={`${idPrefix}-subtitle-bg-color`}
                 type="color"
-                value={String(v.subtitle_bg_color ?? '#000000')}
-                onChange={(e) => set('subtitle_bg_color')(e.target.value.toUpperCase())}
+                defaultValue={String(v.subtitle_bg_color ?? '#000000')}
+                onBlur={(e) => set('subtitle_bg_color')(e.target.value.toUpperCase())}
               />
             </Row>
             <Row label={`背景の不透明度: ${Math.round(Number(v.subtitle_bg_opacity ?? 0.5) * 100)}%`}>

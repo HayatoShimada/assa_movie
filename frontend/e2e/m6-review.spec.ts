@@ -1,23 +1,7 @@
-import { expect, test, type APIRequestContext } from '@playwright/test'
-
-const API = 'http://localhost:8001'
+import { expect, test } from '@playwright/test'
+import { API, seedTranscribed } from './helpers'
 
 /** M6: レビューUI・質問キュー・対話アシストの画面操作テスト */
-
-async function seedTranscribed(request: APIRequestContext): Promise<number> {
-  await request.post(`${API}/api/e2e/reset`)
-  const seed = await (await request.post(`${API}/api/e2e/seed`)).json()
-  await request.post(`${API}/api/media/${seed.media_id}/jobs`, {
-    data: { type: 'transcribe_fake', params: {} },
-  })
-  await expect
-    .poll(
-      async () => (await (await request.get(`${API}/api/media/${seed.media_id}`)).json()).status,
-      { timeout: 15000 },
-    )
-    .toBe('transcribed')
-  return seed.media_id
-}
 
 test('レビュー: 解決実行→提案が並び、承認でトランスクリプトに下線付き反映', async ({
   page,

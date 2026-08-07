@@ -2,6 +2,9 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api } from '../api/client'
+import type { Clip } from '../api/clips'
+import type { ConvertMethod } from '../lib/catalogs'
+import { resolveSettings } from '../lib/settings'
 import { VideoPlayer } from '../components/player/VideoPlayer'
 import { AssistChat } from '../components/transcript/AssistChat'
 import { SegmentList } from '../components/transcript/SegmentList'
@@ -28,10 +31,9 @@ function Badge({ count }: { count: number }) {
 export function Editor({ mediaId }: { mediaId: number }) {
   const [tab, setTab] = useState<Tab>('transcript')
   const [showAizuchi, setShowAizuchi] = useState(true)
-  const [clipSubtitlePosition, setClipSubtitlePosition] = useState<'top' | 'center' | 'bottom' | null>(null)
-  const [clipSubtitleOffsetY, setClipSubtitleOffsetY] = useState<number | null>(null)
-  const [clipConvertMethod, setClipConvertMethod] = useState<'crop' | 'blur_pad' | 'face' | null>(null)
-  const [clipCropX, setClipCropX] = useState<number | null>(null)
+  // プレビュー対象のクリップ。個々のフィールドではなくクリップごと持つことで
+  // 「同じクリップの値である」ことが構造的に保証される
+  const [selectedClip, setSelectedClip] = useState<Clip | null>(null)
   const selectedSegmentId = usePlayback((s) => s.selectedSegmentId)
 
   const media = useQuery({
@@ -44,18 +46,12 @@ export function Editor({ mediaId }: { mediaId: number }) {
     enabled: media.data?.project_id != null,
   })
   const settings = useQuery({ queryKey: ['settings'], queryFn: api.getSettings })
-  // プロジェクト設定はグローバルとの差分なのでマージして使う
-  const styleValues = {
-    ...(settings.data?.values ?? {}),
-    ...((project.data?.settings ?? {}) as Record<string, unknown>),
-  }
+  const styleValues = resolveSettings(settings.data?.values, project.data?.settings)
   const outputOrientation = project.data?.output_orientation ?? 'landscape'
+
+  const previewClip = tab === 'clips' ? selectedClip : null
   // クリップの上書きが無ければプロジェクト(マージ済み)の変換方式でプレビュー
-  const previewConvertMethod =
-    tab === 'clips'
-      ? (clipConvertMethod ??
-        ((styleValues.convert_method as 'crop' | 'blur_pad' | 'face' | undefined) ?? null))
-      : null
+  const projectConvertMethod = (styleValues.convert_method as ConvertMethod | undefined) ?? null
   const segments = useQuery({
     queryKey: ['segments', mediaId, showAizuchi],
     queryFn: () => api.listSegments(mediaId, showAizuchi),
@@ -98,12 +94,12 @@ export function Editor({ mediaId }: { mediaId: number }) {
           <VideoPlayer
             mediaId={mediaId}
             segments={segments.data ?? []}
-            subtitlePosition={tab === 'clips' ? (clipSubtitlePosition ?? 'bottom') : 'bottom'}
-            subtitleOffsetY={tab === 'clips' ? (clipSubtitleOffsetY ?? 0) : 0}
-            outputOrientation={outputOrientation}
-            convertMethod={previewConvertMethod}
-            cropX={clipCropX ?? 0.5}
             styleValues={styleValues}
+            outputOrientation={outputOrientation}
+            subtitlePosition={previewClip?.subtitle_position ?? 'bottom'}
+            subtitleOffsetY={previewClip?.subtitle_offset_y ?? 0}
+            convertMethod={previewClip ? (previewClip.convert_method ?? projectConvertMethod) : null}
+            cropX={previewClip?.crop_x ?? 0.5}
           />
         </section>
 
@@ -161,15 +157,7 @@ export function Editor({ mediaId }: { mediaId: number }) {
             )}
             {tab === 'questions' && <QuestionsTab mediaId={mediaId} />}
             {tab === 'clips' && (
-              <ClipsTab
-                mediaId={mediaId}
-                onSubtitlePositionPreviewChange={setClipSubtitlePosition}
-                onSubtitleOffsetPreviewChange={setClipSubtitleOffsetY}
-                onConvertPreviewChange={(method, cropX) => {
-                  setClipConvertMethod(method)
-                  setClipCropX(cropX)
-                }}
-              />
+              <ClipsTab mediaId={mediaId} onSelectedClipChange={setSelectedClip} />
             )}
             {tab === 'export' && <ExportTab mediaId={mediaId} />}
             {tab === 'settings' && (

@@ -1,52 +1,38 @@
 /**
  * 動画プレビュー。再生位置をストアに流し、シーク関数を登録する。
  *
- * 字幕オーバーレイはバックエンド(pipeline/subtitle.py scaled_style)と同じ
- * 相対規則で描く: フォント・左右余白は「画面幅に対する比率」、上下余白は
- * 「画面高さに対する比率」。コンテナクエリ単位(cqw/cqh)で実現し、
- * どの出力向き・ウィンドウ幅でも書き出しと同じ見た目比率になる。
- *   フォント: font_size(1920幅基準px) / 1920 → cqw
- *   上下余白: (40±offset)(1080高基準px) / 1080 → cqh
+ * 字幕の位置・サイズはバックエンド(pipeline/subtitle.py scaled_style)と
+ * 同じ相対規則で描く。規則そのものは lib/subtitleLayout.ts の純関数にあり、
+ * テストで期待値を固定している。
  */
 import { useEffect, useRef } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { API_BASE, api, type Orientation, type Segment } from '../../api/client'
+import { API_BASE, type Orientation, type Segment } from '../../api/client'
+import type { ConvertMethod } from '../../lib/catalogs'
 import { wrapSubtitle } from '../../lib/subtitle'
+import { hexToRgba, overlayGeometry, type SubtitlePosition } from '../../lib/subtitleLayout'
+import type { SettingsValues } from '../../lib/settings'
 import { usePlayback } from '../../stores/playback'
-
-type SubtitlePosition = 'top' | 'center' | 'bottom'
-type ConvertMethod = 'crop' | 'blur_pad' | 'face' | null
-
-/** バックエンドの hex + 不透明度 → CSS rgba */
-function hexToRgba(hex: string, opacity: number): string {
-  const h = hex.replace('#', '')
-  if (!/^[0-9a-fA-F]{6}$/.test(h)) return `rgba(0,0,0,${opacity})`
-  const r = parseInt(h.slice(0, 2), 16)
-  const g = parseInt(h.slice(2, 4), 16)
-  const b = parseInt(h.slice(4, 6), 16)
-  return `rgba(${r},${g},${b},${opacity})`
-}
 
 export function VideoPlayer({
   mediaId,
   segments,
+  styleValues,
   subtitlePosition = 'bottom',
   subtitleOffsetY = 0,
   outputOrientation = 'landscape',
   convertMethod = null,
   cropX = 0.5,
-  styleValues,
 }: {
   mediaId: number
   segments: Segment[]
+  /** プロジェクト設定を反映済みの設定値(lib/settings.ts の resolveSettings) */
+  styleValues: SettingsValues
   subtitlePosition?: SubtitlePosition
   subtitleOffsetY?: number
   outputOrientation?: Orientation
-  /** 縦横変換のプレビュー(クリップ選択時)。cropのみ実映像で近似できる */
-  convertMethod?: ConvertMethod
+  /** 縦横変換のプレビュー。cropのみ実映像で近似できる */
+  convertMethod?: ConvertMethod | null
   cropX?: number
-  /** プロジェクト設定を反映した設定値(省略時はグローバル設定) */
-  styleValues?: Record<string, unknown>
 }) {
   const ref = useRef<HTMLVideoElement>(null)
   const setCurrentTime = usePlayback((s) => s.setCurrentTime)
@@ -62,8 +48,7 @@ export function VideoPlayer({
     return () => setSeeker(null)
   }, [setSeeker])
 
-  const settings = useQuery({ queryKey: ['settings'], queryFn: api.getSettings })
-  const v = styleValues ?? settings.data?.values ?? {}
+  const v = styleValues
   const maxChars = Number(v.subtitle_max_chars_per_line ?? 15)
   const fontSize = Number(v.subtitle_font_size ?? 48)
   const fontFamily = String(v.subtitle_font_family ?? 'Noto Sans JP')
@@ -82,25 +67,20 @@ export function VideoPlayer({
   )
   // 話者ラベル(「はやまる: 」)を外し、書き出しと同じ折返し・禁則を適用する
   const lines = active ? wrapSubtitle(active.text.replace(/^[^:]+: /, ''), maxChars) : []
-
-  // 上下余白は高さ基準(バックエンドの margin_v=40±offset @1080 と同じ比率)
-  const offset = Math.max(-120, Math.min(120, subtitleOffsetY))
-  const cqh = (px: number) => `${((Math.max(0, px) / 1080) * 100).toFixed(3)}cqh`
-  const overlayStyle =
-    subtitlePosition === 'top'
-      ? { top: cqh(40 + offset) }
-      : subtitlePosition === 'center'
-        ? { top: '50%', transform: 'translateY(-50%)' }
-        : { bottom: cqh(40 - offset) }
+  const { fontSize: fontSizeCq, ...overlayStyle } = overlayGeometry(
+    subtitlePosition,
+    subtitleOffsetY,
+    fontSize,
+  )
 
   const isPortrait = outputOrientation === 'portrait'
   // crop: 実映像で切り出し位置を再現。blur_pad/face: 全体表示(書き出し時に背景合成)
   const videoFit =
-    isPortrait || convertMethod
-      ? convertMethod === 'crop'
-        ? ({ objectFit: 'cover', objectPosition: `${(cropX ?? 0.5) * 100}% 50%` } as const)
-        : ({ objectFit: 'contain' } as const)
-      : undefined
+    convertMethod === 'crop'
+      ? ({ objectFit: 'cover', objectPosition: `${cropX * 100}% 50%` } as const)
+      : isPortrait || convertMethod
+        ? ({ objectFit: 'contain' } as const)
+        : undefined
 
   return (
     <div
@@ -131,20 +111,17 @@ export function VideoPlayer({
           className="pointer-events-none absolute text-center font-bold"
           style={{
             ...overlayStyle,
-            left: `${((60 / 1920) * 100).toFixed(3)}cqw`,
-            right: `${((60 / 1920) * 100).toFixed(3)}cqw`,
-            fontSize: `${((fontSize / 1920) * 100).toFixed(3)}cqw`,
+            fontSize: fontSizeCq,
             fontFamily: `'${fontFamily}', sans-serif`,
             color: textColor,
             lineHeight: 1.2,
-            textShadow:
-              bg === 'box' ? 'none' : '0 0 4px rgba(0,0,0,.9), 0 0 8px rgba(0,0,0,.7)',
+            textShadow: bg === 'box' ? 'none' : '0 0 4px rgba(0,0,0,.9), 0 0 8px rgba(0,0,0,.7)',
           }}
         >
           {lines.map((line, i) => (
             <span
               key={i}
-              className="block w-fit mx-auto"
+              className="mx-auto block w-fit"
               style={
                 bg === 'box'
                   ? { backgroundColor: hexToRgba(bgColor, bgOpacity), padding: '0 0.3em' }

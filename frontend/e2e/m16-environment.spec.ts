@@ -1,22 +1,6 @@
 /** M16: 設定タブの環境パネル(スキャン結果表示・VRAM割当・おすすめ適用) */
-import { expect, test, type APIRequestContext } from '@playwright/test'
-
-const API = 'http://localhost:8001'
-
-async function seedTranscribed(request: APIRequestContext): Promise<number> {
-  await request.post(`${API}/api/e2e/reset`)
-  const seed = await (await request.post(`${API}/api/e2e/seed`)).json()
-  await request.post(`${API}/api/media/${seed.media_id}/jobs`, {
-    data: { type: 'transcribe_fake', params: {} },
-  })
-  await expect
-    .poll(
-      async () => (await (await request.get(`${API}/api/media/${seed.media_id}`)).json()).status,
-      { timeout: 15000 },
-    )
-    .toBe('transcribed')
-  return seed.media_id
-}
+import { expect, test } from '@playwright/test'
+import { API, seedTranscribed } from './helpers'
 
 test('環境パネル: スキャン結果とおすすめが表示される', async ({ page, request }) => {
   const mediaId = await seedTranscribed(request)

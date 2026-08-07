@@ -118,6 +118,15 @@ export const api = {
   getEnvironment: () => request<EnvironmentResponse>('/api/environment'),
 }
 
+/**
+ * マシン構成のクエリ設定。
+ *
+ * /api/environment はOllamaへのプローブ(最大2秒)とGPU問い合わせ、
+ * /api/fonts は fc-list の起動を伴う。セッション中に変わらない情報なので、
+ * パネルを開くたびに再スキャンしない(変わる操作の後は明示的にinvalidateする)。
+ */
+export const machineQueryOptions = { staleTime: Infinity } as const
+
 export interface EnvironmentResponse {
   accel: 'cuda' | 'rocm' | 'cpu'
   gpu: { name?: string; vram_total_mb?: number; vram_free_mb?: number }

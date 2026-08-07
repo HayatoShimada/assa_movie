@@ -7,20 +7,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api, type Orientation } from '../../api/client'
+import { TEMPLATES, type Template } from '../../lib/catalogs'
+import { overrideProps, type SettingsValues } from '../../lib/settings'
 import { Button } from '../ui'
 import { SettingsFields } from '../settings/SettingsFields'
-
-export const TEMPLATES: {
-  id: string
-  label: string
-  input: Orientation
-  output: Orientation
-}[] = [
-  { id: 'l2l', label: '横 → 横', input: 'landscape', output: 'landscape' },
-  { id: 'l2p', label: '横 → 縦', input: 'landscape', output: 'portrait' },
-  { id: 'p2p', label: '縦 → 縦', input: 'portrait', output: 'portrait' },
-  { id: 'p2l', label: '縦 → 横', input: 'portrait', output: 'landscape' },
-]
 
 function OrientationIcon({ orientation }: { orientation: Orientation }) {
   // 矩形1つで向きを表す(横=16:9、縦=9:16)
@@ -51,21 +41,19 @@ export function CreateProjectForm() {
   const queryClient = useQueryClient()
   const settings = useQuery({ queryKey: ['settings'], queryFn: api.getSettings })
   const [name, setName] = useState('')
-  const [templateId, setTemplateId] = useState('l2l')
+  const [template, setTemplate] = useState<Template>(TEMPLATES[0])
   const [showDetails, setShowDetails] = useState(false)
   // グローバル設定との差分だけを保持する
-  const [overrides, setOverrides] = useState<Record<string, unknown>>({})
+  const [overrides, setOverrides] = useState<SettingsValues>({})
 
   const create = useMutation({
-    mutationFn: () => {
-      const t = TEMPLATES.find((t) => t.id === templateId) ?? TEMPLATES[0]
-      return api.createProject({
+    mutationFn: () =>
+      api.createProject({
         name,
-        input_orientation: t.input,
-        output_orientation: t.output,
+        input_orientation: template.input,
+        output_orientation: template.output,
         settings: overrides,
-      })
-    },
+      }),
     onSuccess: () => {
       setName('')
       setOverrides({})
@@ -73,9 +61,6 @@ export function CreateProjectForm() {
       queryClient.invalidateQueries({ queryKey: ['projects'] })
     },
   })
-
-  const globalValues = settings.data?.values ?? {}
-  const mergedValues = { ...globalValues, ...overrides }
 
   return (
     <form
@@ -106,9 +91,9 @@ export function CreateProjectForm() {
               key={t.id}
               type="button"
               data-testid={`template-${t.id}`}
-              onClick={() => setTemplateId(t.id)}
+              onClick={() => setTemplate(t)}
               className={`flex flex-col items-center gap-1 rounded-md border p-2 text-xs ${
-                templateId === t.id
+                template.id === t.id
                   ? 'border-blue-600 bg-blue-50 font-semibold text-blue-700 dark:bg-blue-950 dark:text-blue-300'
                   : 'border-neutral-300 text-neutral-600 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-900'
               }`}
@@ -133,17 +118,8 @@ export function CreateProjectForm() {
           <div className="mt-2 max-h-96 overflow-y-auto rounded border border-neutral-200 p-3 dark:border-neutral-800">
             <SettingsFields
               idPrefix="new-project"
-              values={mergedValues}
               meta={settings.data}
-              onSet={(key, value) => setOverrides((o) => ({ ...o, [key]: value }))}
-              overriddenKeys={new Set(Object.keys(overrides))}
-              onReset={(key) =>
-                setOverrides((o) => {
-                  const next = { ...o }
-                  delete next[key]
-                  return next
-                })
-              }
+              {...overrideProps(settings.data.values, overrides, setOverrides)}
             />
           </div>
         )}

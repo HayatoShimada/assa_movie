@@ -1,31 +1,6 @@
 /** M15: プロジェクトテンプレート・プロジェクト設定・削除・クリップの縦変換UI */
-import { expect, test, type APIRequestContext } from '@playwright/test'
-
-const API = 'http://localhost:8001'
-
-async function reset(request: APIRequestContext) {
-  await request.post(`${API}/api/e2e/reset`)
-}
-
-async function seedTranscribed(
-  request: APIRequestContext,
-  orientation: 'landscape' | 'portrait' = 'landscape',
-): Promise<number> {
-  await reset(request)
-  const seed = await (
-    await request.post(`${API}/api/e2e/seed?output_orientation=${orientation}`)
-  ).json()
-  await request.post(`${API}/api/media/${seed.media_id}/jobs`, {
-    data: { type: 'transcribe_fake', params: {} },
-  })
-  await expect
-    .poll(
-      async () => (await (await request.get(`${API}/api/media/${seed.media_id}`)).json()).status,
-      { timeout: 15000 },
-    )
-    .toBe('transcribed')
-  return seed.media_id
-}
+import { expect, test } from '@playwright/test'
+import { API, reset, seedTranscribed } from './helpers'
 
 test('プロジェクト作成: テンプレート「横→縦」と設定の上書きが保存される', async ({
   page,

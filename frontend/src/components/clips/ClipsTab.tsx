@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { api } from '../../api/client'
 import { clipsApi, type Clip } from '../../api/clips'
 import { useJobProgress } from '../../hooks/useJobProgress'
+import { CONVERT_METHOD_LABELS } from '../../lib/catalogs'
 import { usePlayback } from '../../stores/playback'
 import { Button, ProgressBar, formatTime } from '../ui'
 import { ClipTimeline } from './ClipTimeline'
@@ -173,9 +174,11 @@ function ClipEditor({
           }
         >
           <option value="">プロジェクト既定</option>
-          <option value="crop">中央クロップ(位置調整可)</option>
-          <option value="blur_pad">ぼかし背景(全体表示)</option>
-          <option value="face">顔検出(1人=追従 / 2人=上下分割)</option>
+          {Object.entries(CONVERT_METHOD_LABELS).map(([id, label]) => (
+            <option key={id} value={id}>
+              {label}
+            </option>
+          ))}
         </select>
         {clip.convert_method === 'crop' && (
           <>
@@ -288,14 +291,11 @@ function ClipEditor({
 
 export function ClipsTab({
   mediaId,
-  onSubtitlePositionPreviewChange,
-  onSubtitleOffsetPreviewChange,
-  onConvertPreviewChange,
+  onSelectedClipChange,
 }: {
   mediaId: number
-  onSubtitlePositionPreviewChange?: (position: Clip['subtitle_position'] | null) => void
-  onSubtitleOffsetPreviewChange?: (offsetY: number | null) => void
-  onConvertPreviewChange?: (method: Clip['convert_method'], cropX: number | null) => void
+  /** プレビュー用に選択中のクリップを親へ通知する */
+  onSelectedClipChange?: (clip: Clip | null) => void
 }) {
   const queryClient = useQueryClient()
   const clips = useQuery({ queryKey: ['clips', mediaId], queryFn: () => clipsApi.list(mediaId) })
@@ -322,18 +322,8 @@ export function ClipsTab({
   const globalSubtitleOffsetY = Number(settings.data?.values.subtitle_offset_y ?? 0)
 
   useEffect(() => {
-    onSubtitlePositionPreviewChange?.(selected?.subtitle_position ?? null)
-    onSubtitleOffsetPreviewChange?.(selected?.subtitle_offset_y ?? null)
-    onConvertPreviewChange?.(selected?.convert_method ?? null, selected?.crop_x ?? null)
-  }, [
-    onConvertPreviewChange,
-    onSubtitleOffsetPreviewChange,
-    onSubtitlePositionPreviewChange,
-    selected?.convert_method,
-    selected?.crop_x,
-    selected?.subtitle_offset_y,
-    selected?.subtitle_position,
-  ])
+    onSelectedClipChange?.(selected ?? null)
+  }, [onSelectedClipChange, selected])
 
   return (
     <div className="flex h-full flex-col overflow-y-auto">

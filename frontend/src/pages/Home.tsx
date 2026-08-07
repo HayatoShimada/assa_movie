@@ -3,8 +3,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRef, useState } from 'react'
 import { api, type Media, type Project } from '../api/client'
 import { Button, Card, ProgressBar, formatTime } from '../components/ui'
-import { CreateProjectForm, TEMPLATES } from '../components/project/CreateProjectForm'
+import { CreateProjectForm } from '../components/project/CreateProjectForm'
 import { ProjectSettingsPanel } from '../components/project/ProjectSettingsPanel'
+import { templateFor } from '../lib/catalogs'
 import { useJobProgress } from '../hooks/useJobProgress'
 import { navigate } from '../hooks/useHashRoute'
 
@@ -71,18 +72,18 @@ function ProjectCard({ project }: { project: Project }) {
   const media = useQuery({
     queryKey: ['media', project.id],
     queryFn: () => api.listMedia(project.id),
-    // 文字起こし完了(status変化)を自動反映する。全件完了していれば止める
+    // 画面外(CLI・別タブ)で始まった文字起こしの完了も反映したいので緩く監視する。
+    // UIから始めたジョブはSSE完了時にinvalidateされるため、これは保険。
+    // 未処理のメディアが残っている間だけ回す(タブが非表示の間は自動で止まる)
     refetchInterval: (query) =>
-      (query.state.data ?? []).some((m) => m.status !== 'transcribed') ? 5000 : false,
+      (query.state.data ?? []).some((m) => m.status !== 'transcribed') ? 30000 : false,
   })
   const [showSettings, setShowSettings] = useState(false)
   const remove = useMutation({
     mutationFn: () => api.deleteProject(project.id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['projects'] }),
   })
-  const templateLabel = TEMPLATES.find(
-    (t) => t.input === project.input_orientation && t.output === project.output_orientation,
-  )?.label
+  const templateLabel = templateFor(project)?.label
   const [path, setPath] = useState('')
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const addMedia = useMutation({
@@ -113,10 +114,10 @@ function ProjectCard({ project }: { project: Project }) {
             {templateLabel}
           </span>
         )}
-        <span className="ml-auto" />
         <Button
           data-testid={`project-settings-${project.id}`}
           variant="ghost"
+          className="ml-auto"
           onClick={() => setShowSettings((s) => !s)}
         >
           設定

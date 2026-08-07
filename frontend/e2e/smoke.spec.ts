@@ -1,6 +1,5 @@
 import { expect, test } from '@playwright/test'
-
-const API = 'http://localhost:8001'
+import { API } from './helpers'
 
 /**
  * 基盤の疎通確認。UI実装後はここに画面操作のテストを足していく。

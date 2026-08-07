@@ -5,7 +5,7 @@
  * VRAM割当の変更と「VRAMに収まる最良のASR・LLM」のワンクリック適用を提供する。
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { api } from '../../api/client'
+import { api, machineQueryOptions } from '../../api/client'
 import { Button } from '../ui'
 
 const GB = (mb: number) => `${(mb / 1024).toFixed(1)}GB`
@@ -21,11 +21,17 @@ function Item({ label, value }: { label: string; value: React.ReactNode }) {
 
 export function EnvironmentPanel() {
   const queryClient = useQueryClient()
-  const env = useQuery({ queryKey: ['environment'], queryFn: api.getEnvironment })
+  const env = useQuery({
+    queryKey: ['environment'],
+    queryFn: api.getEnvironment,
+    ...machineQueryOptions,
+  })
+  const settings = useQuery({ queryKey: ['settings'], queryFn: api.getSettings })
   const update = useMutation({
     mutationFn: api.updateSettings,
     onSuccess: (data) => {
       queryClient.setQueryData(['settings'], data)
+      // 割当VRAMを変えると推奨も変わるので、この操作の後だけ再スキャンする
       queryClient.invalidateQueries({ queryKey: ['environment'] })
     },
   })
@@ -37,11 +43,9 @@ export function EnvironmentPanel() {
   const rec = e.recommendations
   const hasGpu = Boolean(e.gpu.name)
   const total = e.gpu.vram_total_mb ?? 0
-
-  const engineLabel: Record<string, string> = {
-    faster_whisper: 'faster-whisper',
-    transformers: 'transformers Whisper',
-  }
+  // エンジン名はバックエンドが返すラベルを使う(選択UIと表記を揃える)
+  const engineLabel =
+    settings.data?.asr_engines.find((x) => x.id === rec.asr_engine)?.label ?? rec.asr_engine
 
   return (
     <div
@@ -105,7 +109,7 @@ export function EnvironmentPanel() {
           この環境(利用可能 {hasGpu ? GB(e.effective_vram_mb) : 'CPU'})でのおすすめ:
         </p>
         <p data-testid="env-recommendation" className="mt-0.5">
-          ASR: {rec.asr_model}({engineLabel[rec.asr_engine] ?? rec.asr_engine})
+          ASR: {rec.asr_model}({engineLabel})
           {rec.ollama_model ? ` / LLM: ${rec.ollama_model}` : ''}
         </p>
         <Button

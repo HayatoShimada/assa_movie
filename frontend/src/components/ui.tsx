@@ -67,6 +67,10 @@ export function Card({ title, children }: { title: string; children: ReactNode }
   )
 }
 
+/** フォーム部品(select/input)の共通クラス */
+export const selectCls =
+  'rounded-md border border-neutral-300 bg-transparent px-2 py-1 text-sm dark:border-neutral-700 dark:bg-neutral-900'
+
 /** 秒を 1:23 / 1:02:03 形式にする */
 export function formatTime(seconds: number): string {
   const s = Math.floor(seconds)

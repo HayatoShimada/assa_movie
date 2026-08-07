@@ -1,6 +1,5 @@
 import { expect, test } from '@playwright/test'
-
-const API = 'http://localhost:8001'
+import { API } from './helpers'
 
 /** M5: ホーム画面 → 文字起こし → エディタ の画面操作テスト */
 test.beforeEach(async ({ request }) => {
