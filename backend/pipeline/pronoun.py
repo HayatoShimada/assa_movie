@@ -6,6 +6,7 @@ LLMは提案するだけで、適用は機械ガードを通過したものだ�
 """
 
 import difflib
+import re
 from dataclasses import dataclass, field
 
 # ---- 積極性(どの指示語を対象にするか) ----
@@ -88,7 +89,12 @@ BASE_PROMPT = """あなたは対談の文字起こしを校正する編集者で
 9. 参照先の語が同じ行の中に既に出ている場合は置き換えない(重複した文になるため)。
 10. 「編集対象」とマークされた行だけを編集する。「文脈(参照用)」の行は編集しない。
 11. referent には指している内容そのもの(名詞句)を書く。
-12. confidence は参照先が明白なら "auto"、迷いがあるなら "review" とする。
+    **replacement と referent に指示語(そのこと・それ・あの件 等)を使ってはいけない**。
+    具体的な内容が書けないなら編集を出さない。
+12. confidence の判定基準:
+    - "auto": 参照先が直前の2〜3行に明示されており、読み手の誰もが同じ解釈をする場合のみ
+    - "review": 参照先が離れている・要約や言い換えが必要・複数の解釈がありうる場合
+    迷ったら必ず "review" にする。
 13. 置き換えるべきものが無ければ {{"edits": []}} を返す。
 
 出力形式: {{"edits": [{{"line": 行番号, "original": "置換前", "replacement": "置換後",
@@ -181,6 +187,37 @@ def build_user_prompt(
     return "\n".join(parts)
 
 
+# 行頭の指示語(長いものから先にマッチさせる)
+_LEAD_DEMO = re.compile(
+    r"^(こういう|そういう|ああいう|こんな|そんな|あんな|あそこ|これ|それ|あれ|この|その|あの|ここ|そこ|こう|そう)"
+)
+# 「そのこと」「それ」など、指示語だけで構成され具体性のない語
+_DEMO_ONLY = re.compile(
+    r"^(これ|それ|あれ|この|その|あの|ここ|そこ|こう|そう|ああ)?(こと|もの|事|物|件|よう)?(を|が|は|に)?$"
+)
+
+
+def is_demonstrative_only(text: str) -> bool:
+    """指示語だけで具体的な内容を含まない語か(実測: qwen3が「これ→そのこと」を出す)"""
+    return bool(text) and bool(_DEMO_ONLY.match(text))
+
+
+def normalize_edit(edit: "EditProposal") -> "EditProposal | None":
+    """置換先が指示語のままの編集を補正する。
+
+    replacement が「そのこと」等でも referent が具体的なら referent を使う。
+    referent も指示語のままなら適用不能として None を返す。
+    """
+    if not is_demonstrative_only(edit.replacement):
+        return edit
+    if edit.referent and not is_demonstrative_only(edit.referent):
+        return EditProposal(
+            line=edit.line, original=edit.original, replacement=edit.referent,
+            referent=edit.referent, confidence="review",  # 補正したので必ずレビューに回す
+        )
+    return None
+
+
 def inserted_chunks(orig: str, repl: str) -> list[str]:
     """origをreplに変えたとき新たに挿入される文字列の一覧"""
     sm = difflib.SequenceMatcher(None, orig, repl)
@@ -247,8 +284,16 @@ def apply_edit(line_text: str, edit: EditProposal, form: str = "annotate") -> st
         return line_text.replace(
             edit.original, f"{edit.replacement}({referent})", 1
         )
-    # annotate(既定)
-    return line_text.replace(edit.original, f"{edit.original}({referent})", 1)
+    # annotate(既定): originalが「そこと矛盾した」のように指示語+助詞で始まる場合は
+    # 指示語の直後に注釈を入れる(「そこ(感受性)と矛盾した」)。
+    # 「この人」のような指示語+名詞は名詞ごと注釈する(「この人(稲見)」)。
+    m = _LEAD_DEMO.match(edit.original)
+    tail = edit.original[m.end():] if m else ""
+    if m and tail and tail[0] in "とがをはにでもへや、。":
+        annotated = f"{edit.original[: m.end()]}({referent}){tail}"
+    else:
+        annotated = f"{edit.original}({referent})"
+    return line_text.replace(edit.original, annotated, 1)
 
 
 def parse_edits(payload: dict) -> list[EditProposal]:

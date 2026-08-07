@@ -121,9 +121,19 @@ def run_resolve(
 
     # ---- 機械ガード → 保存 ----
     accepted = 0
-    for edit, line_range in proposals:
-        segment_id = id_by_line.get(edit.line)
+    for raw_edit, line_range in proposals:
+        segment_id = id_by_line.get(raw_edit.line)
         if segment_id is None:
+            continue
+        # 置換先が指示語のまま(「これ→そのこと」)なら referent で補正、不能なら却下
+        edit = pronoun.normalize_edit(raw_edit)
+        if edit is None:
+            conn.execute(
+                "INSERT INTO feedback (media_id, kind, before, after, note)"
+                " VALUES (?,'rejection',?,?,?)",
+                (media_id, raw_edit.original, raw_edit.replacement,
+                 "機械ガード: 参照先が指示語のまま具体的でない"),
+            )
             continue
         line_text = lines[edit.line - 1]
         v = pronoun.validate_edit(edit, line_text, level=level, line_range=line_range)
