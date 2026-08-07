@@ -10,10 +10,13 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    // バックエンドAPIへプロキシ。フロントは常に同一オリジンで /api を叩けばよい
+    // バックエンドAPIへプロキシ。フロントは常に同一オリジンで /api を叩く(CORS不要)。
+    // E2EはVITE_API_PORT=8001でFakeLLMバックエンドに向ける。
     proxy: {
-      '/api': { target: 'http://localhost:8000', changeOrigin: true },
-      '/media': { target: 'http://localhost:8000', changeOrigin: true },
+      '/api': {
+        target: `http://localhost:${process.env.VITE_API_PORT ?? 8000}`,
+        changeOrigin: true,
+      },
     },
   },
 })

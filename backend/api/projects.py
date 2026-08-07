@@ -6,6 +6,7 @@ import subprocess
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import FileResponse
 
 from backend.api.deps import get_db
 from backend.models.dto import Media, MediaCreate, Project, ProjectCreate
@@ -68,3 +69,23 @@ def list_media(project_id: int, db: sqlite3.Connection = Depends(get_db)):
         "SELECT * FROM media WHERE project_id=? ORDER BY id", (project_id,)
     ).fetchall()
     return [Media(**dict(r)) for r in rows]
+
+
+@router.get("/media/{media_id}", response_model=Media)
+def get_media(media_id: int, db: sqlite3.Connection = Depends(get_db)):
+    row = db.execute("SELECT * FROM media WHERE id=?", (media_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "メディアが見つかりません")
+    return Media(**dict(row))
+
+
+@router.get("/media/{media_id}/file")
+def get_media_file(media_id: int, db: sqlite3.Connection = Depends(get_db)):
+    """動画プレビュー用にメディアファイル本体を返す(Range対応はFileResponse任せ)"""
+    row = db.execute("SELECT path FROM media WHERE id=?", (media_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "メディアが見つかりません")
+    path = Path(row["path"])
+    if not path.exists():
+        raise HTTPException(404, f"ファイルが存在しません: {path}")
+    return FileResponse(path)

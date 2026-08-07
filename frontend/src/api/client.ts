@@ -13,9 +13,8 @@ export type Segment = components['schemas']['Segment']
 export type Edit = components['schemas']['Edit']
 export type Question = components['schemas']['Question']
 
-// E2Eでは別ポートのバックエンドを使うため差し替え可能にする
-const API_PORT = import.meta.env?.VITE_API_PORT
-export const API_BASE = API_PORT ? `http://localhost:${API_PORT}` : ''
+// 常に同一オリジン(Viteプロキシ経由)でAPIを叩く。CORS設定は不要
+export const API_BASE = ''
 
 export class ApiError extends Error {
   status: number
@@ -49,6 +48,7 @@ export const api = {
   listProjects: () => request<Project[]>('/api/projects'),
   createProject: (name: string) => post<Project>('/api/projects', { name }),
   listMedia: (projectId: number) => request<Media[]>(`/api/projects/${projectId}/media`),
+  getMedia: (mediaId: number) => request<Media>(`/api/media/${mediaId}`),
   addMedia: (projectId: number, path: string) =>
     post<Media>(`/api/projects/${projectId}/media`, { path }),
 

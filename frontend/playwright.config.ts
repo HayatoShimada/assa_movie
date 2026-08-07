@@ -8,7 +8,10 @@ import { defineConfig, devices } from '@playwright/test'
  */
 export default defineConfig({
   testDir: './e2e',
-  fullyParallel: false, // 単一バックエンドを共有するので直列実行
+  // 全テストが単一バックエンド(共有DB)を使うため、ファイル間も含め完全直列にする。
+  // workers: 1 が無いとファイル単位で並列になり、resetが互いのデータを消して壊れる
+  fullyParallel: false,
+  workers: 1,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? 'github' : [['html', { open: 'never' }], ['list']],

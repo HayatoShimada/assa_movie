@@ -11,11 +11,12 @@
 | M1 移植 | **完了** | 移植前goldenとbyte一致を確認(`pytest --run-gpu`で常時検証) |
 | M2 ジョブ基盤+API | **完了** | 実動画でcurl E2E確認済み(docs/verify_m2.md) |
 | M3 エンジン選択 | **完了** | large-v3既定 / turbo切替 + 設定API |
-| M4 指示語置換+HITL | **完了** | FakeLLMで学習ループ検証・質問機能含む |
-| M5 フロント骨格 | 未着手 | 次はここから |
-| M6〜M8 | 未着手 | |
+| M4 指示語置換+HITL | **完了** | FakeLLMで学習ループ検証・質問機能・Gemini API対応含む |
+| M5 フロント骨格 | **完了** | ホーム/エディタ/設定タブ・E2E 8件。実Geminiでの指示語解決も確認済み |
+| M6 レビューUI+対話 | 未着手 | 次はここから |
+| M7〜M8 | 未着手 | |
 
-テスト113件緑。実装済みAPIの一覧は `GET /openapi.json` で確認できる。
+テスト: backend 130件 / frontend unit 13件 / E2E 8件。APIの一覧は `GET /openapi.json`。
 
 ## 実装者(AI/人間)への共通ルール
 
