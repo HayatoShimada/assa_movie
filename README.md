@@ -139,9 +139,9 @@ AIで開発を続ける場合の規約は [CLAUDE.md](CLAUDE.md)。
 - 複数クリップの一括書き出しUIは未実装
 - Windows は未対応
 - 話者分離は2人の対談に最適化(3人以上は「話者N」表示)
-- ROCm環境ではASRがtransformers版Whisper(実時間比約4.4倍)になるため、
-  CUDA機のfaster-whisper比で低速・initial_prompt(フィラー忠実転写)非対応
-  (実測値は docs/verify_rocm.md 参照)
+- ROCm環境ではASRが公式Whisper(PyTorch版・実時間比約4.4倍)になる。
+  faster-whisperはCUDA専用ビルドのためAMD GPUでは使えない
+  (機能は同等。実測値は docs/verify_rocm.md 参照)
 
 ## ライセンス
 

@@ -9,8 +9,13 @@ authors = [
 requires-python = ">=3.12"
 dependencies = [
     "faster-whisper>=1.1.0",
-    # ROCm環境用ASRエンジン(CTranslate2がROCm非対応のためtransformers版Whisperを使う)
+    # ROCm環境用のASRエンジン。CTranslate2(faster-whisper)はCUDA専用ビルドのため
+    # AMD GPUでは使えず、PyTorchで動くWhisper実装に切り替える
     "transformers>=4.44",
+    # 公式Whisper。単語確率とinitial_promptが取れるのでROCmでも機能が揃う。
+    # 依存のtritonはNVIDIA版でpytorch-triton-rocmと同じモジュール名を奪うため、
+    # tool.uv.overrides で除外している(ROCm版が既に triton を提供する)
+    "openai-whisper>=20240930",
     # 顔検出(M14の縦型レイアウト)とフレーム抽出。ffmpeg同梱のheadless版。
     # OpenCV 5はCascadeClassifierと同梱Haarカスケードxmlが削除されているため4系固定
     "opencv-python-headless>=4.10,<5",
@@ -49,6 +54,9 @@ testpaths = ["tests"]
 [tool.uv]
 # 開発機がROCm(RX 7900系)のため既定でrocmグループを入れる
 default-groups = ["dev", "rocm"]
+# openai-whisperが要求するtritonはNVIDIA版。ROCmでは pytorch-triton-rocm が
+# 同名モジュールを提供済みで、二重に入れるとファイルが衝突する
+override-dependencies = ["triton; sys_platform == 'no-such-platform'"]
 # cu128とrocmは同時に入れられない(torchのwheelが排他)
 conflicts = [[{ group = "cu128" }, { group = "rocm" }]]
 

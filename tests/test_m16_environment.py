@@ -64,14 +64,14 @@ INSTALLED = [
 @pytest.mark.parametrize(
     "name, vram_mb, accel, expected_engine, expected_model, expected_llm",
     [
-        # 24GB ROCm機: transformers版large-v3(約10GB)+ qwen3:32b(22GB)…は
+        # 24GB ROCm機: 公式Whisper large-v3(約10GB)+ qwen3:32b(22GB)…は
         # 同時常駐しないため個別にフィット判定(ASRとLLMは直列実行)
-        ("24GB/ROCm", 24560, "rocm", "transformers", "large-v3", "qwen3:32b"),
+        ("24GB/ROCm", 24560, "rocm", "openai_whisper", "large-v3", "qwen3:32b"),
         ("24GB/CUDA", 24560, "cuda", "faster_whisper", "large-v3", "qwen3:32b"),
-        # 12GB: transformers large-v3(10GB)は載る。LLMは14bまで
-        ("12GB/ROCm", 12000, "rocm", "transformers", "large-v3", "qwen3:14b"),
-        # 8GB: transformersはturbo、LLMは8bまで
-        ("8GB/ROCm", 8000, "rocm", "transformers", "large-v3-turbo", "qwen3:8b"),
+        # 12GB: PyTorch版large-v3(10GB)は載る。LLMは14bまで
+        ("12GB/ROCm", 12000, "rocm", "openai_whisper", "large-v3", "qwen3:14b"),
+        # 8GB: PyTorch版はturbo、LLMは8bまで
+        ("8GB/ROCm", 8000, "rocm", "openai_whisper", "large-v3-turbo", "qwen3:8b"),
         # 6GB CUDA: faster-whisperならlarge-v3(5GB)が載る
         ("6GB/CUDA", 6000, "cuda", "faster_whisper", "large-v3", "なし"),
         # GPUなし: CPUのfaster-whisper。速度重視でturbo

@@ -42,17 +42,33 @@ uv run pytest -q --run-gpu  # golden検証(ASRがGPUで動くこと)
 6. クリップ書き出しが h264_vaapi で完走し、出力mp4が再生できること
    (vaapi不可の環境では自動で libx264 に落ちる)
 
-## 実測値(RX 7900 XTX / ROCm 7.2 / torch 2.8+rocm6.4, 2026-08-07)
+## 実測値(RX 7900 XTX / ROCm 7.2 / torch 2.8+rocm6.4, 2026-08-08)
 
-- ASR(transformers Whisper large-v3): モデルロード 7〜15秒、転写 実時間比 約4.4倍
-  (75分動画 ≈ 17分)。60秒スライス逐次処理でVRAMピーク一定
+### ASRエンジンの比較(同一音源・large-v3)
+
+| | **openai-whisper(既定)** | transformers |
+|---|---|---|
+| 転写速度 | 実時間比 3.9〜4.4倍 | 4.9倍 |
+| モデルロード | 6〜16秒 | 8秒 |
+| 単語の粒度 | 1.7文字 | 1.5文字 |
+| **単語確率** | **全単語で取得** | **取得できない** |
+| **句読点** | **あり**(「〜わけですよ。」) | **なし** |
+| initial_prompt | 対応 | 非対応 |
+
+speed は transformers がわずかに速いが、**句読点が出ないため字幕の文末分割が
+効かず**、単語確率も無いためフィラー自動判定のシグナルが1つ欠ける。
+機能が揃う openai-whisper を ROCm の既定にしている。
+
+### その他
+
 - 話者分離(pyannote): GPU実行でCPU比 約2.8倍(MIOpen迂回)
 - 書き出し: h264_vaapi ハードウェアエンコード動作確認済み
 
 ## 既知の制限(ROCm)
 
-- faster-whisper(CTranslate2)はROCm非対応 → transformersエンジンを使用
-- transformersエンジンは initial_prompt(フィラー忠実転写の文体例)非対応
+- faster-whisper(CTranslate2)は**CUDA専用ビルド**でAMD GPUでは初期化に失敗する
+  (`CUDA driver version is insufficient`)。PyTorch実装のWhisperに切り替えて回避
+- transformersエンジンを明示選択した場合は initial_prompt と単語確率が使えない
 - 通常メモリ→GPU転送が約0.2GB/sと極端に遅い環境がある(IOMMU起因の可能性)。
   アプリはpinnedメモリ経由でロードするため影響を回避済みだが、システム全体を
   改善したい場合はGRUBのカーネルオプションに `iommu=pt` を追加して再起動

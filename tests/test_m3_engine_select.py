@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from backend.core.config import Settings
 from backend.engines.asr.fasterwhisper import FasterWhisperEngine
 from backend.engines.asr.registry import DEFAULT_MODEL, ENGINES, MODELS, build_engine
+from backend.engines.asr.openai_whisper import OpenAIWhisperEngine
 from backend.engines.asr.transformers_whisper import TransformersWhisperEngine
 
 
@@ -36,8 +37,8 @@ def test_build_engine_uses_configured_model(monkeypatch):
     [
         # CUDA: faster-whisper float16(従来どおり)
         ("cuda", FasterWhisperEngine, "cuda", "float16"),
-        # ROCm: CTranslate2非対応のためtransformers版(HIPはcudaを名乗る)
-        ("rocm", TransformersWhisperEngine, "cuda", None),
+        # ROCm: CTranslate2非対応のため公式Whisper(HIPはcudaを名乗る)
+        ("rocm", OpenAIWhisperEngine, "cuda", None),
         # GPUなし: faster-whisperのCPU int8(int8クラッシュはBlackwell GPU限定)
         ("cpu", FasterWhisperEngine, "cpu", "int8"),
     ],

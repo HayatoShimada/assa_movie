@@ -5,7 +5,10 @@ PyTorch(HIP)で動くtransformersのWhisperを使う(DESIGN.md「制約」参照
 
 制限(faster-whisperとの差分):
 - initial_prompt 非対応(transformersのprompt_ids対応が不安定なため無視してログのみ)
-- 進捗はセグメント単位で出せないため開始・完了の粗い通知のみ
+- 単語確率(probability)が取れない。フィラー判定のシグナルが1つ減る
+- 進捗は60秒スライス単位
+
+これらが必要な場合は openai_whisper エンジン(公式実装)を使う。
 """
 
 import logging
@@ -29,6 +32,18 @@ MAX_SEGMENT_CHARS = 30
 # 長尺はこの秒数で分割して逐次処理する(ピークVRAMを一定に保つ+進捗が細かくなる)。
 # 60秒=約2〜3チャンクはバッチ4でも24GBに収まることを実測済み
 SLICE_SEC = 60
+
+
+def full_language_name(language: str | None) -> str | None:
+    """ISOコード("ja")を言語名("japanese")に直す。未知の値はそのまま返す"""
+    if not language:
+        return None
+    try:
+        from transformers.models.whisper.tokenization_whisper import LANGUAGES
+    except ImportError:
+        return language
+    key = language.lower()
+    return LANGUAGES.get(key, key)
 
 
 def chunks_to_words(chunks: list[dict]) -> list[Word]:
@@ -146,6 +161,12 @@ class TransformersWhisperEngine:
         generate_kwargs = {"task": "transcribe"}
         if language:
             generate_kwargs["language"] = language
+        # 単語の切り出しは言語を「フルネーム」で判定する実装になっており、
+        # ISOコード("ja")のままだと空白分割になる。日本語は空白が無いので
+        # 発話全体が1単語になってしまうため、必ず名称("japanese")を渡す
+        # (transformers/models/whisper/tokenization_whisper.py の
+        #  _combine_tokens_into_words 参照)
+        pipe.tokenizer.language = full_language_name(language)
 
         def run(piece):
             # batch_size>1はROCm実測で速度向上せずVRAMだけ消費(単語TSの注意重み保持が

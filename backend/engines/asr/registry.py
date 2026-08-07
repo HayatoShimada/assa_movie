@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from backend.core.device import detect_accel
 from backend.engines.asr.base import ASREngine
 from backend.engines.asr.fasterwhisper import FasterWhisperEngine
+from backend.engines.asr.openai_whisper import OpenAIWhisperEngine
 from backend.engines.asr.transformers_whisper import TransformersWhisperEngine
 
 
@@ -25,12 +26,14 @@ class ModelInfo:
     word_timestamps: bool
     hf_id: str = ""   # transformersエンジンで使うHugging FaceのモデルID
     vram_fw_mb: int = 0  # faster-whisper(float16)でのVRAM目安
-    vram_tf_mb: int = 0  # transformers(float16)でのVRAM目安
+    vram_tf_mb: int = 0  # PyTorch系(公式/transformers、float16)でのVRAM目安
     note: str = ""
 
     def vram_mb(self, engine: str) -> int:
         """指定エンジンで動かしたときのVRAM目安(推奨判定と選択UIで共用)"""
-        return self.vram_tf_mb if engine == "transformers" else self.vram_fw_mb
+        # PyTorch実装は重みに加えて注意重み等を持つため目安が大きい
+        torch_engines = ("transformers", "openai_whisper")
+        return self.vram_tf_mb if engine in torch_engines else self.vram_fw_mb
 
 
 MODELS: dict[str, ModelInfo] = {
@@ -61,7 +64,8 @@ DEFAULT_MODEL = "large-v3"
 ENGINES: dict[str, str] = {
     "auto": "自動(GPUに合わせて選択)",
     "faster_whisper": "faster-whisper(CUDA/CPU)",
-    "transformers": "transformers Whisper(ROCm/CUDA)",
+    "openai_whisper": "公式Whisper(ROCm/CUDA)",
+    "transformers": "transformers Whisper(単語確率なし)",
 }
 
 
@@ -69,8 +73,9 @@ def resolve_engine(engine_id: str, accel: str) -> str:
     """`auto` を実際のエンジンに解決する(実行と推奨表示で同じ規則を使う)"""
     if engine_id != "auto":
         return engine_id
-    # CTranslate2はROCm非対応なのでROCmではtransformers版を使う
-    return "transformers" if accel == "rocm" else "faster_whisper"
+    # CTranslate2(faster-whisper)はCUDA専用ビルドなのでROCmでは公式Whisperを使う。
+    # 公式版なら単語確率とinitial_promptも取れ、CUDA機と機能が揃う
+    return "openai_whisper" if accel == "rocm" else "faster_whisper"
 
 
 def build_engine(settings) -> ASREngine:
@@ -87,11 +92,18 @@ def build_engine(settings) -> ASREngine:
     accel = detect_accel()
     engine_id = resolve_engine(settings.asr_engine, accel)
 
+    # ROCmのHIPはtorch上で"cuda"を名乗るのでそのまま渡す
+    torch_device = "cuda" if accel in ("cuda", "rocm") else "cpu"
+    if engine_id == "openai_whisper":
+        return OpenAIWhisperEngine(
+            model_size=settings.asr_model,
+            device=torch_device,
+            beam_size=settings.asr_beam_size,
+        )
     if engine_id == "transformers":
         return TransformersWhisperEngine(
             model_id=MODELS[settings.asr_model].hf_id,
-            # ROCmのHIPはtorch上で"cuda"を名乗るのでそのまま渡す
-            device="cuda" if accel in ("cuda", "rocm") else "cpu",
+            device=torch_device,
         )
 
     # CTranslate2はROCm非対応のため、rocm/cpuともCPU実行にフォールバック

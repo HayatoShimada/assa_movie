@@ -50,7 +50,9 @@ def get_environment() -> dict:
             "fits": (not has_gpu) or vram <= effective,
         }
         for m in MODELS.values()
-        for engine, vram in (("faster_whisper", m.vram_fw_mb), ("transformers", m.vram_tf_mb))
+        for engine in ENGINES
+        if engine != "auto"
+        for vram in [m.vram_mb(engine)]
     ]
     ollama_options = [
         {**m, "fits": has_gpu and m["vram_mb"] <= effective}

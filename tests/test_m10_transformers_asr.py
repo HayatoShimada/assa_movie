@@ -11,6 +11,7 @@ from backend.engines.asr.base import Word
 from backend.engines.asr.transformers_whisper import (
     TransformersWhisperEngine,
     chunks_to_words,
+    full_language_name,
     words_to_segments,
 )
 
@@ -99,14 +100,44 @@ def test_words_to_segments_keeps_word_timestamps():
 
 # ---- エンジン統合(Fake pipeline注入) ----
 
+class FakeTokenizer:
+    language = None
+
+
 class FakePipe:
     def __init__(self, output):
         self.output = output
         self.calls = []
+        self.tokenizer = FakeTokenizer()
 
     def __call__(self, audio, **kwargs):
         self.calls.append(kwargs)
         return self.output
+
+
+# ---- 言語名の解決(単語分割が壊れた原因) ----
+
+@pytest.mark.parametrize(
+    "given, expected",
+    [
+        ("ja", "japanese"),   # ISOコードのままだと空白分割になり日本語が1単語になる
+        ("JA", "japanese"),
+        ("en", "english"),
+        ("japanese", "japanese"),  # 既に名称ならそのまま
+        ("xx", "xx"),         # 未知の値は触らない
+        (None, None),
+    ],
+)
+def test_full_language_name(given, expected):
+    assert full_language_name(given) == expected
+
+
+def test_transcribe_sets_tokenizer_language_to_full_name():
+    """回帰: tokenizer.languageが"ja"のままだと日本語が分割されない"""
+    fake = FakePipe({"text": "はい", "chunks": [{"text": "はい", "timestamp": (0.0, 0.5)}]})
+    engine = TransformersWhisperEngine(pipeline_factory=lambda: fake)
+    engine.transcribe(np.zeros(16000, dtype=np.float32), language="ja")
+    assert fake.tokenizer.language == "japanese"
 
 
 def test_engine_transcribe_with_fake_pipeline():
