@@ -8,12 +8,56 @@ transformers版との違い: あちらは単語確率が取れず initial_prompt
 出力形状はfaster-whisperとほぼ同じなので、CUDA機とROCm機で挙動が揃う。
 """
 
+import contextlib
+import io
+
 import numpy as np
 
 from backend.core.device import detect_accel
 from backend.engines.asr.base import ProgressFn, Segment, TranscribeResult, Word
 
 SAMPLE_RATE = 16000
+# 進捗の配分: 転写本体を2%〜99%に割り当てる(残りは呼び出し側の前後処理)
+PROGRESS_START = 0.02
+PROGRESS_END = 0.99
+
+
+@contextlib.contextmanager
+def _progress_via_tqdm(progress: ProgressFn | None):
+    """whisperが内部で使う進捗バーを横取りして呼び出し側へ流す。
+
+    公式実装は進捗コールバックを持たず、`tqdm` に処理済みフレーム数を
+    報告するだけなので、そのtqdmを差し替えて割合を取り出す
+    (whisper/transcribe.py の `with tqdm.tqdm(total=content_frames...) as pbar`)。
+    """
+    if progress is None:
+        yield
+        return
+    # whisper/__init__.py が同名の関数で submodule を隠すため importlib で取る
+    import importlib
+
+    wt = importlib.import_module("whisper.transcribe")
+    original = wt.tqdm.tqdm
+
+    class _Relay(original):
+        def __init__(self, *args, **kwargs):
+            # 無効化されたtqdmは内部カウンタを更新しないので必ず有効にし、
+            # 出力は捨てる(サーバーのログをバーで埋めないため)
+            kwargs["disable"] = False
+            kwargs["file"] = io.StringIO()
+            super().__init__(*args, **kwargs)
+
+        def update(self, n=1):
+            super().update(n)
+            if self.total:
+                done = min(self.n / self.total, 1.0)
+                progress(PROGRESS_START + (PROGRESS_END - PROGRESS_START) * done)
+
+    wt.tqdm.tqdm = _Relay
+    try:
+        yield
+    finally:
+        wt.tqdm.tqdm = original
 
 
 def to_segments(raw_segments: list[dict]) -> list[Segment]:
@@ -89,16 +133,17 @@ class OpenAIWhisperEngine:
     ) -> TranscribeResult:
         model = self.load()
         if progress:
-            progress(0.02)  # モデルロード後すぐ動き出したことを知らせる
-        result = model.transcribe(
-            audio,
-            language=language,
-            beam_size=self.beam_size,
-            word_timestamps=True,  # 話者割り当て・字幕同期・フィラー判定に必要
-            initial_prompt=initial_prompt,
-            fp16=self.device != "cpu",
-            verbose=None,
-        )
+            progress(PROGRESS_START)  # モデルロード後すぐ動き出したことを知らせる
+        with _progress_via_tqdm(progress):
+            result = model.transcribe(
+                audio,
+                language=language,
+                beam_size=self.beam_size,
+                word_timestamps=True,  # 話者割り当て・字幕同期・フィラー判定に必要
+                initial_prompt=initial_prompt,
+                fp16=self.device != "cpu",
+                verbose=None,  # セグメントの逐次表示は不要(進捗は上で横取りする)
+            )
         if progress:
             progress(1.0)
         return TranscribeResult(

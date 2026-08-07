@@ -79,6 +79,30 @@ def test_transcribe_requests_word_timestamps_and_prompt():
     assert progressed and progressed[-1] == 1.0
 
 
+def test_progress_is_relayed_from_internal_tqdm():
+    """公式実装は進捗コールバックを持たないので、内部の進捗バーを横取りする"""
+    import importlib
+
+    wt = importlib.import_module("whisper.transcribe")
+    reported = []
+
+    class TqdmUsingModel(FakeModel):
+        def transcribe(self, audio, **kwargs):
+            # whisper本体と同じ使い方で進捗バーを回す
+            with wt.tqdm.tqdm(total=100, disable=True) as pbar:
+                pbar.update(50)
+                pbar.update(50)
+            return super().transcribe(audio, **kwargs)
+
+    engine = OpenAIWhisperEngine(model_factory=TqdmUsingModel)
+    engine.transcribe(np.zeros(16000, dtype=np.float32), progress=reported.append)
+
+    assert 0.4 < reported[1] < 0.6, reported  # 半分でおよそ50%
+    assert reported[-1] == 1.0
+    # 差し替えたtqdmは必ず元に戻す(他の処理の進捗表示を壊さない)
+    assert wt.tqdm.tqdm.__name__ == "tqdm"
+
+
 def test_cpu_disables_fp16():
     fake = FakeModel()
     engine = OpenAIWhisperEngine(device="cpu", model_factory=lambda: fake)
