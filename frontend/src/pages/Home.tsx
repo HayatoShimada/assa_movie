@@ -71,6 +71,9 @@ function ProjectCard({ project }: { project: Project }) {
   const media = useQuery({
     queryKey: ['media', project.id],
     queryFn: () => api.listMedia(project.id),
+    // 文字起こし完了(status変化)を自動反映する。全件完了していれば止める
+    refetchInterval: (query) =>
+      (query.state.data ?? []).some((m) => m.status !== 'transcribed') ? 5000 : false,
   })
   const [showSettings, setShowSettings] = useState(false)
   const remove = useMutation({
