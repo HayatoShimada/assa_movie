@@ -28,7 +28,7 @@ import sys
 from pathlib import Path
 
 from backend.core.config import settings
-from backend.engines.llm.ollama import build_client
+from backend.engines.llm.registry import build_client
 from backend.pipeline import pronoun
 
 

@@ -8,7 +8,7 @@ from typing import Callable
 
 from backend.core.config import settings
 from backend.engines.llm.base import LLMClient
-from backend.engines.llm.ollama import build_client
+from backend.engines.llm.registry import build_client
 from backend.jobs.queue import register
 from backend.pipeline import pronoun
 

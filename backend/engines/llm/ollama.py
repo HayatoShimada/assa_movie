@@ -42,14 +42,3 @@ class OllamaClient:
                 last_error = e
                 time.sleep(2)
         raise LLMError(f"Ollama呼び出しに{self.retries}回失敗: {last_error}")
-
-
-def build_client(settings):
-    """設定からLLMクライアントを組み立てる"""
-    if settings.llm_provider == "ollama":
-        return OllamaClient(
-            url=settings.ollama_url,
-            model=settings.ollama_model,
-            retries=settings.llm_retries,
-        )
-    raise ValueError(f"未対応のLLMプロバイダ: {settings.llm_provider}")

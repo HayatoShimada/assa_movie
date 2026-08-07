@@ -3,6 +3,20 @@
 [DESIGN.md](DESIGN.md) / [BACKEND_DESIGN.md](BACKEND_DESIGN.md) / [FRONTEND_DESIGN.md](FRONTEND_DESIGN.md) を実装するための計画。
 **各タスクは小さく・受け入れ基準付き・検証コマンド付き**で定義し、設計判断を実装時に持ち越さない。
 
+## 進捗(2026-08-07時点)
+
+| M | 状態 | 備考 |
+|---|---|---|
+| M0 足場 | **完了** | FastAPI起動・SQLite 12テーブル・設定 |
+| M1 移植 | **完了** | 移植前goldenとbyte一致を確認(`pytest --run-gpu`で常時検証) |
+| M2 ジョブ基盤+API | **完了** | 実動画でcurl E2E確認済み(docs/verify_m2.md) |
+| M3 エンジン選択 | **完了** | large-v3既定 / turbo切替 + 設定API |
+| M4 指示語置換+HITL | **完了** | FakeLLMで学習ループ検証・質問機能含む |
+| M5 フロント骨格 | 未着手 | 次はここから |
+| M6〜M8 | 未着手 | |
+
+テスト113件緑。実装済みAPIの一覧は `GET /openapi.json` で確認できる。
+
 ## 実装者(AI/人間)への共通ルール
 
 1. **設計書が正** — 迷ったら設計書の該当節に従う。設計書にない判断が必要になったら、実装せずTODOコメントと質問を残す

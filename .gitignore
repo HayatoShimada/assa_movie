@@ -25,3 +25,12 @@ hf_token.txt
 
 # 生成されるDB
 whisper.db
+# フロントエンド
+node_modules/
+frontend/dist/
+frontend/.openapi.json
+frontend/playwright-report/
+frontend/test-results/
+
+# APIキー
+gemini_api_key.txt

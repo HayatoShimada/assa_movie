@@ -56,9 +56,11 @@ class Settings(BaseSettings):
     subtitle_max_lines: int = 2
 
     # ---- LLM ----
-    llm_provider: str = "ollama"  # ollama | anthropic
+    llm_provider: str = "ollama"  # ollama | gemini
     ollama_url: str = "http://localhost:11434/api/chat"
     ollama_model: str = "qwen3:32b"
+    gemini_model: str = "gemini-3.5-flash"
+    gemini_key_file: Path = PROJECT_ROOT / "gemini_api_key.txt"
     llm_chunk_size: int = 30
     llm_context_size: int = 15
 
