@@ -1,0 +1,31 @@
+[project]
+name = "whisper-local"
+version = "0.1.0"
+description = "faster-whisper による ローカル文字起こし (RTX PRO 6000 Blackwell / CUDA 12.8)"
+readme = "README.md"
+authors = [
+    { name = "HayatoShimada", email = "hayato.shimada.ze@nachi.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    # pyannote-audio 3.x はtorchaudio 2.9以降の削除APIに依存しているため2.8系に固定
+    # (2.8+cu128はBlackwell/sm_120対応済み)
+    "torch==2.8.*",
+    "torchaudio==2.8.*",
+    "faster-whisper>=1.1.0",
+    # 4.x系は同意済みでないpyannote/speaker-diarization-community-1を要求するため3.x系に固定
+    "pyannote-audio>=3.3,<4",
+    # pyannote-audio 3.x はhuggingface_hub 1.0で削除されたuse_auth_token引数を使うため0.x系に固定
+    "huggingface-hub<1.0",
+    # resolve_pronouns.py がOllama APIを叩くのに使用
+    "requests>=2.31",
+]
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu128" }
+torchaudio = { index = "pytorch-cu128" }
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
