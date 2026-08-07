@@ -24,6 +24,10 @@ SENTENCE_END = ("。", "?", "!", "?", "!")
 # 句読点もポーズも無い発話が続く場合の強制分割(字幕1枚に収まる長さ)
 MAX_SEGMENT_SEC = 8.0
 MAX_SEGMENT_CHARS = 30
+# パイプラインは単語タイムスタンプ用の注意重みを音声全体分GPUに貯め込むため、
+# 長尺はこの秒数で分割して逐次処理する(ピークVRAMを一定に保つ+進捗が細かくなる)。
+# 60秒=約2〜3チャンクはバッチ4でも24GBに収まることを実測済み
+SLICE_SEC = 60
 
 
 def chunks_to_words(chunks: list[dict]) -> list[Word]:
@@ -83,12 +87,10 @@ class TransformersWhisperEngine:
         self,
         model_id: str = "openai/whisper-large-v3",
         device: str = "cuda",
-        batch_size: int = 1,  # 30秒チャンクの並列数(VRAMに応じてregistryが決める)
         pipeline_factory=None,  # テスト用の差し替え口
     ):
         self.model_id = model_id
         self.device = device
-        self.batch_size = max(1, int(batch_size))
         self._pipeline_factory = pipeline_factory
         self._pipe = None
 
@@ -98,12 +100,31 @@ class TransformersWhisperEngine:
                 self._pipe = self._pipeline_factory()
             else:
                 import torch
-                from transformers import pipeline
+                from transformers import (
+                    AutoModelForSpeechSeq2Seq,
+                    AutoProcessor,
+                    pipeline,
+                )
 
+                dtype = torch.float16 if self.device != "cpu" else torch.float32
+                model = AutoModelForSpeechSeq2Seq.from_pretrained(
+                    self.model_id, dtype=dtype, low_cpu_mem_usage=True
+                )
+                if self.device != "cpu":
+                    # 通常メモリ→GPUの転送はIOMMU構成によっては1回0.5秒超の
+                    # オーバーヘッドがあり、約1000テンソルのロードが数分かかる
+                    # (RX 7900 XTX実測)。page-locked経由なら数秒で済む
+                    for p in model.parameters():
+                        p.data = p.data.pin_memory()
+                    for b in model.buffers():
+                        b.data = b.data.pin_memory()
+                model.to(self.device)
+                processor = AutoProcessor.from_pretrained(self.model_id)
                 self._pipe = pipeline(
                     "automatic-speech-recognition",
-                    model=self.model_id,
-                    torch_dtype=torch.float16 if self.device != "cpu" else torch.float32,
+                    model=model,
+                    tokenizer=processor.tokenizer,
+                    feature_extractor=processor.feature_extractor,
                     device=self.device,
                 )
         return self._pipe
@@ -119,18 +140,31 @@ class TransformersWhisperEngine:
             logger.info("transformersエンジンはinitial_promptに未対応のため無視します")
         pipe = self.load()
         if progress:
-            progress(0.05)
+            progress(0.02)
         generate_kwargs = {"task": "transcribe"}
         if language:
             generate_kwargs["language"] = language
-        out = pipe(
-            {"array": audio, "sampling_rate": SAMPLE_RATE},
-            return_timestamps="word",
-            chunk_length_s=30,
-            batch_size=self.batch_size,  # 長尺はチャンク並列で数倍速くなる
-            generate_kwargs=generate_kwargs,
-        )
-        words = chunks_to_words(out.get("chunks") or [])
+
+        def run(piece):
+            # batch_size>1はROCm実測で速度向上せずVRAMだけ消費(単語TSの注意重み保持が
+            # バッチ分増えるため)。batch=1+60秒スライスが最速かつOOMしない
+            return pipe(
+                {"array": piece, "sampling_rate": SAMPLE_RATE},
+                return_timestamps="word",
+                chunk_length_s=30,
+                generate_kwargs=generate_kwargs,
+            )
+
+        step = SLICE_SEC * SAMPLE_RATE
+        starts = list(range(0, max(1, len(audio)), step))
+        words: list[Word] = []
+        for i, start in enumerate(starts):
+            out = run(audio[start:start + step])
+            offset = start / SAMPLE_RATE
+            for w in chunks_to_words(out.get("chunks") or []):
+                words.append(Word(start=w.start + offset, end=w.end + offset, text=w.text))
+            if progress:
+                progress(0.02 + 0.98 * (i + 1) / len(starts))
         segments = words_to_segments(words)
         if progress:
             progress(1.0)

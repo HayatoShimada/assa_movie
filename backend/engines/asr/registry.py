@@ -11,7 +11,7 @@
 
 from dataclasses import dataclass
 
-from backend.core.device import detect_accel, gpu_info
+from backend.core.device import detect_accel
 from backend.engines.asr.base import ASREngine
 from backend.engines.asr.fasterwhisper import FasterWhisperEngine
 from backend.engines.asr.transformers_whisper import TransformersWhisperEngine
@@ -61,20 +61,6 @@ ENGINES: dict[str, str] = {
 }
 
 
-def _transformers_batch_size(settings) -> int:
-    """割当VRAMに応じて30秒チャンクの並列数を決める(長尺の処理速度に直結)"""
-    total = gpu_info().get("vram_total_mb", 0)
-    budget = int(getattr(settings, "vram_budget_mb", 0) or 0)
-    effective = min(budget, total) if budget > 0 else total
-    if effective >= 16000:
-        return 8
-    if effective >= 10000:
-        return 4
-    if effective >= 6500:
-        return 2
-    return 1
-
-
 def build_engine(settings) -> ASREngine:
     """設定からASRエンジンを組み立てる"""
     if settings.asr_model not in MODELS:
@@ -96,7 +82,6 @@ def build_engine(settings) -> ASREngine:
             model_id=MODELS[settings.asr_model].hf_id,
             # ROCmのHIPはtorch上で"cuda"を名乗るのでそのまま渡す
             device="cuda" if accel in ("cuda", "rocm") else "cpu",
-            batch_size=_transformers_batch_size(settings),
         )
 
     if accel == "cuda":

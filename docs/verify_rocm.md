@@ -42,8 +42,20 @@ uv run pytest -q --run-gpu  # golden検証(ASRがGPUで動くこと)
 6. クリップ書き出しが h264_vaapi で完走し、出力mp4が再生できること
    (vaapi不可の環境では自動で libx264 に落ちる)
 
+## 実測値(RX 7900 XTX / ROCm 7.2 / torch 2.8+rocm6.4, 2026-08-07)
+
+- ASR(transformers Whisper large-v3): モデルロード 7〜15秒、転写 実時間比 約4.4倍
+  (75分動画 ≈ 17分)。60秒スライス逐次処理でVRAMピーク一定
+- 話者分離(pyannote): GPU実行でCPU比 約2.8倍(MIOpen迂回)
+- 書き出し: h264_vaapi ハードウェアエンコード動作確認済み
+
 ## 既知の制限(ROCm)
 
 - faster-whisper(CTranslate2)はROCm非対応 → transformersエンジンを使用
 - transformersエンジンは initial_prompt(フィラー忠実転写の文体例)非対応
-- transformersエンジンの進捗表示は粗い(開始→完了のみ)
+- 通常メモリ→GPU転送が約0.2GB/sと極端に遅い環境がある(IOMMU起因の可能性)。
+  アプリはpinnedメモリ経由でロードするため影響を回避済みだが、システム全体を
+  改善したい場合はGRUBのカーネルオプションに `iommu=pt` を追加して再起動
+  (`/etc/default/grub` の GRUB_CMDLINE_LINUX_DEFAULT → `sudo update-grub`)
+- ROCm 6.2 SDK等の追加インストールは不要(torch wheelがランタイム同梱。
+  システムROCm 7.2と混ぜるとaptの依存が壊れるため入れないこと)

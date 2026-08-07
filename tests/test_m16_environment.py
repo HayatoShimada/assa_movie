@@ -136,28 +136,6 @@ def test_scan_ollama_unreachable(monkeypatch):
     assert out == {"reachable": False, "models": []}
 
 
-# ---- transformersのバッチサイズ(VRAM連動) ----
-
-@pytest.mark.parametrize(
-    "total_mb, budget_mb, expected",
-    [
-        (24560, 0, 8),      # 24GB自動 → バッチ8
-        (24560, 12000, 4),  # 割当12GB → バッチ4
-        (8000, 0, 2),
-        (4000, 0, 1),
-        (0, 0, 1),          # GPU情報なし
-    ],
-)
-def test_transformers_batch_size_table(monkeypatch, total_mb, budget_mb, expected):
-    from backend.engines.asr import registry
-
-    monkeypatch.setattr(
-        registry, "gpu_info", lambda: {"vram_total_mb": total_mb} if total_mb else {}
-    )
-    s = SimpleNamespace(vram_budget_mb=budget_mb)
-    assert registry._transformers_batch_size(s) == expected
-
-
 # ---- API ----
 
 def test_environment_api_shape(client):
