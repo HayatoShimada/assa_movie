@@ -35,10 +35,18 @@ def run_export_job(
         raise ValueError("endはstartより大きい必要があります")
     burn = bool(params.get("burn_subtitles", True))
 
+    # クリップ相対時刻の中抜き区間(絶対時刻で来るのでオフセットする)
+    cuts = [
+        (max(0.0, c["start"] - start), min(end, c["end"]) - start)
+        for c in params.get("cuts", [])
+        if c["end"] > start and c["start"] < end
+    ]
+
     out_dir = input_path.parent / "exports"
     out_dir.mkdir(exist_ok=True)
     base = input_path.stem
-    out_path = out_dir / f"{base}_{int(start)}s-{int(end)}s.mp4"
+    suffix = f"_clip{params['clip_id']}" if params.get("clip_id") else ""
+    out_path = out_dir / f"{base}_{int(start)}s-{int(end)}s{suffix}.mp4"
 
     # ---- 字幕(ASS)生成 ----
     ass_path = None
@@ -67,7 +75,7 @@ def run_export_job(
     progress(0.05)
 
     # ---- ffmpeg実行 ----
-    cmd = export_mod.build_export_cmd(input_path, out_path, start, end, ass_path)
+    cmd = export_mod.build_export_cmd(input_path, out_path, start, end, ass_path, cuts=cuts)
     export_mod.run_export(cmd, duration=end - start, progress=lambda p: progress(0.05 + p * 0.94))
 
     conn.execute(
@@ -75,5 +83,9 @@ def run_export_job(
         " AND status='running'",
         (json.dumps({"path": str(out_path)}, ensure_ascii=False), media_id),
     )
+    if params.get("clip_id"):
+        conn.execute(
+            "UPDATE clips SET status='exported' WHERE id=?", (params["clip_id"],)
+        )
     conn.commit()
     progress(1.0)

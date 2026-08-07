@@ -391,6 +391,120 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/media/{media_id}/clips": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Clips */
+        get: operations["list_clips_api_media__media_id__clips_get"];
+        put?: never;
+        /** Create Clip */
+        post: operations["create_clip_api_media__media_id__clips_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/clips/{clip_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Clip */
+        delete: operations["delete_clip_api_clips__clip_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Clip */
+        patch: operations["update_clip_api_clips__clip_id__patch"];
+        trace?: never;
+    };
+    "/api/clips/{clip_id}/jetcut": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Jetcut
+         * @description 中抜き(ジェットカット)提案: 無音区間(ffmpeg silencedetect)+相槌セグメント
+         */
+        post: operations["jetcut_api_clips__clip_id__jetcut_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/clip_cuts/{cut_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Toggle Cut */
+        patch: operations["toggle_cut_api_clip_cuts__cut_id__patch"];
+        trace?: never;
+    };
+    "/api/clips/{clip_id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resolve Clip
+         * @description クリップ文脈の指示語自己完結化。切り抜くと前の文脈が消えるため、
+         *     クリップ内だけで意味が通るように指示語を解決する(M4の機構を再利用)
+         */
+        post: operations["resolve_clip_api_clips__clip_id__resolve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/clips/{clip_id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Export Clip
+         * @description クリップを書き出す(有効な中抜きを反映)
+         */
+        post: operations["export_clip_api_clips__clip_id__export_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -448,6 +562,72 @@ export interface components {
              * @default
              */
             notes: string;
+        };
+        /** Clip */
+        Clip: {
+            /** Id */
+            id: number;
+            /** Media Id */
+            media_id: number;
+            /** Start */
+            start: number;
+            /** End */
+            end: number;
+            /** Title */
+            title?: string | null;
+            /** Hook Text */
+            hook_text?: string | null;
+            /** Score */
+            score?: number | null;
+            /**
+             * Score Reasons
+             * @default []
+             */
+            score_reasons: string[];
+            /**
+             * Layout
+             * @default landscape
+             */
+            layout: string;
+            /** Target Duration */
+            target_duration?: number | null;
+            /** Meta */
+            meta?: {
+                [key: string]: unknown;
+            } | null;
+            /** Status */
+            status: string;
+            /**
+             * Cuts
+             * @default []
+             */
+            cuts: {
+                [key: string]: unknown;
+            }[];
+        };
+        /** ClipCreate */
+        ClipCreate: {
+            /** Start */
+            start: number;
+            /** End */
+            end: number;
+            /** Title */
+            title?: string | null;
+        };
+        /** ClipUpdate */
+        ClipUpdate: {
+            /** Start */
+            start?: number | null;
+            /** End */
+            end?: number | null;
+            /** Title */
+            title?: string | null;
+            /** Hook Text */
+            hook_text?: string | null;
+            /** Layout */
+            layout?: string | null;
+            /** Status */
+            status?: string | null;
         };
         /** Edit */
         Edit: {
@@ -1617,6 +1797,264 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AssistResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_clips_api_media__media_id__clips_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                media_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Clip"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_clip_api_media__media_id__clips_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                media_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClipCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Clip"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_clip_api_clips__clip_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                clip_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_clip_api_clips__clip_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                clip_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClipUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Clip"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    jetcut_api_clips__clip_id__jetcut_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                clip_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Clip"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    toggle_cut_api_clip_cuts__cut_id__patch: {
+        parameters: {
+            query: {
+                active: boolean;
+            };
+            header?: never;
+            path: {
+                cut_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resolve_clip_api_clips__clip_id__resolve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                clip_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_clip_api_clips__clip_id__export_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                clip_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

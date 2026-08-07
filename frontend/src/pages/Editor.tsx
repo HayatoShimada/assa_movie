@@ -5,6 +5,7 @@ import { api } from '../api/client'
 import { VideoPlayer } from '../components/player/VideoPlayer'
 import { AssistChat } from '../components/transcript/AssistChat'
 import { SegmentList } from '../components/transcript/SegmentList'
+import { ClipsTab } from '../components/clips/ClipsTab'
 import { ReviewTab } from '../components/edits/ReviewTab'
 import { ExportTab } from '../components/export/ExportTab'
 import { QuestionsTab } from '../components/questions/QuestionsTab'
@@ -13,7 +14,7 @@ import { Button } from '../components/ui'
 import { navigate } from '../hooks/useHashRoute'
 import { usePlayback } from '../stores/playback'
 
-type Tab = 'transcript' | 'review' | 'questions' | 'export' | 'settings'
+type Tab = 'transcript' | 'review' | 'questions' | 'clips' | 'export' | 'settings'
 
 function Badge({ count }: { count: number }) {
   if (count === 0) return null
@@ -54,6 +55,7 @@ export function Editor({ mediaId }: { mediaId: number }) {
     { key: 'transcript', label: 'トランスクリプト', badge: 0 },
     { key: 'review', label: 'レビュー', badge: proposedCount },
     { key: 'questions', label: '質問', badge: openQuestions },
+    { key: 'clips', label: 'クリップ', badge: 0 },
     { key: 'export', label: '書き出し', badge: 0 },
     { key: 'settings', label: '設定', badge: 0 },
   ]
@@ -127,6 +129,7 @@ export function Editor({ mediaId }: { mediaId: number }) {
               <ReviewTab mediaId={mediaId} projectId={media.data?.project_id} />
             )}
             {tab === 'questions' && <QuestionsTab mediaId={mediaId} />}
+            {tab === 'clips' && <ClipsTab mediaId={mediaId} />}
             {tab === 'export' && <ExportTab mediaId={mediaId} />}
             {tab === 'settings' && (
               <div className="h-full overflow-y-auto">

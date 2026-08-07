@@ -120,6 +120,9 @@ def run_resolve(
     target_lines = sorted(line_by_id[s["id"]] for s in segments)
     client = _get_client()
     parts = _load_prompt_parts(conn, media_id, level)
+    # クリップの自己完結化など、この実行だけの追加指示
+    if params.get("extra_instruction"):
+        parts.instructions = [*parts.instructions, str(params["extra_instruction"])]
     system = pronoun.build_system_prompt(parts)
 
     proposals: list[tuple[pronoun.EditProposal, int]] = []

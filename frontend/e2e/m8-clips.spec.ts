@@ -1,0 +1,103 @@
+import { expect, test, type APIRequestContext } from '@playwright/test'
+
+const API = 'http://localhost:8001'
+
+async function seedTranscribed(request: APIRequestContext): Promise<number> {
+  await request.post(`${API}/api/e2e/reset`)
+  const seed = await (await request.post(`${API}/api/e2e/seed`)).json()
+  await request.post(`${API}/api/media/${seed.media_id}/jobs`, {
+    data: { type: 'transcribe_fake', params: {} },
+  })
+  await expect
+    .poll(
+      async () => (await (await request.get(`${API}/api/media/${seed.media_id}`)).json()).status,
+      { timeout: 15000 },
+    )
+    .toBe('transcribed')
+  return seed.media_id
+}
+
+test('クリップ: 候補生成→カード表示→編集モード', async ({ page, request }) => {
+  const mediaId = await seedTranscribed(request)
+  await page.goto(`/#/media/${mediaId}`)
+  await page.getByTestId('tab-clips').click()
+
+  await page.getByTestId('run-suggest').click()
+  const card = page.locator('[data-testid^="clip-"][data-testid$="1"]').first()
+  await expect(page.getByText('ハッカソンの話')).toBeVisible({ timeout: 15000 })
+  await expect(page.getByText('完結した話題')).toBeVisible()
+
+  // カードをクリックすると編集モードが開く
+  await page.getByText('ハッカソンの話').click()
+  await expect(page.getByTestId('clip-timeline')).toBeVisible()
+  await expect(page.getByTestId('clip-duration')).toBeVisible()
+  await expect(page.getByTestId('handle-start')).toBeVisible()
+})
+
+test('クリップ: 中抜き提案がタイムラインに出てクリックで切替できる', async ({
+  page,
+  request,
+}) => {
+  const mediaId = await seedTranscribed(request)
+  // シードの相槌セグメントを含む範囲でクリップを直接作る
+  const clip = await (
+    await request.post(`${API}/api/media/${mediaId}/clips`, {
+      data: { start: 0, end: 8, title: '手動' },
+    })
+  ).json()
+
+  await page.goto(`/#/media/${mediaId}`)
+  await page.getByTestId('tab-clips').click()
+  await page.getByText('手動').click()
+
+  await page.getByRole('button', { name: '中抜きを提案' }).click()
+  const cut = page.locator('[data-testid^="cut-"]').first()
+  await expect(cut).toBeVisible({ timeout: 10000 })
+
+  const before = await page.getByTestId('clip-duration').textContent()
+  await cut.click() // 中抜きOFF
+  await expect(page.getByTestId('clip-duration')).not.toHaveText(before!)
+
+  const cuts = await (await request.get(`${API}/api/media/${mediaId}/clips`)).json()
+  expect(cuts.find((c: { id: number }) => c.id === clip.id).cuts[0].active).toBe(0)
+})
+
+test('クリップ: メタ生成でフック案が出て選択できる', async ({ page, request }) => {
+  const mediaId = await seedTranscribed(request)
+  await request.post(`${API}/api/media/${mediaId}/clips`, {
+    data: { start: 0, end: 8, title: 'メタ対象' },
+  })
+  await page.goto(`/#/media/${mediaId}`)
+  await page.getByTestId('tab-clips').click()
+  await page.getByText('メタ対象').click()
+
+  await page.getByRole('button', { name: 'タイトル・メタ生成' }).click()
+  await expect(page.getByText('AIと古着の出会い')).toBeVisible({ timeout: 15000 })
+
+  await page.getByRole('button', { name: 'AIと古着の出会い' }).click()
+  await expect
+    .poll(async () => {
+      const clips = await (await request.get(`${API}/api/media/${mediaId}/clips`)).json()
+      return clips[0].hook_text
+    })
+    .toBe('AIと古着の出会い')
+})
+
+test('クリップ: 自己完結化でresolveジョブが走り提案がレビューに入る', async ({
+  page,
+  request,
+}) => {
+  const mediaId = await seedTranscribed(request)
+  await request.post(`${API}/api/media/${mediaId}/clips`, {
+    data: { start: 0, end: 8, title: '自己完結' },
+  })
+  await page.goto(`/#/media/${mediaId}`)
+  await page.getByTestId('tab-clips').click()
+  await page.getByText('自己完結').click()
+
+  await page.getByRole('button', { name: '指示語を自己完結化' }).click()
+  await expect(page.getByText(/自己完結化完了/)).toBeVisible({ timeout: 15000 })
+
+  // FakeLLMの提案(review)がレビュータブのバッジに乗る
+  await expect(page.getByTestId('tab-review')).toContainText('1')
+})

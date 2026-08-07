@@ -55,12 +55,30 @@ FAKE_ASSIST = {
 }
 
 
+FAKE_ATTENTION = {
+    "candidates": [
+        {"start_line": 1, "end_line": 3, "title": "ハッカソンの話",
+         "hook": "去年の意外な挑戦", "score": 8, "reasons": ["完結した話題"]}
+    ]
+}
+FAKE_META = {
+    "title": "ハッカソンで見つけた答え",
+    "hooks": ["去年の意外な挑戦", "AIと古着の出会い", "結果は予想外"],
+    "description": "去年のハッカソンについての対談クリップ。",
+    "hashtags": ["#AI", "#ハッカソン"],
+}
+
+
 def _fake_llm(system: str, user: str) -> dict:
     """呼び出し内容で応答を出し分ける(プロンプトの種類で判別)"""
     if "編集アシスタント" in system:
         return FAKE_ASSIST
     if "音は合っているが漢字表記が誤っている" in system:
         return FAKE_QUESTIONS
+    if "切り抜き候補" in system:
+        return FAKE_ATTENTION
+    if "投稿を最適化" in system:
+        return FAKE_META
     return FAKE_EDITS
 
 

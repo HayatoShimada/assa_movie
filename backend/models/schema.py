@@ -106,6 +106,7 @@ CREATE TABLE IF NOT EXISTS clips (
     layout             TEXT NOT NULL DEFAULT 'landscape',
     template_id        INTEGER REFERENCES templates(id) ON DELETE SET NULL,
     target_duration    REAL,
+    meta_json          TEXT,
     status             TEXT NOT NULL DEFAULT 'draft'
 );
 
@@ -156,6 +157,7 @@ _MIGRATIONS = [
     ("media", "brief_json", "TEXT"),
     ("segments", "filler_candidates_json", "TEXT"),
     ("jobs", "result_json", "TEXT"),
+    ("clips", "meta_json", "TEXT"),
 ]
 
 
