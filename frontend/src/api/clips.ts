@@ -21,6 +21,8 @@ export interface Clip {
   layout: string
   subtitle_position: 'top' | 'center' | 'bottom'
   subtitle_offset_y: number
+  convert_method: 'crop' | 'blur_pad' | 'face' | null
+  crop_x: number
   target_duration: number | null
   meta: { title: string; hooks: string[]; description: string; hashtags: string[] } | null
   status: string
@@ -43,7 +45,7 @@ export const clipsApi = {
       method: 'POST',
       body: JSON.stringify({ start, end }),
     }),
-  update: (clipId: number, patch: Partial<Pick<Clip, 'start' | 'end' | 'title' | 'hook_text' | 'status' | 'subtitle_position' | 'subtitle_offset_y'>>) =>
+  update: (clipId: number, patch: Partial<Pick<Clip, 'start' | 'end' | 'title' | 'hook_text' | 'status' | 'subtitle_position' | 'subtitle_offset_y' | 'convert_method' | 'crop_x'>>) =>
     req<Clip>(`/api/clips/${clipId}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   remove: (clipId: number) => req<{ deleted: number }>(`/api/clips/${clipId}`, { method: 'DELETE' }),
   jetcut: (clipId: number) => req<Clip>(`/api/clips/${clipId}/jetcut`, { method: 'POST' }),

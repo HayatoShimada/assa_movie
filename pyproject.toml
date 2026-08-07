@@ -1,18 +1,18 @@
 [project]
 name = "whisper-local"
-version = "0.1.0"
-description = "faster-whisper による ローカル文字起こし (RTX PRO 6000 Blackwell / CUDA 12.8)"
+version = "0.2.0"
+description = "ローカル文字起こし・切り抜き (CUDA / ROCm 両対応。extraで切替)"
 readme = "README.md"
 authors = [
     { name = "HayatoShimada", email = "hayato.shimada.ze@nachi.com" }
 ]
 requires-python = ">=3.12"
 dependencies = [
-    # pyannote-audio 3.x はtorchaudio 2.9以降の削除APIに依存しているため2.8系に固定
-    # (2.8+cu128はBlackwell/sm_120対応済み)
-    "torch==2.8.*",
-    "torchaudio==2.8.*",
     "faster-whisper>=1.1.0",
+    # ROCm環境用ASRエンジン(CTranslate2がROCm非対応のためtransformers版Whisperを使う)
+    "transformers>=4.44",
+    # 顔検出(M14の縦型レイアウト)とフレーム抽出。ffmpeg同梱のheadless版
+    "opencv-python-headless>=4.10",
     # 4.x系は同意済みでないpyannote/speaker-diarization-community-1を要求するため3.x系に固定
     "pyannote-audio>=3.3,<4",
     # pyannote-audio 3.x はhuggingface_hub 1.0で削除されたuse_auth_token引数を使うため0.x系に固定
@@ -27,20 +27,48 @@ dependencies = [
     "sse-starlette>=2.1",
 ]
 
+# torch/torchaudioはGPUベンダーごとにwheelのindexが違うためグループで切り替える。
+# 既定(default-groups)はrocm。NVIDIA機では:
+#   uv sync --no-default-groups --group dev --group cu128
+# pyannote-audio 3.x はtorchaudio 2.9以降の削除APIに依存しているため2.8系に固定
+# (2.8+cu128はBlackwell/sm_120対応済み。2.8+rocm6.4はgfx1100=RX 7900系対応)
 [dependency-groups]
 dev = [
     "pytest>=8.3",
     "httpx>=0.28",
 ]
+cu128 = ["torch==2.8.*", "torchaudio==2.8.*"]
+# pytorch-triton-rocmはtorch(rocm版)の推移依存だが、wheelがrocm indexにしか
+# 無いためuvの仕様上ここに明示する必要がある
+rocm = ["torch==2.8.*", "torchaudio==2.8.*", "pytorch-triton-rocm"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
+[tool.uv]
+# 開発機がROCm(RX 7900系)のため既定でrocmグループを入れる
+default-groups = ["dev", "rocm"]
+# cu128とrocmは同時に入れられない(torchのwheelが排他)
+conflicts = [[{ group = "cu128" }, { group = "rocm" }]]
+
 [tool.uv.sources]
-torch = { index = "pytorch-cu128" }
-torchaudio = { index = "pytorch-cu128" }
+torch = [
+    { index = "pytorch-cu128", group = "cu128" },
+    { index = "pytorch-rocm", group = "rocm" },
+]
+torchaudio = [
+    { index = "pytorch-cu128", group = "cu128" },
+    { index = "pytorch-rocm", group = "rocm" },
+]
+# torch(rocm版)の推移依存。PyPIに3.4系が無くrocm indexにしかない
+pytorch-triton-rocm = [{ index = "pytorch-rocm", group = "rocm" }]
 
 [[tool.uv.index]]
 name = "pytorch-cu128"
 url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-rocm"
+url = "https://download.pytorch.org/whl/rocm6.4"
 explicit = true

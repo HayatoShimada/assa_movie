@@ -29,11 +29,14 @@ class JobQueue:
 
     def __init__(self, conn: sqlite3.Connection):
         self.conn = conn
-        # SQLite接続はワーカースレッドとAPIスレッドで共有するため書き込みを直列化する
+        # 台帳接続はワーカースレッドとAPIスレッドで共有するため書き込みを直列化する
         self.lock = threading.Lock()
         self._q: queue.Queue[int] = queue.Queue()
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
+        # 実行中ジョブの進捗はメモリ保持(ハンドラのトランザクション中に
+        # DBへ書くとロック競合するため。終端状態の書き込み時に確定させる)
+        self._progress: dict[int, float] = {}
 
     # ---- 台帳操作(呼び出し側スレッドから) ----
     def enqueue(self, media_id: int | None, job_type: str, params: dict | None = None) -> int:
@@ -52,7 +55,13 @@ class JobQueue:
     def get(self, job_id: int) -> dict | None:
         with self.lock:
             row = self.conn.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
-        return dict(row) if row else None
+            mem_progress = self._progress.get(job_id)
+        if row is None:
+            return None
+        job = dict(row)
+        if mem_progress is not None and job["status"] == "running":
+            job["progress"] = mem_progress
+        return job
 
     # ---- ワーカー ----
     def start(self) -> None:
@@ -67,6 +76,10 @@ class JobQueue:
             self._thread.join(timeout=timeout)
             self._thread = None
 
+    def _set_progress(self, job_id: int, p: float) -> None:
+        with self.lock:
+            self._progress[job_id] = round(p, 4)
+
     def _update(self, job_id: int, **fields) -> None:
         sets = ", ".join(f"{k}=?" for k in fields)
         with self.lock:
@@ -75,31 +88,61 @@ class JobQueue:
             )
             self.conn.commit()
 
-    def _run(self) -> None:
-        while not self._stop.is_set():
-            job_id = self._q.get()
-            if job_id == -1:
-                continue
-            job = self.get(job_id)
-            if not job or job["status"] != "queued":
-                continue
+    def _worker_conn(self) -> sqlite3.Connection:
+        """ハンドラ用の専用接続を開く。
 
-            self._update(job_id, status="running", progress=0.0)
-            try:
-                handler = _HANDLERS[job["type"]]
-                params = json.loads(job["params_json"] or "{}")
-                handler(
-                    self.conn,
-                    job["media_id"],
-                    params,
-                    lambda p, _id=job_id: self._update(_id, progress=round(float(p), 4)),
-                )
-                self._update(job_id, status="completed", progress=1.0)
-            except Exception as e:
-                self._update(
-                    job_id, status="failed",
-                    error=f"{type(e).__name__}: {e}\n{traceback.format_exc()[-2000:]}",
-                )
+        APIスレッドと同じ接続でクエリを並行実行するとSQLiteがクラッシュ的な
+        SystemErrorを出すことがあるため、ワーカーは自分の接続を持つ
+        (台帳操作 enqueue/get/_update は従来どおり共有接続+lock)。
+        """
+        with self.lock:  # 共有接続への並行アクセスはSystemErrorを起こす
+            row = self.conn.execute("PRAGMA database_list").fetchone()
+            db_file = row["file"] if row else ""
+        if not db_file:  # インメモリDBは接続を分けられないので共有のまま
+            return self.conn
+        from backend.models import schema
+
+        return schema.connect(db_file)
+
+    def _run(self) -> None:
+        conn = self._worker_conn()
+        try:
+            while not self._stop.is_set():
+                job_id = self._q.get()
+                if job_id == -1:
+                    continue
+                job = self.get(job_id)
+                if not job or job["status"] != "queued":
+                    continue
+
+                self._update(job_id, status="running", progress=0.0)
+                try:
+                    handler = _HANDLERS[job["type"]]
+                    params = json.loads(job["params_json"] or "{}")
+                    handler(
+                        conn,
+                        job["media_id"],
+                        params,
+                        lambda p, _id=job_id: self._set_progress(_id, float(p)),
+                    )
+                    conn.commit()  # ハンドラのcommit漏れでロックを持ち越さない
+                    self._update(job_id, status="completed", progress=1.0)
+                except Exception as e:
+                    # 未完トランザクションを解放しないと台帳更新がロック待ちになる
+                    try:
+                        conn.rollback()
+                    except sqlite3.Error:
+                        pass
+                    self._update(
+                        job_id, status="failed",
+                        error=f"{type(e).__name__}: {e}\n{traceback.format_exc()[-2000:]}",
+                    )
+                finally:
+                    with self.lock:
+                        self._progress.pop(job_id, None)
+        finally:
+            if conn is not self.conn:
+                conn.close()
 
     def wait(self, job_id: int, timeout: float = 60.0) -> dict:
         """テスト用: ジョブが終端状態になるまで待つ"""

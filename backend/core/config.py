@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     # ---- ASR ----
     # 既定はlarge-v3(精度優先・単語タイムスタンプ必須の要件による。BACKEND_DESIGN.md参照)
     asr_model: str = "large-v3"
+    # auto: CUDA→faster-whisper / ROCm→transformers / CPU→faster-whisper(int8)
+    asr_engine: str = "auto"  # auto | faster_whisper | transformers
     asr_compute_type: str = "float16"  # Blackwellではint8がクラッシュするため固定
     asr_language: str = "ja"
     asr_beam_size: int = 5
@@ -55,8 +57,21 @@ class Settings(BaseSettings):
     subtitle_mode: str = "all"  # all | selective
     subtitle_adoption_rate: float = 0.3  # selective時の採用率
     subtitle_font_size: int = 48
+    subtitle_position: str = "bottom"  # top | center | bottom
+    subtitle_offset_y: int = 0  # +で下、-で上
     subtitle_max_chars_per_line: int = 15
     subtitle_max_lines: int = 2
+    # スタイル(px値は1920×1080基準。出力解像度へは幅/高さ比率で自動換算)
+    subtitle_font_family: str = "Noto Sans JP"
+    subtitle_text_color: str = "#FFFFFF"
+    subtitle_speaker_colors: bool = True  # 話者ごとの色分け(Falseで全員text_color)
+    subtitle_bg: str = "none"  # none(縁取り) | box(背景ボックス)
+    subtitle_bg_color: str = "#000000"
+    subtitle_bg_opacity: float = 0.5
+
+    # ---- レイアウト(向き変換) ----
+    # 入力と出力の向きが違うときの変換方式。クリップ単位でも上書き可能
+    convert_method: str = "blur_pad"  # crop | blur_pad | face
 
     # ---- LLM ----
     llm_provider: str = "ollama"  # ollama | gemini

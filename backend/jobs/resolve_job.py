@@ -6,7 +6,8 @@ LLMは提案するだけで適用判断はしない。適用はレビューAPI(�
 import sqlite3
 from typing import Callable
 
-from backend.core.config import settings
+from backend.core.config import Settings
+from backend.core.project_settings import resolve_settings
 from backend.engines.llm.base import LLMClient
 from backend.engines.llm.registry import build_client
 from backend.jobs.queue import register
@@ -21,8 +22,11 @@ def set_client_factory(factory: Callable[[], LLMClient] | None) -> None:
     _client_factory = factory
 
 
-def _get_client() -> LLMClient:
-    return _client_factory() if _client_factory else build_client(settings)
+def _get_client(s: Settings | None = None) -> LLMClient:
+    """解決済み設定sからLLMクライアントを作る(省略時はグローバル既定)"""
+    if _client_factory:
+        return _client_factory()
+    return build_client(s if s is not None else resolve_settings())
 
 
 def _load_prompt_parts(conn: sqlite3.Connection, media_id: int, level: str) -> pronoun.PromptParts:
@@ -99,10 +103,11 @@ def run_resolve(
     params: dict,
     progress: Callable[[float], None],
 ) -> None:
-    level = params.get("level", settings.pronoun_level)
-    form = params.get("form", settings.pronoun_form)
-    apply_mode = params.get("apply_mode", settings.pronoun_apply_mode)
-    chunk_size = params.get("chunk_size", settings.llm_chunk_size)
+    s = resolve_settings(conn, media_id=media_id)
+    level = params.get("level", s.pronoun_level)
+    form = params.get("form", s.pronoun_form)
+    apply_mode = params.get("apply_mode", s.pronoun_apply_mode)
+    chunk_size = params.get("chunk_size", s.llm_chunk_size)
 
     segments = _target_segments(conn, media_id, params)
     if not segments:
@@ -117,8 +122,8 @@ def run_resolve(
     id_by_line = {i + 1: r["id"] for i, r in enumerate(all_rows)}
     line_by_id = {r["id"]: i + 1 for i, r in enumerate(all_rows)}
 
-    target_lines = sorted(line_by_id[s["id"]] for s in segments)
-    client = _get_client()
+    target_lines = sorted(line_by_id[seg["id"]] for seg in segments)
+    client = _get_client(s)
     parts = _load_prompt_parts(conn, media_id, level)
     # クリップの自己完結化など、この実行だけの追加指示
     if params.get("extra_instruction"):
@@ -129,7 +134,7 @@ def run_resolve(
     chunks = [target_lines[i:i + chunk_size] for i in range(0, len(target_lines), chunk_size)]
 
     for n, chunk in enumerate(chunks):
-        user = pronoun.build_user_prompt(lines, chunk, settings.llm_context_size)
+        user = pronoun.build_user_prompt(lines, chunk, s.llm_context_size)
         payload = client.complete_json(system, user, pronoun.EDITS_SCHEMA)
         for edit in pronoun.parse_edits(payload):
             proposals.append((edit, (chunk[0], chunk[-1])))

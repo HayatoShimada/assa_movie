@@ -82,7 +82,7 @@ def test_build_export_cmd_with_cuts_uses_trim_concat():
     """select式はffmpegバージョン依存の不具合があるためtrim+concat方式を使う"""
     cmd = build_export_cmd(
         Path("in.mov"), Path("out.mp4"), 10.0, 70.0,
-        ass_path=Path("s.ass"), use_nvenc=False,
+        ass_path=Path("s.ass"), encoder="libx264",
         cuts=[(5.0, 6.5), (20.0, 22.0)],
     )
     graph = cmd[cmd.index("-filter_complex") + 1]
@@ -96,7 +96,7 @@ def test_build_export_cmd_with_cuts_uses_trim_concat():
 
 
 def test_build_export_cmd_ignores_empty_cuts():
-    cmd = build_export_cmd(Path("i"), Path("o"), 0, 10, cuts=[], use_nvenc=False)
+    cmd = build_export_cmd(Path("i"), Path("o"), 0, 10, cuts=[], encoder="libx264")
     assert "-filter_complex" not in cmd
 
 
@@ -204,6 +204,18 @@ def test_clip_crud_and_range_validation(client, media):
     assert client.get(f"/api/media/{mid}/clips").json() == []
 
 
+def test_clip_create_uses_global_subtitle_defaults(client, media, monkeypatch):
+    from backend.core import config
+
+    monkeypatch.setattr(config.settings, "subtitle_position", "top")
+    monkeypatch.setattr(config.settings, "subtitle_offset_y", -18)
+
+    mid = media["media_id"]
+    clip = client.post(f"/api/media/{mid}/clips", json={"start": 1, "end": 6}).json()
+    assert clip["subtitle_position"] == "top"
+    assert clip["subtitle_offset_y"] == -18
+
+
 def test_jetcut_proposes_aizuchi_cuts_and_toggle(client, media):
     """ffmpegが使えない偽メディアでも相槌の中抜きは提案される"""
     mid = media["media_id"]
@@ -257,7 +269,11 @@ def test_clip_meta_generation(client, media):
     assert c["hook_text"] == "AIに接客させたら?"
 
 
-def test_clip_export_enqueues_job_with_cuts(client, media):
+def test_clip_export_enqueues_job_with_cuts(client, media, monkeypatch):
+    # ffmpeg不在の開発機でも投入経路を検証できるよう存在チェックだけ通す
+    from backend.api import clips as clips_api
+
+    monkeypatch.setattr(clips_api, "_require_ffmpeg", lambda: None)
     mid = media["media_id"]
     clip = client.post(f"/api/media/{mid}/clips", json={"start": 0, "end": 30}).json()
     client.post(f"/api/clips/{clip['id']}/jetcut")

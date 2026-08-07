@@ -4,7 +4,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from backend.core.config import Settings
-from backend.engines.asr.registry import DEFAULT_MODEL, MODELS, build_engine
+from backend.engines.asr.fasterwhisper import FasterWhisperEngine
+from backend.engines.asr.registry import DEFAULT_MODEL, ENGINES, MODELS, build_engine
+from backend.engines.asr.transformers_whisper import TransformersWhisperEngine
 
 
 @pytest.fixture
@@ -29,12 +31,51 @@ def test_all_registered_models_have_word_timestamps():
     assert all(m.word_timestamps for m in MODELS.values())
 
 
-def test_build_engine_uses_configured_model():
+def test_build_engine_uses_configured_model(monkeypatch):
+    from backend.engines.asr import registry
+
+    monkeypatch.setattr(registry, "detect_accel", lambda: "cuda")
     s = Settings(_env_file=None)
     s.asr_model = "large-v3-turbo"
     engine = build_engine(s)
     assert engine.model_size == "large-v3-turbo"
     assert engine.compute_type == "float16"  # Blackwellでint8はクラッシュする
+
+
+@pytest.mark.parametrize(
+    "accel, expected_type, expected_device, expected_compute",
+    [
+        # CUDA: faster-whisper float16(従来どおり)
+        ("cuda", FasterWhisperEngine, "cuda", "float16"),
+        # ROCm: CTranslate2非対応のためtransformers版(HIPはcudaを名乗る)
+        ("rocm", TransformersWhisperEngine, "cuda", None),
+        # GPUなし: faster-whisperのCPU int8(int8クラッシュはBlackwell GPU限定)
+        ("cpu", FasterWhisperEngine, "cpu", "int8"),
+    ],
+)
+def test_build_engine_auto_selects_by_accel(
+    monkeypatch, accel, expected_type, expected_device, expected_compute
+):
+    from backend.engines.asr import registry
+
+    monkeypatch.setattr(registry, "detect_accel", lambda: accel)
+    engine = build_engine(Settings(_env_file=None))  # asr_engine="auto"
+    assert isinstance(engine, expected_type)
+    assert engine.device == expected_device
+    if expected_compute is not None:
+        assert engine.compute_type == expected_compute
+
+
+def test_build_engine_explicit_transformers_on_cpu(monkeypatch):
+    from backend.engines.asr import registry
+
+    monkeypatch.setattr(registry, "detect_accel", lambda: "cpu")
+    s = Settings(_env_file=None)
+    s.asr_engine = "transformers"
+    engine = build_engine(s)
+    assert isinstance(engine, TransformersWhisperEngine)
+    assert engine.device == "cpu"
+    assert engine.model_id == "openai/whisper-large-v3"
 
 
 def test_build_engine_rejects_unknown_model():
@@ -44,7 +85,23 @@ def test_build_engine_rejects_unknown_model():
         build_engine(s)
 
 
-def test_engine_unload_is_safe_without_load():
+def test_build_engine_rejects_unknown_engine():
+    s = Settings(_env_file=None)
+    s.asr_engine = "whisperx"
+    with pytest.raises(ValueError, match="未知のASRエンジン"):
+        build_engine(s)
+
+
+def test_settings_api_lists_engines(client):
+    body = client.get("/api/settings").json()
+    assert {e["id"] for e in body["asr_engines"]} == set(ENGINES)
+    assert body["values"]["asr_engine"] == "auto"
+
+
+def test_engine_unload_is_safe_without_load(monkeypatch):
+    from backend.engines.asr import registry
+
+    monkeypatch.setattr(registry, "detect_accel", lambda: "cuda")
     engine = build_engine(Settings(_env_file=None))
     engine.unload()  # ロード前でも例外にならない
     assert engine._model is None

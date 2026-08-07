@@ -12,6 +12,7 @@ from backend.api import projects as projects_api
 from backend.api import questions as questions_api
 from backend.api import settings_api
 from backend.api import transcripts as transcripts_api
+from backend.core import project_settings
 from backend.core.config import settings
 from backend.jobs import attention_job  # noqa: F401  ジョブハンドラの登録に必要
 from backend.jobs import export_job  # noqa: F401
@@ -24,9 +25,30 @@ from backend.jobs.queue import JobQueue
 from backend.models import schema
 
 
+def _warn_if_no_gpu_wheel() -> None:
+    """torchがGPU向けwheelでない場合に警告する。
+
+    extra無しの `uv sync` だとPyPI既定のtorchが入ってしまうため、
+    `uv sync --extra rocm`(または --extra cu128)の案内を出す。
+    """
+    try:
+        import torch
+
+        if not (getattr(torch.version, "hip", None) or torch.cuda.is_available()):
+            print(
+                "⚠ torchがGPUを認識していません。"
+                "`./dev.sh sync`(AMD)または `uv sync --extra cu128`(NVIDIA)で"
+                "GPU向けwheelを入れ直してください。CPUでも動作しますが低速です。"
+            )
+    except Exception:
+        pass
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    _warn_if_no_gpu_wheel()
     app.state.db = schema.init_db(settings.db_path)
+    project_settings.load_global_overrides(app.state.db)  # UI変更値の復元
     app.state.jobs = JobQueue(app.state.db)
     app.state.jobs.start()
     yield

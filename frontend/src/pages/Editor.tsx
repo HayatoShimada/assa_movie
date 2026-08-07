@@ -30,12 +30,32 @@ export function Editor({ mediaId }: { mediaId: number }) {
   const [showAizuchi, setShowAizuchi] = useState(true)
   const [clipSubtitlePosition, setClipSubtitlePosition] = useState<'top' | 'center' | 'bottom' | null>(null)
   const [clipSubtitleOffsetY, setClipSubtitleOffsetY] = useState<number | null>(null)
+  const [clipConvertMethod, setClipConvertMethod] = useState<'crop' | 'blur_pad' | 'face' | null>(null)
+  const [clipCropX, setClipCropX] = useState<number | null>(null)
   const selectedSegmentId = usePlayback((s) => s.selectedSegmentId)
 
   const media = useQuery({
     queryKey: ['mediaItem', mediaId],
     queryFn: () => api.getMedia(mediaId),
   })
+  const project = useQuery({
+    queryKey: ['project', media.data?.project_id],
+    queryFn: () => api.getProject(media.data!.project_id),
+    enabled: media.data?.project_id != null,
+  })
+  const settings = useQuery({ queryKey: ['settings'], queryFn: api.getSettings })
+  // プロジェクト設定はグローバルとの差分なのでマージして使う
+  const styleValues = {
+    ...(settings.data?.values ?? {}),
+    ...((project.data?.settings ?? {}) as Record<string, unknown>),
+  }
+  const outputOrientation = project.data?.output_orientation ?? 'landscape'
+  // クリップの上書きが無ければプロジェクト(マージ済み)の変換方式でプレビュー
+  const previewConvertMethod =
+    tab === 'clips'
+      ? (clipConvertMethod ??
+        ((styleValues.convert_method as 'crop' | 'blur_pad' | 'face' | undefined) ?? null))
+      : null
   const segments = useQuery({
     queryKey: ['segments', mediaId, showAizuchi],
     queryFn: () => api.listSegments(mediaId, showAizuchi),
@@ -80,6 +100,10 @@ export function Editor({ mediaId }: { mediaId: number }) {
             segments={segments.data ?? []}
             subtitlePosition={tab === 'clips' ? (clipSubtitlePosition ?? 'bottom') : 'bottom'}
             subtitleOffsetY={tab === 'clips' ? (clipSubtitleOffsetY ?? 0) : 0}
+            outputOrientation={outputOrientation}
+            convertMethod={previewConvertMethod}
+            cropX={clipCropX ?? 0.5}
+            styleValues={styleValues}
           />
         </section>
 
@@ -141,6 +165,10 @@ export function Editor({ mediaId }: { mediaId: number }) {
                 mediaId={mediaId}
                 onSubtitlePositionPreviewChange={setClipSubtitlePosition}
                 onSubtitleOffsetPreviewChange={setClipSubtitleOffsetY}
+                onConvertPreviewChange={(method, cropX) => {
+                  setClipConvertMethod(method)
+                  setClipCropX(cropX)
+                }}
               />
             )}
             {tab === 'export' && <ExportTab mediaId={mediaId} />}

@@ -119,14 +119,23 @@ def reset(request: Request) -> dict:
 
 
 @router.post("/seed")
-def seed(request: Request) -> dict:
-    """プロジェクト+メディアを1件作る(文字起こしは別途ジョブで)"""
+def seed(request: Request, output_orientation: str = "landscape") -> dict:
+    """プロジェクト+メディアを1件作る(文字起こしは別途ジョブで)。
+
+    output_orientation=portrait を渡すと縦書き出しプロジェクトになる
+    (M15の縦変換UIのE2E用)。メディアは1920×1080の横ソース扱い。
+    """
     db = request.app.state.db
-    cur = db.execute("INSERT INTO projects (name) VALUES ('E2Eテスト対談')")
+    cur = db.execute(
+        "INSERT INTO projects (name, input_orientation, output_orientation)"
+        " VALUES ('E2Eテスト対談', 'landscape', ?)",
+        (output_orientation,),
+    )
     project_id = cur.lastrowid
     cur = db.execute(
-        "INSERT INTO media (project_id, path, duration, status) VALUES (?,?,?,'registered')",
-        (project_id, "/e2e/sample.mov", 120.0),
+        "INSERT INTO media (project_id, path, duration, width, height, status)"
+        " VALUES (?,?,?,?,?,'registered')",
+        (project_id, "/e2e/sample.mov", 120.0, 1920, 1080),
     )
     db.commit()
     return {"project_id": project_id, "media_id": cur.lastrowid}

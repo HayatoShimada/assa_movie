@@ -13,7 +13,7 @@ import json
 import sqlite3
 from typing import Callable
 
-from backend.core.config import settings
+from backend.core.project_settings import resolve_settings
 from backend.jobs.queue import register
 from backend.jobs.resolve_job import _get_client
 from backend.pipeline import filler as filler_mod
@@ -37,7 +37,8 @@ def run_filler(
     params: dict,
     progress: Callable[[float], None],
 ) -> None:
-    level = params.get("level", settings.filler_level)
+    s = resolve_settings(conn, media_id=media_id)
+    level = params.get("level", s.filler_level)
     if level == "off":
         progress(1.0)
         return
@@ -77,7 +78,7 @@ def run_filler(
 
     # ---- 2段目(strong): 曖昧なものだけLLMで再判定 ----
     if level == "strong" and ambiguous:
-        client = _get_client()
+        client = _get_client(s)
         line_no = {r["id"]: i + 1 for i, r in enumerate(rows)}
         chunks = [ambiguous[i:i + CHUNK_SIZE] for i in range(0, len(ambiguous), CHUNK_SIZE)]
         for n, chunk in enumerate(chunks):
@@ -106,7 +107,7 @@ def run_filler(
                 if (segment_id, word) in existing:
                     continue
                 if f.get("judgment") == "filler":
-                    apply_mode = params.get("apply_mode", settings.pronoun_apply_mode)
+                    apply_mode = params.get("apply_mode", s.pronoun_apply_mode)
                     status = "applied" if apply_mode == "full_auto" else "proposed"
                     _insert_filler_edit(conn, media_id, segment_id, word, status, created_by="llm")
                     existing.add((segment_id, word))

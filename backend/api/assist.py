@@ -11,7 +11,7 @@ from pydantic import BaseModel
 
 from backend.api.deps import get_db
 from backend.api.edits import Edit
-from backend.core.config import settings
+from backend.core.project_settings import resolve_settings
 from backend.jobs.resolve_job import _get_client, _load_prompt_parts
 from backend.pipeline import pronoun
 
@@ -80,14 +80,15 @@ def assist(
         f"{'▶ 対象行' if r['idx'] == seg['idx'] else '  文脈'}: {r['text']}" for r in rows
     )
 
-    parts = _load_prompt_parts(db, media_id, settings.pronoun_level)
+    s = resolve_settings(db, media_id=media_id)
+    parts = _load_prompt_parts(db, media_id, s.pronoun_level)
     system = ASSIST_PROMPT
     if parts.glossary:
         terms = ", ".join(g["term"] for g in parts.glossary)
         system += f"\n\nこの対談の固有名詞: {terms}"
 
     user = f"{context}\n\nユーザーの指示: {body.message}"
-    payload = _get_client().complete_json(system, user, ASSIST_SCHEMA)
+    payload = _get_client(s).complete_json(system, user, ASSIST_SCHEMA)
 
     saved: list[Edit] = []
     for e in payload.get("edits", []) or []:
@@ -99,7 +100,7 @@ def assist(
             confidence="review",
         )
         # ユーザー主導の編集でも機械ガードは通す(壊れた提案の適用を防ぐ)
-        v = pronoun.validate_edit(proposal, seg["text"], level=settings.pronoun_level)
+        v = pronoun.validate_edit(proposal, seg["text"], level=s.pronoun_level)
         if not v.ok:
             continue
         cur = db.execute(

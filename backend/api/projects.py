@@ -2,7 +2,6 @@
 
 import shutil
 import sqlite3
-import subprocess
 import uuid
 from pathlib import Path
 
@@ -12,38 +11,100 @@ from pydantic import BaseModel
 
 from backend.api.deps import get_db
 from backend.core.config import settings
-from backend.models.dto import Media, MediaCreate, Project, ProjectCreate
+from backend.core.project_settings import PROJECT_OVERRIDABLE
+from backend.models.dto import Media, MediaCreate, Project, ProjectCreate, ProjectUpdate
 
 router = APIRouter(prefix="/api", tags=["projects"])
 
 
-def probe_duration(path: Path) -> float | None:
-    """ffprobeで再生時間を取得する(取れなければNone)"""
-    if not shutil.which("ffprobe"):
-        return None
-    try:
-        out = subprocess.run(
-            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-             "-of", "default=noprint_wrappers=1:nokey=1", str(path)],
-            capture_output=True, text=True, timeout=60,
-        )
-        return float(out.stdout.strip()) if out.returncode == 0 else None
-    except (ValueError, subprocess.SubprocessError):
-        return None
+def _validate_project_settings(values: dict) -> str:
+    """許可キーのみ受け付け、JSON文字列にして返す"""
+    unknown = sorted(set(values) - PROJECT_OVERRIDABLE)
+    if unknown:
+        raise HTTPException(400, f"プロジェクト設定にできない項目です: {', '.join(unknown)}")
+    import json
+
+    return json.dumps(values, ensure_ascii=False)
+
+
+def _to_project(row) -> Project:
+    import json
+
+    d = dict(row)
+    d["settings"] = json.loads(d.pop("settings_json", None) or "{}")
+    return Project(**d)
+
+
+from backend.pipeline.export import probe_media
 
 
 @router.post("/projects", response_model=Project)
 def create_project(body: ProjectCreate, db: sqlite3.Connection = Depends(get_db)):
-    cur = db.execute("INSERT INTO projects (name) VALUES (?)", (body.name,))
+    cur = db.execute(
+        "INSERT INTO projects (name, input_orientation, output_orientation, settings_json)"
+        " VALUES (?,?,?,?)",
+        (body.name, body.input_orientation, body.output_orientation,
+         _validate_project_settings(body.settings)),
+    )
     db.commit()
     row = db.execute("SELECT * FROM projects WHERE id=?", (cur.lastrowid,)).fetchone()
-    return Project(**dict(row))
+    return _to_project(row)
 
 
 @router.get("/projects", response_model=list[Project])
 def list_projects(db: sqlite3.Connection = Depends(get_db)):
     rows = db.execute("SELECT * FROM projects ORDER BY id DESC").fetchall()
-    return [Project(**dict(r)) for r in rows]
+    return [_to_project(r) for r in rows]
+
+
+@router.get("/projects/{project_id}", response_model=Project)
+def get_project(project_id: int, db: sqlite3.Connection = Depends(get_db)):
+    row = db.execute("SELECT * FROM projects WHERE id=?", (project_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "プロジェクトが見つかりません")
+    return _to_project(row)
+
+
+@router.patch("/projects/{project_id}", response_model=Project)
+def update_project(
+    project_id: int, body: ProjectUpdate, db: sqlite3.Connection = Depends(get_db)
+):
+    row = db.execute("SELECT * FROM projects WHERE id=?", (project_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "プロジェクトが見つかりません")
+    updates: list[tuple[str, object]] = []
+    if body.name is not None:
+        updates.append(("name", body.name))
+    if body.input_orientation is not None:
+        updates.append(("input_orientation", body.input_orientation))
+    if body.output_orientation is not None:
+        updates.append(("output_orientation", body.output_orientation))
+    if body.settings is not None:
+        updates.append(("settings_json", _validate_project_settings(body.settings)))
+    if updates:
+        sets = ", ".join(f"{k}=?" for k, _ in updates)
+        db.execute(
+            f"UPDATE projects SET {sets} WHERE id=?",
+            (*[v for _, v in updates], project_id),
+        )
+        db.commit()
+    return _to_project(
+        db.execute("SELECT * FROM projects WHERE id=?", (project_id,)).fetchone()
+    )
+
+
+@router.delete("/projects/{project_id}")
+def delete_project(project_id: int, db: sqlite3.Connection = Depends(get_db)):
+    """プロジェクトを削除する(メディア・セグメント等はFKのCASCADEで連鎖削除)"""
+    if db.execute("SELECT 1 FROM projects WHERE id=?", (project_id,)).fetchone() is None:
+        raise HTTPException(404, "プロジェクトが見つかりません")
+    db.execute("DELETE FROM projects WHERE id=?", (project_id,))
+    db.commit()
+    # アップロードされた実ファイルも掃除する(外部パス登録のメディアは消さない)
+    upload_dir = settings.db_path.parent / "uploads" / f"project_{project_id}"
+    if upload_dir.exists():
+        shutil.rmtree(upload_dir, ignore_errors=True)
+    return {"deleted": project_id}
 
 
 @router.post("/projects/{project_id}/media", response_model=Media)
@@ -57,9 +118,10 @@ def add_media(
     if not path.exists():
         raise HTTPException(400, f"ファイルが存在しません: {path}")
 
+    duration, width, height = probe_media(path)
     cur = db.execute(
-        "INSERT INTO media (project_id, path, duration) VALUES (?,?,?)",
-        (project_id, str(path.resolve()), probe_duration(path)),
+        "INSERT INTO media (project_id, path, duration, width, height) VALUES (?,?,?,?,?)",
+        (project_id, str(path.resolve()), duration, width, height),
     )
     db.commit()
     row = db.execute("SELECT * FROM media WHERE id=?", (cur.lastrowid,)).fetchone()
@@ -88,9 +150,10 @@ async def upload_media(
             f.write(chunk)
     await file.close()
 
+    duration, width, height = probe_media(saved_path)
     cur = db.execute(
-        "INSERT INTO media (project_id, path, duration) VALUES (?,?,?)",
-        (project_id, str(saved_path.resolve()), probe_duration(saved_path)),
+        "INSERT INTO media (project_id, path, duration, width, height) VALUES (?,?,?,?,?)",
+        (project_id, str(saved_path.resolve()), duration, width, height),
     )
     db.commit()
     row = db.execute("SELECT * FROM media WHERE id=?", (cur.lastrowid,)).fetchone()

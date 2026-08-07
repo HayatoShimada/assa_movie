@@ -100,6 +100,21 @@ SPEAKER_ASS_COLORS = [
     "&H00B469FF",  # ピンク
 ]
 
+# スケーリングの基準解像度。設定の字幕px値はすべてこの解像度基準で保存し、
+# 出力解像度へは幅比率(フォント・左右余白)/高さ比率(上下余白)で換算する
+BASE_RES_X = 1920
+BASE_RES_Y = 1080
+
+
+def hex_to_ass(hex_color: str, transparency: float = 0.0) -> str:
+    """#RRGGBB → ASSの &HAABBGGRR(AAは透明度: 00=不透明, FF=透明)"""
+    h = hex_color.lstrip("#")
+    if len(h) != 6 or any(c not in "0123456789abcdefABCDEF" for c in h):
+        h = "FFFFFF"  # 不正値は白にフォールバック(書き出しを止めない)
+    r, g, b = h[0:2], h[2:4], h[4:6]
+    alpha = round(max(0.0, min(1.0, transparency)) * 255)
+    return f"&H{alpha:02X}{b.upper()}{g.upper()}{r.upper()}"
+
 
 @dataclass
 class SubtitleStyle:
@@ -107,10 +122,59 @@ class SubtitleStyle:
     font_size: int = 48
     alignment: int = 2          # ASSの1-9(テンキー配置)。2=下中央
     margin_v: int = 40
+    margin_l: int = 60
+    margin_r: int = 60
     outline: int = 2
     max_chars_per_line: int = 15
     play_res_x: int = 1920
     play_res_y: int = 1080
+    text_color: str = "#FFFFFF"
+    speaker_colors: bool = True   # Falseなら全話者 text_color
+    bg: str = "none"              # none(縁取りのみ) | box(背景ボックス)
+    bg_color: str = "#000000"
+    bg_opacity: float = 0.5       # 0..1(boxのとき有効)
+
+
+def scaled_style(
+    settings,
+    res_x: int = BASE_RES_X,
+    res_y: int = BASE_RES_Y,
+    position: str = "bottom",
+    offset_y: int = 0,
+) -> SubtitleStyle:
+    """設定値(1920×1080基準px)を出力解像度に合わせたスタイルへ換算する(純関数)。
+
+    - フォント・左右余白は幅比率、上下余白・縁取りは高さ比率でスケール
+      → どの解像度・向きでも「画面幅に対する余白・文字の比率」が一定になる
+    - 1920×1080では従来のハードコード値と厳密一致(後方互換)
+    - offset_y: +で下へ、-で上へ(クリップ画面のプレビューと同じ向き)
+    """
+    fx = res_x / BASE_RES_X
+    fy = res_y / BASE_RES_Y
+    offset = max(-120, min(120, int(offset_y)))
+    if position == "top":
+        alignment, margin_base = 8, 40 + offset
+    elif position == "center":
+        alignment, margin_base = 5, 0  # 中央はオフセット無効
+    else:
+        alignment, margin_base = 2, 40 - offset
+    return SubtitleStyle(
+        font_name=settings.subtitle_font_family,
+        font_size=round(settings.subtitle_font_size * fx),
+        alignment=alignment,
+        margin_v=max(0, round(margin_base * fy)),
+        margin_l=round(60 * fx),
+        margin_r=round(60 * fx),
+        outline=max(1, round(2 * fy)),
+        max_chars_per_line=settings.subtitle_max_chars_per_line,
+        play_res_x=res_x,
+        play_res_y=res_y,
+        text_color=settings.subtitle_text_color,
+        speaker_colors=settings.subtitle_speaker_colors,
+        bg=settings.subtitle_bg,
+        bg_color=settings.subtitle_bg_color,
+        bg_opacity=settings.subtitle_bg_opacity,
+    )
 
 
 @dataclass
@@ -127,11 +191,16 @@ def build_ass(events: list[AssEvent], style: SubtitleStyle = SubtitleStyle()) ->
     - 折返し・禁則は wrap_subtitle を適用(ASSの改行は \\N)
     - 話者ごとにスタイル(文字色)を割り当てる
     """
-    speakers = sorted({e.speaker for e in events if e.speaker})
+    speakers = sorted({e.speaker for e in events if e.speaker}) if style.speaker_colors else []
     style_of = {
         sp: (f"S{i}", SPEAKER_ASS_COLORS[i % len(SPEAKER_ASS_COLORS)])
         for i, sp in enumerate(speakers)
     }
+    primary = hex_to_ass(style.text_color)
+    back = hex_to_ass(style.bg_color, 1.0 - style.bg_opacity)
+    # box: 縁取りの代わりに背景ボックスを描く(BorderStyle=3)。影は不要
+    border_style = 3 if style.bg == "box" else 1
+    shadow = 0 if style.bg == "box" else 1
 
     header = f"""[Script Info]
 ScriptType: v4.00+
@@ -143,17 +212,18 @@ ScaledBorderAndShadow: yes
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 """
+    common = (
+        f"&H000000FF,&H00000000,{back},0,0,0,0,100,100,0,0,{border_style},"
+        f"{style.outline},{shadow},{style.alignment},"
+        f"{style.margin_l},{style.margin_r},{style.margin_v},1"
+    )
     style_lines = [
-        f"Style: Default,{style.font_name},{style.font_size},&H00FFFFFF,&H000000FF,"
-        f"&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,{style.outline},1,"
-        f"{style.alignment},60,60,{style.margin_v},1"
+        f"Style: Default,{style.font_name},{style.font_size},{primary},{common}"
     ]
     for sp in speakers:
         name, color = style_of[sp]
         style_lines.append(
-            f"Style: {name},{style.font_name},{style.font_size},{color},&H000000FF,"
-            f"&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,{style.outline},1,"
-            f"{style.alignment},60,60,{style.margin_v},1"
+            f"Style: {name},{style.font_name},{style.font_size},{color},{common}"
         )
 
     event_lines = [

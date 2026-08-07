@@ -202,7 +202,7 @@ def test_brief_roundtrip_and_prompt_injection(client, media):
 def test_build_export_cmd_with_subtitles(tmp_path):
     cmd = build_export_cmd(
         tmp_path / "in.mov", tmp_path / "out.mp4", 10.0, 70.0,
-        ass_path=tmp_path / "sub.ass", use_nvenc=False,
+        ass_path=tmp_path / "sub.ass", encoder="libx264",
     )
     joined = " ".join(cmd)
     assert "-ss 10.000" in joined
@@ -214,6 +214,6 @@ def test_build_export_cmd_with_subtitles(tmp_path):
 def test_build_export_cmd_nvenc():
     from pathlib import Path
 
-    cmd = build_export_cmd(Path("in.mov"), Path("out.mp4"), 0, 10, use_nvenc=True)
+    cmd = build_export_cmd(Path("in.mov"), Path("out.mp4"), 0, 10, encoder="h264_nvenc")
     assert "h264_nvenc" in cmd
     assert not any("ass=" in c for c in cmd)  # 字幕なしならフィルタもなし

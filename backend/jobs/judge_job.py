@@ -8,7 +8,7 @@ import json
 import sqlite3
 from typing import Callable
 
-from backend.core.config import settings
+from backend.core.project_settings import resolve_settings
 from backend.jobs.queue import register
 from backend.jobs.resolve_job import _get_client
 from backend.pipeline import judge as judge_mod
@@ -21,7 +21,8 @@ def run_judge(
     params: dict,
     progress: Callable[[float], None],
 ) -> None:
-    rate = float(params.get("rate", settings.subtitle_adoption_rate))
+    s = resolve_settings(conn, media_id=media_id)
+    rate = float(params.get("rate", s.subtitle_adoption_rate))
     use_llm = bool(params.get("use_llm", True))
 
     rows = conn.execute(
@@ -42,7 +43,7 @@ def run_judge(
     # ---- LLMによる重要行の判定(任意) ----
     important: set[int] = set()
     if use_llm:
-        client = _get_client()
+        client = _get_client(s)
         lines = [f"{i + 1}: {r['text']}" for i, r in enumerate(rows)]
         chunk = 150
         for n in range(0, len(lines), chunk):

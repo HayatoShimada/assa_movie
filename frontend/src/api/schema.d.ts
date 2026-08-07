@@ -22,6 +22,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{project_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Project */
+        get: operations["get_project_api_projects__project_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Project
+         * @description プロジェクトを削除する(メディア・セグメント等はFKのCASCADEで連鎖削除)
+         */
+        delete: operations["delete_project_api_projects__project_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Project */
+        patch: operations["update_project_api_projects__project_id__patch"];
+        trace?: never;
+    };
     "/api/projects/{project_id}/media": {
         parameters: {
             query?: never;
@@ -199,6 +221,26 @@ export interface paths {
         head?: never;
         /** Update Segment */
         patch: operations["update_segment_api_segments__segment_id__patch"];
+        trace?: never;
+    };
+    "/api/fonts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Fonts
+         * @description 日本語対応フォントの一覧(字幕のフォント選択UI用)
+         */
+        get: operations["list_fonts_api_fonts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/settings": {
@@ -621,6 +663,13 @@ export interface components {
              * @default 0
              */
             subtitle_offset_y: number;
+            /** Convert Method */
+            convert_method?: string | null;
+            /**
+             * Crop X
+             * @default 0.5
+             */
+            crop_x: number;
             /** Target Duration */
             target_duration?: number | null;
             /** Meta */
@@ -662,6 +711,10 @@ export interface components {
             subtitle_position?: string | null;
             /** Subtitle Offset Y */
             subtitle_offset_y?: number | null;
+            /** Convert Method */
+            convert_method?: string | null;
+            /** Crop X */
+            crop_x?: number | null;
             /** Status */
             status?: string | null;
         };
@@ -771,6 +824,10 @@ export interface components {
             path: string;
             /** Duration */
             duration?: number | null;
+            /** Width */
+            width?: number | null;
+            /** Height */
+            height?: number | null;
             /** Status */
             status: string;
             /** Created At */
@@ -790,6 +847,22 @@ export interface components {
             id: number;
             /** Name */
             name: string;
+            /**
+             * Input Orientation
+             * @default landscape
+             * @enum {string}
+             */
+            input_orientation: "landscape" | "portrait";
+            /**
+             * Output Orientation
+             * @default landscape
+             * @enum {string}
+             */
+            output_orientation: "landscape" | "portrait";
+            /** Settings */
+            settings?: {
+                [key: string]: unknown;
+            };
             /** Created At */
             created_at: string;
         };
@@ -797,6 +870,35 @@ export interface components {
         ProjectCreate: {
             /** Name */
             name: string;
+            /**
+             * Input Orientation
+             * @default landscape
+             * @enum {string}
+             */
+            input_orientation: "landscape" | "portrait";
+            /**
+             * Output Orientation
+             * @default landscape
+             * @enum {string}
+             */
+            output_orientation: "landscape" | "portrait";
+            /** Settings */
+            settings?: {
+                [key: string]: unknown;
+            };
+        };
+        /** ProjectUpdate */
+        ProjectUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Input Orientation */
+            input_orientation?: ("landscape" | "portrait") | null;
+            /** Output Orientation */
+            output_orientation?: ("landscape" | "portrait") | null;
+            /** Settings */
+            settings?: {
+                [key: string]: unknown;
+            } | null;
         };
         /** Question */
         Question: {
@@ -878,6 +980,8 @@ export interface components {
         SettingsUpdate: {
             /** Asr Model */
             asr_model?: string | null;
+            /** Asr Engine */
+            asr_engine?: string | null;
             /** Asr Language */
             asr_language?: string | null;
             /** Filler Level */
@@ -896,8 +1000,24 @@ export interface components {
             subtitle_adoption_rate?: number | null;
             /** Subtitle Font Size */
             subtitle_font_size?: number | null;
+            /** Subtitle Position */
+            subtitle_position?: string | null;
+            /** Subtitle Offset Y */
+            subtitle_offset_y?: number | null;
             /** Subtitle Max Chars Per Line */
             subtitle_max_chars_per_line?: number | null;
+            /** Subtitle Font Family */
+            subtitle_font_family?: string | null;
+            /** Subtitle Text Color */
+            subtitle_text_color?: string | null;
+            /** Subtitle Speaker Colors */
+            subtitle_speaker_colors?: boolean | null;
+            /** Subtitle Bg */
+            subtitle_bg?: string | null;
+            /** Subtitle Bg Color */
+            subtitle_bg_color?: string | null;
+            /** Subtitle Bg Opacity */
+            subtitle_bg_opacity?: number | null;
             /** Diarization Enabled */
             diarization_enabled?: boolean | null;
             /** Num Speakers */
@@ -908,6 +1028,8 @@ export interface components {
             female_name?: string | null;
             /** Aizuchi Filter Enabled */
             aizuchi_filter_enabled?: boolean | null;
+            /** Convert Method */
+            convert_method?: string | null;
             /** Llm Provider */
             llm_provider?: string | null;
             /** Ollama Model */
@@ -976,6 +1098,103 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ProjectCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Project"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_project_api_projects__project_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Project"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_project_api_projects__project_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_project_api_projects__project_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectUpdate"];
             };
         };
         responses: {
@@ -1389,6 +1608,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_fonts_api_fonts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
         };

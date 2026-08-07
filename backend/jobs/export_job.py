@@ -9,22 +9,67 @@ import sqlite3
 from pathlib import Path
 from typing import Callable
 
-from backend.core.config import settings
+from backend.core.project_settings import resolve_settings
 from backend.jobs.filler_job import filler_words_by_segment
 from backend.jobs.queue import register
 from backend.pipeline import export as export_mod
+from backend.pipeline import face as face_mod
 from backend.pipeline import filler as filler_mod
+from backend.pipeline import layout as layout_mod
 from backend.pipeline import subtitle as subtitle_mod
 
 
-def subtitle_style_for_position(position: str, offset_y: int = 0) -> subtitle_mod.SubtitleStyle:
-    # offset_y: +で下へ、-で上へ(クリップ画面のプレビューと同じ向き)
-    offset = max(-120, min(120, int(offset_y)))
-    if position == "top":
-        return subtitle_mod.SubtitleStyle(alignment=8, margin_v=max(0, 40 + offset))
-    if position == "center":
-        return subtitle_mod.SubtitleStyle(alignment=5, margin_v=0)
-    return subtitle_mod.SubtitleStyle(alignment=2, margin_v=max(0, 40 - offset))
+def resolve_layout(
+    conn: sqlite3.Connection,
+    media: sqlite3.Row,
+    s,
+    params: dict,
+    start: float,
+    end: float,
+) -> tuple[str | None, int, int]:
+    """向き変換フィルタと最終出力解像度を決める。
+
+    戻り値: (layout_filter, final_w, final_h)。ASSのPlayResはこの最終解像度に合わせる。
+    優先順位: クリップ上書き(params) > プロジェクト設定 > グローバル設定。
+    """
+    input_path = Path(media["path"])
+    src_w, src_h = media["width"], media["height"]
+    if not src_w or not src_h:
+        _, src_w, src_h = export_mod.probe_media(input_path)
+        if src_w and src_h:  # 旧データは遅延プローブして保存
+            conn.execute(
+                "UPDATE media SET width=?, height=? WHERE id=?",
+                (src_w, src_h, media["id"]),
+            )
+    row = conn.execute(
+        "SELECT output_orientation FROM projects WHERE id=?", (media["project_id"],)
+    ).fetchone()
+    orientation = row["output_orientation"] if row else "landscape"
+    out_w, out_h = layout_mod.OUTPUT_RES[orientation]
+
+    if not src_w or not src_h:
+        # 解像度不明なら変換せず、字幕は従来どおり1920×1080基準
+        return None, subtitle_mod.BASE_RES_X, subtitle_mod.BASE_RES_Y
+
+    method = params.get("convert_method") or s.convert_method
+    face_plan = None
+    if method == "face" and src_w * out_h != src_h * out_w:
+        times = face_mod.sample_times(start, end)
+        samples = [
+            face_mod.detect_faces(f)
+            for f in face_mod.sample_frames(input_path, times)
+        ]
+        face_plan = face_mod.make_face_plan(samples, src_w, src_h)
+
+    crop_x = params.get("crop_x")
+    layout_filter = layout_mod.build_layout_filter(
+        src_w, src_h, out_w, out_h, method,
+        crop_x=0.5 if crop_x is None else float(crop_x),  # 0.0(左端)も有効値
+        face_plan=face_plan,
+    )
+    if layout_filter:
+        return layout_filter, out_w, out_h
+    return None, src_w, src_h  # パススルー時はソース解像度が最終解像度
 
 
 @register("export")
@@ -37,6 +82,7 @@ def run_export_job(
     media = conn.execute("SELECT * FROM media WHERE id=?", (media_id,)).fetchone()
     if media is None:
         raise ValueError(f"media {media_id} が見つかりません")
+    s = resolve_settings(conn, media_id=media_id)
 
     input_path = Path(media["path"])
     start = float(params.get("start", 0.0))
@@ -58,6 +104,9 @@ def run_export_job(
     suffix = f"_clip{params['clip_id']}" if params.get("clip_id") else ""
     out_path = out_dir / f"{base}_{int(start)}s-{int(end)}s{suffix}.mp4"
 
+    # ---- 向き変換(縦↔横)と最終解像度 ----
+    layout_filter, out_w, out_h = resolve_layout(conn, media, s, params, start, end)
+
     # ---- 字幕(ASS)生成 ----
     ass_path = None
     if burn:
@@ -65,22 +114,22 @@ def run_export_job(
             "SELECT * FROM segments WHERE media_id=? ORDER BY idx", (media_id,)
         )]
         filler_words = filler_words_by_segment(conn, media_id)
-        for s in segments:
-            text = s["text"]
+        for seg in segments:
+            text = seg["text"]
             # 適用済みフィラー編集(LLM/質問回答)を除去
-            for w in filler_words.get(s["id"], []):
+            for w in filler_words.get(seg["id"], []):
                 text = filler_mod.remove_filler(text, w)
             # 安全群フィラーは弱モード以上なら常時除去
-            if settings.filler_level in ("weak", "strong"):
+            if s.filler_level in ("weak", "strong"):
                 text = filler_mod.remove_fillers_weak(text)
-            s["text"] = text
+            seg["text"] = text
 
-        style = subtitle_style_for_position(
+        # ASSのPlayResは出力解像度に合わせる(スタイル値は幅/高さ比率で自動換算)
+        style = subtitle_mod.scaled_style(
+            s, out_w, out_h,
             str(params.get("subtitle_position", "bottom")),
             int(params.get("subtitle_offset_y", 0)),
         )
-        style.font_size = int(settings.subtitle_font_size)
-        style.max_chars_per_line = settings.subtitle_max_chars_per_line
         events = subtitle_mod.segments_to_events(segments, clip_start=start, clip_end=end)
         ass_path = out_dir / f"{base}_{int(start)}s-{int(end)}s.ass"
         ass_path.write_text(subtitle_mod.build_ass(events, style), encoding="utf-8")
@@ -88,7 +137,10 @@ def run_export_job(
     progress(0.05)
 
     # ---- ffmpeg実行 ----
-    cmd = export_mod.build_export_cmd(input_path, out_path, start, end, ass_path, cuts=cuts)
+    cmd = export_mod.build_export_cmd(
+        input_path, out_path, start, end, ass_path,
+        cuts=cuts, layout_filter=layout_filter,
+    )
     export_mod.run_export(cmd, duration=end - start, progress=lambda p: progress(0.05 + p * 0.94))
 
     conn.execute(

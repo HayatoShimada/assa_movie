@@ -5,9 +5,20 @@ from pathlib import Path
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS projects (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    name       TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    name               TEXT NOT NULL,
+    -- テンプレート(縦→縦/横→縦/横→横/縦→横)は入力・出力の向きの組で表現する
+    input_orientation  TEXT NOT NULL DEFAULT 'landscape',
+    output_orientation TEXT NOT NULL DEFAULT 'landscape',
+    -- グローバル設定との差分のみを持つ(core/project_settings.py参照)
+    settings_json      TEXT,
+    created_at         TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- UIで変更したグローバル設定の永続化(key単位のupsert)
+CREATE TABLE IF NOT EXISTS app_settings (
+    key        TEXT PRIMARY KEY,
+    value_json TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS media (
@@ -151,6 +162,8 @@ def connect(db_path: Path) -> sqlite3.Connection:
     conn = sqlite3.connect(db_path, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    # APIスレッドとジョブワーカーの別接続が書き込みで衝突しても待てるようにする
+    conn.execute("PRAGMA busy_timeout = 5000")
     return conn
 
 
@@ -162,6 +175,14 @@ _MIGRATIONS = [
     ("clips", "meta_json", "TEXT"),
     ("clips", "subtitle_position", "TEXT NOT NULL DEFAULT 'bottom'"),
     ("clips", "subtitle_offset_y", "INTEGER NOT NULL DEFAULT 0"),
+    ("projects", "input_orientation", "TEXT NOT NULL DEFAULT 'landscape'"),
+    ("projects", "output_orientation", "TEXT NOT NULL DEFAULT 'landscape'"),
+    ("projects", "settings_json", "TEXT"),
+    ("media", "width", "INTEGER"),
+    ("media", "height", "INTEGER"),
+    # NULL=プロジェクト既定に従う(クリップ単位の上書き)
+    ("clips", "convert_method", "TEXT"),
+    ("clips", "crop_x", "REAL NOT NULL DEFAULT 0.5"),
 ]
 
 

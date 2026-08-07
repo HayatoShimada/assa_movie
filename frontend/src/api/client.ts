@@ -7,6 +7,7 @@
 import type { components } from './schema'
 
 export type Project = components['schemas']['Project']
+export type Orientation = Project['output_orientation']
 export type Media = components['schemas']['Media']
 export type Job = components['schemas']['Job']
 export type Segment = components['schemas']['Segment']
@@ -47,7 +48,24 @@ export const api = {
   health: () => request<{ status: string }>('/api/health'),
 
   listProjects: () => request<Project[]>('/api/projects'),
-  createProject: (name: string) => post<Project>('/api/projects', { name }),
+  createProject: (body: {
+    name: string
+    input_orientation?: Orientation
+    output_orientation?: Orientation
+    settings?: Record<string, unknown>
+  }) => post<Project>('/api/projects', body),
+  getProject: (projectId: number) => request<Project>(`/api/projects/${projectId}`),
+  updateProject: (
+    projectId: number,
+    patch: {
+      name?: string
+      input_orientation?: Orientation
+      output_orientation?: Orientation
+      settings?: Record<string, unknown>
+    },
+  ) => request<Project>(`/api/projects/${projectId}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+  deleteProject: (projectId: number) =>
+    request<{ deleted: number }>(`/api/projects/${projectId}`, { method: 'DELETE' }),
   listMedia: (projectId: number) => request<Media[]>(`/api/projects/${projectId}/media`),
   getMedia: (mediaId: number) => request<Media>(`/api/media/${mediaId}`),
   addMedia: (projectId: number, path: string) =>
@@ -96,6 +114,7 @@ export const api = {
   getSettings: () => request<SettingsResponse>('/api/settings'),
   updateSettings: (patch: Record<string, unknown>) =>
     request<SettingsResponse>('/api/settings', { method: 'PATCH', body: JSON.stringify(patch) }),
+  getFonts: () => request<{ fonts: string[] }>('/api/fonts'),
 }
 
 export interface AssistResponse {
@@ -106,6 +125,7 @@ export interface AssistResponse {
 
 export interface SettingsResponse {
   values: Record<string, unknown>
+  asr_engines: { id: string; label: string }[]
   asr_models: { id: string; label: string; rtf: number; word_timestamps: boolean; note: string }[]
   llm_providers: {
     id: string

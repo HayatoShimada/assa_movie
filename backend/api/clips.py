@@ -9,15 +9,24 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from backend.core.project_settings import resolve_settings
 from backend.api.deps import get_db, get_jobs
 from backend.jobs.queue import JobQueue
 from backend.pipeline.attention import parse_silences
+from backend.pipeline.layout import CONVERT_METHODS
 
 router = APIRouter(prefix="/api", tags=["clips"])
 
 # 中抜き提案とみなす無音の最小長(秒)
 SILENCE_MIN_DURATION = 0.6
 SILENCE_NOISE_DB = -35
+
+
+def _require_ffmpeg() -> None:
+    if shutil.which("ffmpeg") is None:
+        raise HTTPException(
+            400, "ffmpegが見つかりません。`sudo apt install ffmpeg` でインストールしてください"
+        )
 
 
 class Clip(BaseModel):
@@ -29,9 +38,11 @@ class Clip(BaseModel):
     hook_text: str | None = None
     score: float | None = None
     score_reasons: list[str] = []
-    layout: str = "landscape"
+    layout: str = "landscape"  # 旧カラム(未使用)。互換のため残置
     subtitle_position: str = "bottom"
     subtitle_offset_y: int = 0
+    convert_method: str | None = None  # None=プロジェクト既定(crop|blur_pad|face)
+    crop_x: float = 0.5  # crop時の切り出し位置(0..1)
     target_duration: float | None = None
     meta: dict | None = None
     status: str
@@ -52,6 +63,8 @@ class ClipUpdate(BaseModel):
     layout: str | None = None
     subtitle_position: str | None = None
     subtitle_offset_y: int | None = None
+    convert_method: str | None = None
+    crop_x: float | None = None
     status: str | None = None
 
 
@@ -64,7 +77,10 @@ def _to_clip(db: sqlite3.Connection, row: sqlite3.Row) -> Clip:
         id=row["id"], media_id=row["media_id"], start=row["start"], end=row["end"],
         title=row["title"], hook_text=row["hook_text"], score=row["score"],
         score_reasons=json.loads(row["score_reasons_json"] or "[]"),
-        layout=row["layout"], subtitle_position=row["subtitle_position"], subtitle_offset_y=row["subtitle_offset_y"], target_duration=row["target_duration"],
+        layout=row["layout"], subtitle_position=row["subtitle_position"],
+        subtitle_offset_y=row["subtitle_offset_y"],
+        convert_method=row["convert_method"], crop_x=row["crop_x"],
+        target_duration=row["target_duration"],
         meta=json.loads(row["meta_json"] or "null"),
         status=row["status"], cuts=cuts,
     )
@@ -91,9 +107,18 @@ def create_clip(
 ):
     if body.end <= body.start:
         raise HTTPException(400, "endはstartより大きい必要があります")
+    s = resolve_settings(db, media_id=media_id)
     cur = db.execute(
-        "INSERT INTO clips (media_id, start, end, title, status) VALUES (?,?,?,?,'draft')",
-        (media_id, body.start, body.end, body.title),
+        "INSERT INTO clips (media_id, start, end, title, subtitle_position, subtitle_offset_y, status)"
+        " VALUES (?,?,?,?,?,?,'draft')",
+        (
+            media_id,
+            body.start,
+            body.end,
+            body.title,
+            s.subtitle_position,
+            int(s.subtitle_offset_y),
+        ),
     )
     db.commit()
     return _to_clip(db, _get_clip_row(db, cur.lastrowid))
@@ -105,6 +130,10 @@ def update_clip(clip_id: int, body: ClipUpdate, db: sqlite3.Connection = Depends
     fields = body.model_dump(exclude_none=True)
     if not fields:
         return _to_clip(db, row)
+    if "convert_method" in fields and fields["convert_method"] not in CONVERT_METHODS:
+        raise HTTPException(400, f"未知の変換方式: {fields['convert_method']}")
+    if "crop_x" in fields:
+        fields["crop_x"] = max(0.0, min(1.0, float(fields["crop_x"])))
     new_start = fields.get("start", row["start"])
     new_end = fields.get("end", row["end"])
     if new_end <= new_start:
@@ -220,6 +249,7 @@ def export_clip(
     jobs: JobQueue = Depends(get_jobs),
 ):
     """クリップを書き出す(有効な中抜きを反映)"""
+    _require_ffmpeg()  # ジョブ投入後に失敗するより先にUIへ伝える
     clip = _get_clip_row(db, clip_id)
     cuts = [
         {"start": r["start"], "end": r["end"]}
@@ -233,6 +263,8 @@ def export_clip(
         "burn_subtitles": True, "cuts": cuts, "clip_id": clip_id,
         "subtitle_position": clip["subtitle_position"],
         "subtitle_offset_y": clip["subtitle_offset_y"],
+        "convert_method": clip["convert_method"],  # None=プロジェクト既定
+        "crop_x": clip["crop_x"],
     })
     db.execute("UPDATE clips SET status='exporting' WHERE id=?", (clip_id,))
     db.commit()

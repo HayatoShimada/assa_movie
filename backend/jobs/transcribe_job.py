@@ -8,7 +8,7 @@ import sqlite3
 from pathlib import Path
 from typing import Callable
 
-from backend.core.config import settings
+from backend.core.project_settings import resolve_settings
 from backend.engines.asr.registry import build_engine
 from backend.engines.diarize import pyannote as diarize
 from backend.jobs.queue import register
@@ -32,25 +32,26 @@ def run_transcribe(
     if row is None:
         raise ValueError(f"media {media_id} が見つかりません")
 
-    language = params.get("language", settings.asr_language)
+    s = resolve_settings(conn, media_id=media_id)
+    language = params.get("language", s.asr_language)
     audio = audio_io.decode(Path(row["path"]))
     progress(0.05)
 
     # ---- 話者分離 ----
     turns: list = []
     label_map: dict[str, str] = {}
-    if settings.diarization_enabled:
-        token = diarize.load_hf_token(settings.hf_token_file)
+    if s.diarization_enabled:
+        token = diarize.load_hf_token(s.hf_token_file)
         if token:
             turns = diarize.run_diarization(
                 audio, token,
-                model=settings.diarization_model,
-                num_speakers=settings.num_speakers,
+                model=s.diarization_model,
+                num_speakers=s.num_speakers,
             )
             label_map = diarize.build_label_map(
                 audio, turns,
-                male_name=settings.male_name,
-                female_name=settings.female_name,
+                male_name=s.male_name,
+                female_name=s.female_name,
                 log=lambda *_: None,
             )
     progress(DIARIZE_SHARE)
@@ -65,13 +66,13 @@ def run_transcribe(
         "SELECT term FROM glossary WHERE project_id=?", (project_id,)
     )]
     prompt_parts = []
-    if settings.asr_verbatim_style:
+    if s.asr_verbatim_style:
         prompt_parts.append("えーと、あのー、そのー、なんか、うん。")
     if terms:
         prompt_parts.append("、".join(terms[:30]) + "。")
     initial_prompt = " ".join(prompt_parts) or None
 
-    engine = build_engine(settings)
+    engine = build_engine(s)
     try:
         result = engine.transcribe(
             audio,
@@ -96,7 +97,7 @@ def run_transcribe(
         rows.append((
             media_id, idx, seg.start, seg.end, seg.text, seg.text,
             label_map.get(speaker_label, speaker_label),
-            int(is_aizuchi(seg.text, seg.end - seg.start, settings.aizuchi_max_duration)),
+            int(is_aizuchi(seg.text, seg.end - seg.start, s.aizuchi_max_duration)),
             seg.confidence,
             json.dumps(words, ensure_ascii=False),
             json.dumps(filler_candidates, ensure_ascii=False) if filler_candidates else None,

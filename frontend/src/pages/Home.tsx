@@ -3,6 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRef, useState } from 'react'
 import { api, type Media, type Project } from '../api/client'
 import { Button, Card, ProgressBar, formatTime } from '../components/ui'
+import { CreateProjectForm, TEMPLATES } from '../components/project/CreateProjectForm'
+import { ProjectSettingsPanel } from '../components/project/ProjectSettingsPanel'
 import { useJobProgress } from '../hooks/useJobProgress'
 import { navigate } from '../hooks/useHashRoute'
 
@@ -70,6 +72,14 @@ function ProjectCard({ project }: { project: Project }) {
     queryKey: ['media', project.id],
     queryFn: () => api.listMedia(project.id),
   })
+  const [showSettings, setShowSettings] = useState(false)
+  const remove = useMutation({
+    mutationFn: () => api.deleteProject(project.id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['projects'] }),
+  })
+  const templateLabel = TEMPLATES.find(
+    (t) => t.input === project.input_orientation && t.output === project.output_orientation,
+  )?.label
   const [path, setPath] = useState('')
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const addMedia = useMutation({
@@ -91,6 +101,40 @@ function ProjectCard({ project }: { project: Project }) {
 
   return (
     <Card title={project.name}>
+      <div className="mb-2 flex items-center gap-2">
+        {templateLabel && (
+          <span
+            data-testid={`project-template-badge-${project.id}`}
+            className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"
+          >
+            {templateLabel}
+          </span>
+        )}
+        <span className="ml-auto" />
+        <Button
+          data-testid={`project-settings-${project.id}`}
+          variant="ghost"
+          onClick={() => setShowSettings((s) => !s)}
+        >
+          設定
+        </Button>
+        <Button
+          data-testid={`project-delete-${project.id}`}
+          variant="ghost"
+          disabled={remove.isPending}
+          onClick={() => {
+            if (
+              window.confirm(
+                `プロジェクト「${project.name}」を削除します。動画の文字起こし・クリップも全て消えます。よろしいですか?`,
+              )
+            )
+              remove.mutate()
+          }}
+        >
+          削除
+        </Button>
+      </div>
+      {showSettings && <ProjectSettingsPanel project={project} />}
       {media.data?.length ? (
         <ul>
           {media.data.map((m) => (
@@ -144,39 +188,13 @@ function ProjectCard({ project }: { project: Project }) {
 }
 
 export function Home() {
-  const queryClient = useQueryClient()
   const projects = useQuery({ queryKey: ['projects'], queryFn: api.listProjects })
-  const [name, setName] = useState('')
-  const create = useMutation({
-    mutationFn: () => api.createProject(name),
-    onSuccess: () => {
-      setName('')
-      queryClient.invalidateQueries({ queryKey: ['projects'] })
-    },
-  })
 
   return (
     <main className="mx-auto max-w-3xl space-y-4 p-6">
       <h1 className="text-xl font-bold">Attention Subtitle Separate Application</h1>
 
-      <form
-        className="flex gap-2"
-        onSubmit={(e) => {
-          e.preventDefault()
-          if (name.trim()) create.mutate()
-        }}
-      >
-        <input
-          data-testid="new-project-name"
-          className="flex-1 rounded-md border border-neutral-300 px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-900"
-          placeholder="新しいプロジェクト名"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-        <Button type="submit" disabled={create.isPending}>
-          作成
-        </Button>
-      </form>
+      <CreateProjectForm />
 
       {projects.isError && (
         <p className="text-sm text-red-600">

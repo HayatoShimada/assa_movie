@@ -33,11 +33,19 @@ cd frontend && npm run gen:api    # バックエンドのAPIを変えたら必�
 
 ## 設計上の重要な決定(変えるときは相談)
 
-- **ASRは faster-whisper large-v3 が既定。** 精度優先・単語タイムスタンプ必須の要件による。
-  kotoba-whisperは単語TSが取れないため不採用(実測記録はBACKEND_DESIGN.md)。
-- **依存バージョンは固定。** torch 2.8 / pyannote 3.x / huggingface_hub 0.x / TypeScript 5.9。
-  互換性を検証済みの組み合わせなので上げない(理由は各所のコメント参照)。
-- **Blackwell GPUでは compute_type="float16" 固定。** int8はクラッシュする。
+- **ASRエンジンはGPUで自動選択(`asr_engine=auto`)。** CUDA→faster-whisper /
+  ROCm→transformers版Whisper(CTranslate2がROCm非対応のため)/ GPUなし→faster-whisper CPU。
+  モデルは large-v3 が既定(精度優先・単語タイムスタンプ必須。BACKEND_DESIGN.md)。
+- **torchはdependency-groupsで切替。** 既定は rocm(RX 7900系)。NVIDIA機は
+  `WL_TORCH_GROUP=cu128 ./dev.sh sync`。依存バージョンは固定
+  (torch 2.8 / pyannote 3.x / huggingface_hub 0.x / TypeScript 5.9)。上げない。
+- **Blackwell GPUでは compute_type="float16" 固定。** int8はクラッシュする(CPUのint8は安全)。
+- **設定は3層(グローバル→プロジェクト→クリップ)。** ジョブ・APIは
+  `resolve_settings()`(backend/core/project_settings.py)経由で読む。
+  ジョブ層でグローバルsettingsを直接importしない(テストで担保)。
+- **字幕のpx値は1920×1080基準で保存し、出力解像度へ比率換算する。**
+  フォント・左右余白=幅比率、上下余白=高さ比率(subtitle.scaled_style)。
+  フロントのプレビューも同じ規則(cqw/cqh)で描く。
 - **LLMは提案するだけ、適用は機械ガードを通ったものだけ。**
   `pronoun.validate_edit()` が削除のみ・既出重複・慣用表現などを弾く。この構造を壊さない。
 - **`original_text` は常に原文を保持。** 置換もユーザー編集も非破壊で、いつでも戻せる。

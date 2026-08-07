@@ -4,7 +4,7 @@ import json
 import sqlite3
 from typing import Callable
 
-from backend.core.config import settings
+from backend.core.project_settings import resolve_settings
 from backend.jobs.queue import register
 from backend.jobs.resolve_job import _get_client, _load_prompt_parts
 from backend.pipeline import attention as att
@@ -31,18 +31,19 @@ def run_attention(
         return
 
     # 概要(ブリーフ)があれば候補選定の文脈として渡す
-    parts = _load_prompt_parts(conn, media_id, settings.pronoun_level)
+    s = resolve_settings(conn, media_id=media_id)
+    parts = _load_prompt_parts(conn, media_id, s.pronoun_level)
     system = att.build_attention_prompt(target_duration)
     if parts.brief:
         system += f"\n\nこの動画の概要(ユーザー提供):\n{parts.brief}"
 
-    client = _get_client()
+    client = _get_client(s)
     lines = [f"{i + 1}: [{r['speaker'] or '?'}] {r['text']}" for i, r in enumerate(speech)]
 
     raw_candidates = []
     starts = list(range(0, len(lines), CHUNK_LINES - OVERLAP))
-    for n, s in enumerate(starts):
-        chunk = lines[s:s + CHUNK_LINES]
+    for n, pos in enumerate(starts):
+        chunk = lines[pos:pos + CHUNK_LINES]
         payload = client.complete_json(system, "\n".join(chunk), att.ATTENTION_SCHEMA)
         for c in payload.get("candidates", []) or []:
             raw_candidates.append(c)
@@ -72,11 +73,12 @@ def run_attention(
         reasons = list(dict.fromkeys([*(c.get("reasons") or []), *mech_reasons]))[:5]
         conn.execute(
             "INSERT INTO clips (media_id, start, end, title, hook_text, score,"
-            " score_reasons_json, target_duration, status)"
-            " VALUES (?,?,?,?,?,?,?,?,'suggested')",
+              " score_reasons_json, subtitle_position, subtitle_offset_y, target_duration, status)"
+              " VALUES (?,?,?,?,?,?,?,?,?,?,'suggested')",
             (media_id, start, end, str(c.get("title", ""))[:60],
              str(c.get("hook", ""))[:40], score,
-             json.dumps(reasons, ensure_ascii=False), target_duration),
+               json.dumps(reasons, ensure_ascii=False),
+               s.subtitle_position, int(s.subtitle_offset_y), target_duration),
         )
         seen_ranges.append((start, end))
         inserted += 1
@@ -106,12 +108,13 @@ def run_clip_meta(
     transcript = "\n".join(r["text"] for r in rows)
     progress(0.1)
 
-    parts = _load_prompt_parts(conn, media_id, settings.pronoun_level)
+    s = resolve_settings(conn, media_id=media_id)
+    parts = _load_prompt_parts(conn, media_id, s.pronoun_level)
     system = att.META_PROMPT
     if parts.brief:
         system += f"\n\nこの動画の概要(ユーザー提供):\n{parts.brief}"
 
-    payload = _get_client().complete_json(system, transcript, att.META_SCHEMA)
+    payload = _get_client(s).complete_json(system, transcript, att.META_SCHEMA)
     meta = {
         "title": str(payload.get("title", "")),
         "hooks": [str(h) for h in (payload.get("hooks") or [])][:3],

@@ -22,7 +22,17 @@ function effectiveDuration(clip: Clip): number {
   return clip.end - clip.start - cutTotal
 }
 
-function ClipEditor({ clip, mediaId }: { clip: Clip; mediaId: number }) {
+function ClipEditor({
+  clip,
+  mediaId,
+  globalSubtitlePosition,
+  globalSubtitleOffsetY,
+}: {
+  clip: Clip
+  mediaId: number
+  globalSubtitlePosition: Clip['subtitle_position']
+  globalSubtitleOffsetY: number
+}) {
   const queryClient = useQueryClient()
   const seekTo = usePlayback((s) => s.seekTo)
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['clips', mediaId] })
@@ -151,7 +161,54 @@ function ClipEditor({ clip, mediaId }: { clip: Clip; mediaId: number }) {
       )}
 
       <div className="space-y-1">
-        <label className="block text-xs text-neutral-500">字幕位置</label>
+        <label className="block text-xs text-neutral-500">縦横変換(このクリップだけ上書き)</label>
+        <select
+          data-testid="clip-convert-method"
+          className="w-full rounded border border-neutral-300 px-2 py-1 text-sm dark:border-neutral-700 dark:bg-neutral-900"
+          value={clip.convert_method ?? ''}
+          onChange={(e) =>
+            update.mutate({
+              convert_method: (e.target.value || null) as Clip['convert_method'],
+            })
+          }
+        >
+          <option value="">プロジェクト既定</option>
+          <option value="crop">中央クロップ(位置調整可)</option>
+          <option value="blur_pad">ぼかし背景(全体表示)</option>
+          <option value="face">顔検出(1人=追従 / 2人=上下分割)</option>
+        </select>
+        {clip.convert_method === 'crop' && (
+          <>
+            <label className="block text-xs text-neutral-500">
+              クロップ位置 ({Math.round(clip.crop_x * 100)}%)
+            </label>
+            <input
+              data-testid="clip-crop-x"
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={clip.crop_x}
+              onChange={(e) => update.mutate({ crop_x: Number(e.target.value) })}
+              className="w-full"
+            />
+          </>
+        )}
+        <div className="flex items-center justify-between">
+          <label className="block text-xs text-neutral-500">字幕位置</label>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() =>
+              update.mutate({
+                subtitle_position: globalSubtitlePosition,
+                subtitle_offset_y: globalSubtitleOffsetY,
+              })
+            }
+          >
+            全体設定で上書き
+          </Button>
+        </div>
         <select
           data-testid="clip-subtitle-position"
           className="w-full rounded border border-neutral-300 px-2 py-1 text-sm dark:border-neutral-700 dark:bg-neutral-900"
@@ -233,13 +290,16 @@ export function ClipsTab({
   mediaId,
   onSubtitlePositionPreviewChange,
   onSubtitleOffsetPreviewChange,
+  onConvertPreviewChange,
 }: {
   mediaId: number
   onSubtitlePositionPreviewChange?: (position: Clip['subtitle_position'] | null) => void
   onSubtitleOffsetPreviewChange?: (offsetY: number | null) => void
+  onConvertPreviewChange?: (method: Clip['convert_method'], cropX: number | null) => void
 }) {
   const queryClient = useQueryClient()
   const clips = useQuery({ queryKey: ['clips', mediaId], queryFn: () => clipsApi.list(mediaId) })
+  const settings = useQuery({ queryKey: ['settings'], queryFn: api.getSettings })
   const [target, setTarget] = useState(60)
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [jobId, setJobId] = useState<number | null>(null)
@@ -257,13 +317,20 @@ export function ClipsTab({
 
   const running = progress.status === 'running' || progress.status === 'queued'
   const selected = clips.data?.find((c) => c.id === selectedId)
+  const globalSubtitlePosition =
+    (settings.data?.values.subtitle_position as Clip['subtitle_position'] | undefined) ?? 'bottom'
+  const globalSubtitleOffsetY = Number(settings.data?.values.subtitle_offset_y ?? 0)
 
   useEffect(() => {
     onSubtitlePositionPreviewChange?.(selected?.subtitle_position ?? null)
     onSubtitleOffsetPreviewChange?.(selected?.subtitle_offset_y ?? null)
+    onConvertPreviewChange?.(selected?.convert_method ?? null, selected?.crop_x ?? null)
   }, [
+    onConvertPreviewChange,
     onSubtitleOffsetPreviewChange,
     onSubtitlePositionPreviewChange,
+    selected?.convert_method,
+    selected?.crop_x,
     selected?.subtitle_offset_y,
     selected?.subtitle_position,
   ])
@@ -349,7 +416,14 @@ export function ClipsTab({
               </span>
             </div>
           </div>
-          {selected?.id === clip.id && <ClipEditor clip={selected} mediaId={mediaId} />}
+          {selected?.id === clip.id && (
+            <ClipEditor
+              clip={selected}
+              mediaId={mediaId}
+              globalSubtitlePosition={globalSubtitlePosition}
+              globalSubtitleOffsetY={globalSubtitleOffsetY}
+            />
+          )}
         </div>
       ))}
     </div>

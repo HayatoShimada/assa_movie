@@ -56,13 +56,26 @@ def run_diarization(
     except TypeError:
         # pyannote.audio 3.x は引数名が use_auth_token
         pipeline = Pipeline.from_pretrained(model, use_auth_token=token)
-    pipeline.to(torch.device("cuda"))
+    # ROCmのHIPビルドもtorch上では"cuda"を名乗るのでこの判定で両対応になる
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    pipeline.to(device)
 
     inputs = {"waveform": torch.from_numpy(audio).unsqueeze(0), "sample_rate": SAMPLE_RATE}
-    if num_speakers is not None:
-        result = pipeline(inputs, num_speakers=num_speakers)
-    else:
-        result = pipeline(inputs)
+    try:
+        if num_speakers is not None:
+            result = pipeline(inputs, num_speakers=num_speakers)
+        else:
+            result = pipeline(inputs)
+    except RuntimeError:
+        if device.type != "cuda":
+            raise
+        # ROCm初期環境でのMIOpenカーネル生成失敗等に備え、CPUで1回だけ再試行する
+        print("⚠ GPUでの話者分離に失敗したため、CPUで再試行します。")
+        pipeline.to(torch.device("cpu"))
+        if num_speakers is not None:
+            result = pipeline(inputs, num_speakers=num_speakers)
+        else:
+            result = pipeline(inputs)
 
     # pyannote.audio 4.x はコンテナ型、3.x はAnnotationを直接返す
     annotation = getattr(result, "speaker_diarization", result)

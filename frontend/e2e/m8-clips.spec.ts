@@ -124,3 +124,34 @@ test('クリップ: 字幕位置を変更して保存できる', async ({ page, 
     })
     .toBe('top:-30')
 })
+
+test('クリップ: 全体設定で上書きボタンが効く', async ({ page, request }) => {
+  const mediaId = await seedTranscribed(request)
+  const clip = await (
+    await request.post(`${API}/api/media/${mediaId}/clips`, {
+      data: { start: 0, end: 8, title: '上書きテスト' },
+    })
+  ).json()
+
+  await request.patch(`${API}/api/settings`, {
+    data: { subtitle_position: 'top', subtitle_offset_y: -20 },
+  })
+
+  await page.goto(`/#/media/${mediaId}`)
+  await page.getByTestId('tab-clips').click()
+  await page.getByText('上書きテスト').click()
+
+  await page.getByRole('button', { name: '全体設定で上書き' }).click()
+
+  await expect
+    .poll(async () => {
+      const clips = await (await request.get(`${API}/api/media/${mediaId}/clips`)).json()
+      const target = clips.find((c: { id: number }) => c.id === clip.id)
+      return `${target.subtitle_position}:${target.subtitle_offset_y}`
+    })
+    .toBe('top:-20')
+
+  await request.patch(`${API}/api/settings`, {
+    data: { subtitle_position: 'bottom', subtitle_offset_y: 0 },
+  })
+})

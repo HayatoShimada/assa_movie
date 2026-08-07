@@ -9,7 +9,7 @@ import sqlite3
 from collections import Counter
 from typing import Callable
 
-from backend.core.config import settings
+from backend.core.project_settings import resolve_settings
 from backend.jobs.queue import register
 from backend.jobs.resolve_job import _get_client
 
@@ -67,7 +67,7 @@ def run_extract_terms(
         return
 
     texts = [r["text"] for r in rows]
-    client = _get_client()
+    client = _get_client(resolve_settings(conn, media_id=media_id))
     chunk_size = params.get("chunk_size", 100)
     chunks = [texts[i:i + chunk_size] for i in range(0, len(texts), chunk_size)]
 
