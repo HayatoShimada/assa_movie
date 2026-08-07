@@ -3,7 +3,9 @@
  * 字幕オーバーレイは現在セグメントのテキストをCSSで重ねる(スタイル調整はM7)。
  */
 import { useEffect, useRef } from 'react'
-import { API_BASE, type Segment } from '../../api/client'
+import { useQuery } from '@tanstack/react-query'
+import { API_BASE, api, type Segment } from '../../api/client'
+import { wrapSubtitle } from '../../lib/subtitle'
 import { usePlayback } from '../../stores/playback'
 
 export function VideoPlayer({ mediaId, segments }: { mediaId: number; segments: Segment[] }) {
@@ -21,11 +23,19 @@ export function VideoPlayer({ mediaId, segments }: { mediaId: number; segments: 
     return () => setSeeker(null)
   }, [setSeeker])
 
+  const settings = useQuery({ queryKey: ['settings'], queryFn: api.getSettings })
+  const maxChars = Number(settings.data?.values.subtitle_max_chars_per_line ?? 15)
+
+  // 採用ジャッジ(選択字幕)と相槌を反映して現在の字幕を選ぶ
   const active = segments.find(
-    (s) => !s.is_aizuchi && s.start <= currentTime && currentTime < s.end,
+    (s) =>
+      !s.is_aizuchi &&
+      (s.subtitle_show === 'auto_show' || s.subtitle_show === 'user_show') &&
+      s.start <= currentTime &&
+      currentTime < s.end,
   )
-  // 字幕は話者ラベル(「はやまる: 」)を外して表示する
-  const subtitle = active?.text.replace(/^[^:]+: /, '')
+  // 話者ラベル(「はやまる: 」)を外し、書き出しと同じ折返し・禁則を適用する
+  const lines = active ? wrapSubtitle(active.text.replace(/^[^:]+: /, ''), maxChars) : []
 
   return (
     <div className="relative overflow-hidden rounded-lg bg-black">
@@ -37,13 +47,17 @@ export function VideoPlayer({ mediaId, segments }: { mediaId: number; segments: 
         controls
         onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
       />
-      {subtitle && (
+      {lines.length > 0 && (
         <p
           data-testid="subtitle-overlay"
           className="pointer-events-none absolute inset-x-4 bottom-14 text-center text-lg font-bold text-white"
           style={{ textShadow: '0 0 4px rgba(0,0,0,.9), 0 0 8px rgba(0,0,0,.7)' }}
         >
-          {subtitle}
+          {lines.map((line, i) => (
+            <span key={i} className="block">
+              {line}
+            </span>
+          ))}
         </p>
       )}
     </div>

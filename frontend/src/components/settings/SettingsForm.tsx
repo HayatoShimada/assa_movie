@@ -118,6 +118,58 @@ export function SettingsForm() {
       </div>
 
       <div className="py-2">
+        <h3 className="mb-1 text-sm font-semibold">字幕</h3>
+        <Row label="字幕モード">
+          <select
+            data-testid="setting-subtitle-mode"
+            className={selectCls}
+            value={String(v.subtitle_mode)}
+            onChange={(e) => set('subtitle_mode')(e.target.value)}
+          >
+            <option value="all">全文字幕(全セグメントを表示)</option>
+            <option value="selective">選択字幕(必要なものだけ)</option>
+          </select>
+        </Row>
+        {v.subtitle_mode === 'selective' && (
+          <Row label={`採用率 ${Math.round(Number(v.subtitle_adoption_rate) * 100)}%`}>
+            <input
+              type="range"
+              min={0.1}
+              max={1}
+              step={0.05}
+              defaultValue={Number(v.subtitle_adoption_rate)}
+              onMouseUp={(e) =>
+                set('subtitle_adoption_rate')(Number((e.target as HTMLInputElement).value))
+              }
+            />
+          </Row>
+        )}
+        <Row label={`1行の最大文字数: ${v.subtitle_max_chars_per_line}`}>
+          <input
+            type="range"
+            min={10}
+            max={20}
+            defaultValue={Number(v.subtitle_max_chars_per_line)}
+            onMouseUp={(e) =>
+              set('subtitle_max_chars_per_line')(Number((e.target as HTMLInputElement).value))
+            }
+          />
+        </Row>
+        <Row label="フィラー排除">
+          <select
+            data-testid="setting-filler-level"
+            className={selectCls}
+            value={String(v.filler_level)}
+            onChange={(e) => set('filler_level')(e.target.value)}
+          >
+            <option value="off">無効(言い淀みも残す)</option>
+            <option value="weak">弱(明らかな言い淀みのみ)</option>
+            <option value="strong">強(曖昧なものはLLM判定+質問)</option>
+          </select>
+        </Row>
+      </div>
+
+      <div className="py-2">
         <h3 className="mb-1 text-sm font-semibold">LLM</h3>
         <Row label="プロバイダ">
           <select

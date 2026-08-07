@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS media (
     path       TEXT NOT NULL,
     duration   REAL,
     status     TEXT NOT NULL DEFAULT 'registered',
+    brief_json TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -34,6 +35,7 @@ CREATE TABLE IF NOT EXISTS segments (
     subtitle_show         TEXT NOT NULL DEFAULT 'auto_show',
     subtitle_reasons_json TEXT,
     words_json            TEXT,
+    filler_candidates_json TEXT,
     UNIQUE (media_id, idx)
 );
 
@@ -132,6 +134,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     status      TEXT NOT NULL DEFAULT 'queued',
     progress    REAL NOT NULL DEFAULT 0.0,
     error       TEXT,
+    result_json TEXT,
     created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -148,10 +151,22 @@ def connect(db_path: Path) -> sqlite3.Connection:
     return conn
 
 
+# 後から追加された列(既存DBにはALTERで足す)
+_MIGRATIONS = [
+    ("media", "brief_json", "TEXT"),
+    ("segments", "filler_candidates_json", "TEXT"),
+    ("jobs", "result_json", "TEXT"),
+]
+
+
 def init_db(db_path: Path) -> sqlite3.Connection:
     """スキーマを作成(既存なら何もしない)して接続を返す"""
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = connect(db_path)
     conn.executescript(SCHEMA)
+    for table, column, coltype in _MIGRATIONS:
+        cols = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})")}
+        if column not in cols:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {coltype}")
     conn.commit()
     return conn

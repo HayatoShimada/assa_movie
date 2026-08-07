@@ -121,6 +121,7 @@ class PromptParts:
     """プロンプト合成の材料(BACKEND_DESIGN.md「ユーザー指示の注入」の順序)"""
 
     level: str = "medium"
+    brief: str = ""  # 動画の主題・登場人物・固有名詞紹介(ユーザー提供)
     glossary: list[dict] = field(default_factory=list)
     instructions: list[str] = field(default_factory=list)
     feedback: list[dict] = field(default_factory=list)
@@ -128,9 +129,12 @@ class PromptParts:
 
 
 def build_system_prompt(parts: PromptParts) -> str:
-    """レベル → 用語集 → カスタム指示 → feedback few-shot の順に合成する"""
+    """レベル → 概要 → 用語集 → カスタム指示 → feedback few-shot の順に合成する"""
     level = LEVELS.get(parts.level) or LEVELS["medium"]
     sections = [BASE_PROMPT.format(targets=level.targets, policy=level.policy)]
+
+    if parts.brief:
+        sections.append("この動画の概要(ユーザー提供。指示語の解決に活用すること):\n" + parts.brief)
 
     if parts.glossary:
         lines = [

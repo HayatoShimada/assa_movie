@@ -13,6 +13,7 @@ from backend.engines.asr.registry import build_engine
 from backend.engines.diarize import pyannote as diarize
 from backend.jobs.queue import register
 from backend.pipeline import audio as audio_io
+from backend.pipeline import filler as filler_mod
 from backend.pipeline.aizuchi import is_aizuchi
 
 # 進捗の配分: 話者分離40% + 文字起こし55% + 保存5%
@@ -55,12 +56,28 @@ def run_transcribe(
     progress(DIARIZE_SHARE)
 
     # ---- 文字起こし ----
+    # initial_prompt: フィラーを含む文体例を与えるとWhisperが言い淀みを忠実に転写する。
+    # 用語集の語も併せて渡し、固有名詞の認識精度を上げる(量子化段階の工夫)
+    project_id = conn.execute(
+        "SELECT project_id FROM media WHERE id=?", (media_id,)
+    ).fetchone()["project_id"]
+    terms = [r["term"] for r in conn.execute(
+        "SELECT term FROM glossary WHERE project_id=?", (project_id,)
+    )]
+    prompt_parts = []
+    if settings.asr_verbatim_style:
+        prompt_parts.append("えーと、あのー、そのー、なんか、うん。")
+    if terms:
+        prompt_parts.append("、".join(terms[:30]) + "。")
+    initial_prompt = " ".join(prompt_parts) or None
+
     engine = build_engine(settings)
     try:
         result = engine.transcribe(
             audio,
             language=language,
             progress=lambda p: progress(DIARIZE_SHARE + p * ASR_SHARE),
+            initial_prompt=initial_prompt,
         )
     finally:
         engine.unload()
@@ -70,19 +87,24 @@ def run_transcribe(
     rows = []
     for idx, seg in enumerate(result.segments):
         speaker_label = diarize.assign_speaker(seg, turns) if turns else None
+        words = [
+            {"start": w.start, "end": w.end, "text": w.text, "probability": w.probability}
+            for w in (seg.words or [])
+        ]
+        # Whisper段階のフィラー一次判定(音響+表記シグナル)をメタデータとして保存
+        filler_candidates = filler_mod.analyze_line(seg.text, words)
         rows.append((
             media_id, idx, seg.start, seg.end, seg.text, seg.text,
             label_map.get(speaker_label, speaker_label),
             int(is_aizuchi(seg.text, seg.end - seg.start, settings.aizuchi_max_duration)),
             seg.confidence,
-            json.dumps(
-                [{"start": w.start, "end": w.end, "text": w.text} for w in (seg.words or [])],
-                ensure_ascii=False,
-            ),
+            json.dumps(words, ensure_ascii=False),
+            json.dumps(filler_candidates, ensure_ascii=False) if filler_candidates else None,
         ))
     conn.executemany(
         "INSERT INTO segments (media_id, idx, start, end, text, original_text,"
-        " speaker, is_aizuchi, asr_confidence, words_json) VALUES (?,?,?,?,?,?,?,?,?,?)",
+        " speaker, is_aizuchi, asr_confidence, words_json, filler_candidates_json)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?)",
         rows,
     )
     conn.execute("UPDATE media SET status='transcribed' WHERE id=?", (media_id,))

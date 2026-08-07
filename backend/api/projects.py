@@ -7,6 +7,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 
 from backend.api.deps import get_db
 from backend.models.dto import Media, MediaCreate, Project, ProjectCreate
@@ -77,6 +78,38 @@ def get_media(media_id: int, db: sqlite3.Connection = Depends(get_db)):
     if row is None:
         raise HTTPException(404, "メディアが見つかりません")
     return Media(**dict(row))
+
+
+class Brief(BaseModel):
+    theme: str = ""    # 動画全体の主題
+    people: str = ""   # 登場人物の紹介
+    notes: str = ""    # 固有名詞・補足(用語集に入れるほどでない文脈情報)
+
+
+@router.get("/media/{media_id}/brief", response_model=Brief)
+def get_brief(media_id: int, db: sqlite3.Connection = Depends(get_db)):
+    row = db.execute("SELECT brief_json FROM media WHERE id=?", (media_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "メディアが見つかりません")
+    import json
+
+    return Brief(**json.loads(row["brief_json"] or "{}"))
+
+
+@router.patch("/media/{media_id}/brief", response_model=Brief)
+def update_brief(media_id: int, body: Brief, db: sqlite3.Connection = Depends(get_db)):
+    """動画の主題・登場人物・固有名詞紹介。切り抜き・指示語解決・固有名詞スキャンの
+    全LLMプロンプトに注入される(BACKEND_DESIGN.md「ユーザー指示の注入」)"""
+    if db.execute("SELECT 1 FROM media WHERE id=?", (media_id,)).fetchone() is None:
+        raise HTTPException(404, "メディアが見つかりません")
+    import json
+
+    db.execute(
+        "UPDATE media SET brief_json=? WHERE id=?",
+        (json.dumps(body.model_dump(), ensure_ascii=False), media_id),
+    )
+    db.commit()
+    return body
 
 
 @router.get("/media/{media_id}/file")

@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from backend.api.deps import get_db
+from backend.jobs.filler_job import apply_filler_answer
 from backend.jobs.terms_job import apply_term_answer
 
 router = APIRouter(prefix="/api", tags=["questions"])
@@ -54,7 +55,12 @@ def list_questions(
 def answer_question(
     question_id: int, body: Answer, db: sqlite3.Connection = Depends(get_db)
 ):
+    row = db.execute("SELECT kind FROM questions WHERE id=?", (question_id,)).fetchone()
+    if row is None:
+        raise HTTPException(404, "質問が見つかりません")
     try:
+        if row["kind"] == "filler":
+            return apply_filler_answer(db, question_id, body.text)
         return apply_term_answer(db, question_id, body.text)
     except ValueError as e:
         raise HTTPException(404, str(e))

@@ -43,6 +43,7 @@ class FasterWhisperEngine:
         audio: np.ndarray,
         language: str | None = None,
         progress: ProgressFn | None = None,
+        initial_prompt: str | None = None,
     ) -> TranscribeResult:
         model = self.load()
         segments, info = model.transcribe(
@@ -51,6 +52,7 @@ class FasterWhisperEngine:
             beam_size=self.beam_size,
             vad_filter=self.vad_filter,
             word_timestamps=True,  # 話者割り当てと字幕同期の精度向上に必要
+            initial_prompt=initial_prompt,
         )
 
         total = len(audio) / 16000
@@ -61,7 +63,10 @@ class FasterWhisperEngine:
                     start=seg.start,
                     end=seg.end,
                     text=seg.text.strip(),
-                    words=[Word(w.start, w.end, w.word) for w in (seg.words or [])] or None,
+                    words=[
+                        Word(w.start, w.end, w.word, getattr(w, "probability", None))
+                        for w in (seg.words or [])
+                    ] or None,
                     confidence=getattr(seg, "avg_logprob", None),
                 )
             )

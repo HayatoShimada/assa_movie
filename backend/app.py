@@ -12,7 +12,10 @@ from backend.api import questions as questions_api
 from backend.api import settings_api
 from backend.api import transcripts as transcripts_api
 from backend.core.config import settings
-from backend.jobs import resolve_job  # noqa: F401  ジョブハンドラの登録に必要
+from backend.jobs import export_job  # noqa: F401  ジョブハンドラの登録に必要
+from backend.jobs import filler_job  # noqa: F401
+from backend.jobs import judge_job  # noqa: F401
+from backend.jobs import resolve_job  # noqa: F401
 from backend.jobs import terms_job  # noqa: F401
 from backend.jobs import transcribe_job  # noqa: F401
 from backend.jobs.queue import JobQueue

@@ -57,6 +57,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/media/{media_id}/brief": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Brief */
+        get: operations["get_brief_api_media__media_id__brief_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Brief
+         * @description 動画の主題・登場人物・固有名詞紹介。切り抜き・指示語解決・固有名詞スキャンの
+         *     全LLMプロンプトに注入される(BACKEND_DESIGN.md「ユーザー指示の注入」)
+         */
+        patch: operations["update_brief_api_media__media_id__brief_patch"];
+        trace?: never;
+    };
     "/api/media/{media_id}/file": {
         parameters: {
             query?: never;
@@ -409,6 +431,24 @@ export interface components {
             /** Instruction Suggestion */
             instruction_suggestion?: string | null;
         };
+        /** Brief */
+        Brief: {
+            /**
+             * Theme
+             * @default
+             */
+            theme: string;
+            /**
+             * People
+             * @default
+             */
+            people: string;
+            /**
+             * Notes
+             * @default
+             */
+            notes: string;
+        };
         /** Edit */
         Edit: {
             /** Id */
@@ -486,6 +526,10 @@ export interface components {
             progress: number;
             /** Error */
             error?: string | null;
+            /** Result */
+            result?: {
+                [key: string]: unknown;
+            } | null;
             /** Created At */
             created_at: string;
         };
@@ -821,6 +865,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Media"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_brief_api_media__media_id__brief_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                media_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Brief"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_brief_api_media__media_id__brief_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                media_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Brief"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Brief"];
                 };
             };
             /** @description Validation Error */

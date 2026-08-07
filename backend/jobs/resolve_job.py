@@ -26,9 +26,21 @@ def _get_client() -> LLMClient:
 
 
 def _load_prompt_parts(conn: sqlite3.Connection, media_id: int, level: str) -> pronoun.PromptParts:
-    project_id = conn.execute(
-        "SELECT project_id FROM media WHERE id=?", (media_id,)
-    ).fetchone()["project_id"]
+    import json as json_mod
+
+    media = conn.execute(
+        "SELECT project_id, brief_json FROM media WHERE id=?", (media_id,)
+    ).fetchone()
+    project_id = media["project_id"]
+
+    brief_data = json_mod.loads(media["brief_json"] or "{}")
+    brief_lines = []
+    if brief_data.get("theme"):
+        brief_lines.append(f"主題: {brief_data['theme']}")
+    if brief_data.get("people"):
+        brief_lines.append(f"登場人物: {brief_data['people']}")
+    if brief_data.get("notes"):
+        brief_lines.append(f"補足: {brief_data['notes']}")
 
     glossary = [
         dict(r) for r in conn.execute(
@@ -49,7 +61,8 @@ def _load_prompt_parts(conn: sqlite3.Connection, media_id: int, level: str) -> p
         )
     ]
     return pronoun.PromptParts(
-        level=level, glossary=glossary, instructions=instructions, feedback=feedback
+        level=level, brief="\n".join(brief_lines),
+        glossary=glossary, instructions=instructions, feedback=feedback,
     )
 
 

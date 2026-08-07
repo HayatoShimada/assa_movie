@@ -11,6 +11,9 @@ class Word:
     start: float
     end: float
     text: str
+    # Whisperデコード時の単語確率。低い語は「聞き取りが曖昧」のシグナルとして
+    # フィラー判定・字幕採用ジャッジに使う(量子化で捨てられる情報の回収)
+    probability: float | None = None
 
 
 @dataclass

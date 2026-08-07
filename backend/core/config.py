@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     asr_language: str = "ja"
     asr_beam_size: int = 5
     asr_vad_filter: bool = True
+    # フィラー入りの文体例をinitial_promptに与え、言い淀みを忠実に転写させる
+    asr_verbatim_style: bool = True
 
     # ---- 話者分離 ----
     diarization_enabled: bool = True

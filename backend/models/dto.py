@@ -38,6 +38,7 @@ class Job(BaseModel):
     status: str
     progress: float
     error: str | None = None
+    result: dict | None = None  # 書き出しジョブの出力パスなど
     created_at: str
 
 
