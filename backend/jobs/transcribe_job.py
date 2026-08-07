@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Callable
 
 from backend.core.config import settings
-from backend.engines.asr.fasterwhisper import FasterWhisperEngine
+from backend.engines.asr.registry import build_engine
 from backend.engines.diarize import pyannote as diarize
 from backend.jobs.queue import register
 from backend.pipeline import audio as audio_io
@@ -55,12 +55,7 @@ def run_transcribe(
     progress(DIARIZE_SHARE)
 
     # ---- 文字起こし ----
-    engine = FasterWhisperEngine(
-        model_size=settings.asr_model,
-        compute_type=settings.asr_compute_type,
-        beam_size=settings.asr_beam_size,
-        vad_filter=settings.asr_vad_filter,
-    )
+    engine = build_engine(settings)
     try:
         result = engine.transcribe(
             audio,

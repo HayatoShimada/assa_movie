@@ -6,6 +6,7 @@ from fastapi import FastAPI
 
 from backend.api import jobs as jobs_api
 from backend.api import projects as projects_api
+from backend.api import settings_api
 from backend.api import transcripts as transcripts_api
 from backend.core.config import settings
 from backend.jobs import transcribe_job  # noqa: F401  ジョブハンドラの登録に必要
@@ -27,6 +28,7 @@ app = FastAPI(title="Attention Subtitle Separate Application", lifespan=lifespan
 app.include_router(projects_api.router)
 app.include_router(jobs_api.router)
 app.include_router(transcripts_api.router)
+app.include_router(settings_api.router)
 
 
 @app.get("/api/health")
