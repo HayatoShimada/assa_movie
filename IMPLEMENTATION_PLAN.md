@@ -13,10 +13,11 @@
 | M3 エンジン選択 | **完了** | large-v3既定 / turbo切替 + 設定API |
 | M4 指示語置換+HITL | **完了** | FakeLLMで学習ループ検証・質問機能・Gemini API対応含む |
 | M5 フロント骨格 | **完了** | ホーム/エディタ/設定タブ・E2E 8件。実Geminiでの指示語解決も確認済み |
-| M6 レビューUI+対話 | 未着手 | 次はここから |
-| M7〜M8 | 未着手 | |
+| M6 レビューUI+対話 | **完了** | レビュー/質問/アシストのUI+E2E。実Ollama×雑談編でチューニング済み |
+| M7 字幕整形・書き出し | 未着手 | 次はここから |
+| M8 アテンション+クリップ | 未着手 | |
 
-テスト: backend 130件 / frontend unit 13件 / E2E 8件。APIの一覧は `GET /openapi.json`。
+テスト: backend 153件 / frontend unit 13件 / E2E 14件。APIの一覧は `GET /openapi.json`。
 
 ## 実装者(AI/人間)への共通ルール
 
