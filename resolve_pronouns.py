@@ -14,6 +14,7 @@
 事前に Ollama サーバーが起動していること: ollama serve
 """
 
+import difflib
 import json
 import re
 import sys
@@ -29,6 +30,14 @@ CHUNK_SIZE = 30              # 一度にLLMへ渡す編集対象の行数
 CONTEXT_SIZE = 15            # 参照用として前置する直前の行数
 MAX_REPLACEMENT_LEN = 40     # これより長い置換文字列は暴走とみなしてスキップ
 RETRIES = 3
+
+# 指示語を含むが置換対象にしない慣用表現・複合語
+IDIOM_WORDS = (
+    "この世", "この間", "このように", "この前", "この後", "このまま",
+    "これから", "これまで", "これで", "それぞれ", "それなり", "それでも",
+    "それに", "そのまま", "その後", "そのうち", "その通り", "その分",
+    "あれこれ", "あれから",
+)
 
 EDITS_SCHEMA = {
     "type": "object",
@@ -61,10 +70,25 @@ SYSTEM_PROMPT = """あなたは対談の文字起こしを校正する編集者�
 4. original は対象行に実際に含まれる連続した文字列を、指示語を含む最小限の範囲で指定する。
 5. replacement は置き換えても文が自然につながる表現にする。発言の意味を変えない。
 6. 指示語の解決以外の編集(言い回しの修正、誤字修正など)は一切しない。
+7. **指示語を単に削除するだけの編集は禁止**。replacement には指している内容を表す具体的な語句を必ず含めること。
+   (悪い例: 「そのAI」→「AI」、「その人」→「人」 … 参照先を明示していないので出さない)
+8. 慣用表現・複合語(この世・この間・これから・これまで・それぞれ・そのまま・その後・そのうち 等)は指示語として扱わない。
+9. 人称代名詞(僕・私・俺・あなた・彼・彼女)は置き換えない。話者の名前への置き換えも禁止。
+10. 参照先の語が同じ行の中に既に出ている場合は置き換えない(重複した文になるため)。
 7. 「編集対象」とマークされた行だけを編集する。「文脈(参照用)」の行は編集しない。
 8. 置き換えるべきものが無ければ {"edits": []} を返す。
 
 出力形式: {"edits": [{"line": 行番号, "original": "置換前", "replacement": "置換後"}]}"""
+
+
+def inserted_chunks(orig: str, repl: str) -> list[str]:
+    """origをreplに変えたとき新たに挿入される文字列の一覧"""
+    sm = difflib.SequenceMatcher(None, orig, repl)
+    return [
+        repl[j1:j2]
+        for tag, _, _, j1, j2 in sm.get_opcodes()
+        if tag in ("replace", "insert")
+    ]
 
 
 def parse_srt(path: Path):
@@ -167,8 +191,23 @@ def main():
                 reason = "空または無変更の編集"
             elif len(repl) > MAX_REPLACEMENT_LEN:
                 reason = f"置換文字列が長すぎる({len(repl)}文字)"
+            elif any(w in orig for w in IDIOM_WORDS):
+                reason = "慣用表現のため対象外"
             elif orig not in edited[n - 1]:
                 reason = "置換前文字列が行内に存在しない"
+            else:
+                inserted = [c for c in inserted_chunks(orig, repl) if len(c) >= 2]
+                rest_of_line = edited[n - 1].replace(orig, "", 1)
+                # 挿入文字列の3文字窓が行内に既出なら、参照先が重複する編集とみなす
+                windows = [
+                    c[i:i + 3] if len(c) > 3 else c
+                    for c in inserted
+                    for i in range(max(1, len(c) - 2))
+                ]
+                if not inserted:
+                    reason = "指示語の削除のみ(参照先の明示がない)"
+                elif any(w in rest_of_line for w in windows):
+                    reason = "参照先が同じ行に既出(重複になる)"
             if reason:
                 skipped.append((n, orig, repl, reason))
                 continue

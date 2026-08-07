@@ -1,0 +1,43 @@
+/home/nachi/Documents/85movie/whisper-local/.venv/lib/python3.12/site-packages/speechbrain/utils/torch_audio_backend.py:64: UserWarning: torchaudio._backend.list_audio_backends has been deprecated. This deprecation is part of a large refactoring effort to transition TorchAudio into a maintenance phase. The decoding and encoding capabilities of PyTorch for both audio and video are being consolidated into TorchCodec. Please see https://github.com/pytorch/audio/issues/3902 for more information. It will be removed from the 2.9 release. 
+  available_backends = torchaudio.list_audio_backends()
+/home/nachi/Documents/85movie/whisper-local/.venv/lib/python3.12/site-packages/pyannote/audio/utils/reproducibility.py:74: ReproducibilityWarning: TensorFloat-32 (TF32) has been disabled as it might lead to reproducibility issues and lower accuracy.
+It can be re-enabled by calling
+   >>> import torch
+   >>> torch.backends.cuda.matmul.allow_tf32 = True
+   >>> torch.backends.cudnn.allow_tf32 = True
+See https://github.com/pyannote/pyannote-audio/issues/1370 for more details.
+
+  warnings.warn(
+/home/nachi/Documents/85movie/whisper-local/.venv/lib/python3.12/site-packages/pyannote/audio/models/blocks/pooling.py:104: UserWarning: std(): degrees of freedom is <= 0. Correction should be strictly less than the reduction factor (input numel divided by output numel). (Triggered internally at /pytorch/aten/src/ATen/native/ReduceOps.cpp:1839.)
+  std = sequences.std(dim=-1, correction=1)
+音声をデコード中: tests/golden/smoke.wav
+話者分離を実行中... (モデル: pyannote/speaker-diarization-3.1)
+検出された話者: 2人 (SPEAKER_00, SPEAKER_01)
+声の高さで話者を判定: SPEAKER_00=112Hz → はやまる, SPEAKER_01=134Hz → 高田さん
+⚠ 2人の声の高さが近いため、判定が誤っている可能性があります。
+モデル large-v3 を読み込み中... (初回はダウンロードに数分かかります)
+文字起こし開始
+検出言語: ja (確度 1.00)
+[00:00:00,000 - 00:00:01,260] はやまる: 売れ駒だなとか
+[00:00:02,339 - 00:00:06,000] はやまる: でも生きてく上で人と関わらんとって
+[00:00:07,099 - 00:00:08,880] はやまる: 生きてけるんかなとか
+[00:00:08,880 - 00:00:14,960] はやまる: 確かにAIと話してる方が楽だっていう人は
+[00:00:14,960 - 00:00:17,239] はやまる: 結構増えてると思いますよ
+[00:00:19,120 - 00:00:21,339] はやまる: 例えば僕とゆいちゃんだったら
+[00:00:22,160 - 00:00:23,559] はやまる: 妻のゆいちゃんだったら
+[00:00:24,320 - 00:00:27,719] はやまる: 話してることとか今までの経験とか
+[00:00:27,719 - 00:00:30,539] はやまる: 人生観とか性格とかが全く違うわけです
+[00:00:31,239 - 00:00:33,079] はやまる: っていう話してると
+[00:00:33,079 - 00:00:34,679] はやまる: 衝突することもあるわけです
+[00:00:35,840 - 00:00:39,359] はやまる: っていう衝突があるんだったら
+[00:00:39,359 - 00:00:43,200] はやまる: じゃあAIに相談した方が
+[00:00:44,020 - 00:00:47,240] はやまる: 自分の求める回答が得られるっていうので
+[00:00:47,700 - 00:00:49,820] はやまる: AIと話した方が楽だし
+[00:00:50,420 - 00:00:54,140] はやまる: 求める答えがそこには待ってるみたいなことになるのかもしれないです
+[00:00:57,450 - 00:00:59,009] はやまる: それによって最終的に
+[00:00:59,009 - 00:00:59,969] はやまる: 人と関わらない
+
+完了しました。
+除外した相槌: 0件
+字幕ファイル: tests/golden/smoke.srt
+テキストファイル: tests/golden/smoke.txt

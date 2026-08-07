@@ -19,7 +19,21 @@ dependencies = [
     "huggingface-hub<1.0",
     # resolve_pronouns.py がOllama APIを叩くのに使用
     "requests>=2.31",
+    # バックエンドAPI
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "pydantic-settings>=2.6",
+    "sse-starlette>=2.1",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "httpx>=0.28",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
 [tool.uv.sources]
 torch = { index = "pytorch-cu128" }
