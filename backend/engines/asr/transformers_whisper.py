@@ -21,6 +21,9 @@ SAMPLE_RATE = 16000
 PAUSE_SPLIT_SEC = 0.8
 # セグメント末尾として扱う文末記号(全角・半角)
 SENTENCE_END = ("。", "?", "!", "?", "!")
+# 句読点もポーズも無い発話が続く場合の強制分割(字幕1枚に収まる長さ)
+MAX_SEGMENT_SEC = 8.0
+MAX_SEGMENT_CHARS = 30
 
 
 def chunks_to_words(chunks: list[dict]) -> list[Word]:
@@ -60,6 +63,12 @@ def words_to_segments(words: list[Word]) -> list[Segment]:
     for w in words:
         if current and w.start - current[-1].end >= PAUSE_SPLIT_SEC:
             flush()
+        # 句読点もポーズも無いまま長くなったら、字幕1枚に収まる単位で切る
+        if current and (
+            w.end - current[0].start > MAX_SEGMENT_SEC
+            or sum(len(x.text) for x in current) + len(w.text) > MAX_SEGMENT_CHARS
+        ):
+            flush()
         current.append(w)
         if w.text.endswith(SENTENCE_END):
             flush()
@@ -74,10 +83,12 @@ class TransformersWhisperEngine:
         self,
         model_id: str = "openai/whisper-large-v3",
         device: str = "cuda",
+        batch_size: int = 1,  # 30秒チャンクの並列数(VRAMに応じてregistryが決める)
         pipeline_factory=None,  # テスト用の差し替え口
     ):
         self.model_id = model_id
         self.device = device
+        self.batch_size = max(1, int(batch_size))
         self._pipeline_factory = pipeline_factory
         self._pipe = None
 
@@ -116,6 +127,7 @@ class TransformersWhisperEngine:
             {"array": audio, "sampling_rate": SAMPLE_RATE},
             return_timestamps="word",
             chunk_length_s=30,
+            batch_size=self.batch_size,  # 長尺はチャンク並列で数倍速くなる
             generate_kwargs=generate_kwargs,
         )
         words = chunks_to_words(out.get("chunks") or [])

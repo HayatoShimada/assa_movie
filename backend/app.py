@@ -25,28 +25,35 @@ from backend.jobs.queue import JobQueue
 from backend.models import schema
 
 
-def _warn_if_no_gpu_wheel() -> None:
-    """torchがGPU向けwheelでない場合に警告する。
+def _scan_and_report_environment() -> None:
+    """起動時に環境をスキャンして1行サマリを出す(詳細は GET /api/environment)"""
+    from backend.core.environment import scan_environment
 
-    extra無しの `uv sync` だとPyPI既定のtorchが入ってしまうため、
-    `uv sync --extra rocm`(または --extra cu128)の案内を出す。
-    """
     try:
-        import torch
-
-        if not (getattr(torch.version, "hip", None) or torch.cuda.is_available()):
-            print(
-                "⚠ torchがGPUを認識していません。"
-                "`./dev.sh sync`(AMD)または `uv sync --extra cu128`(NVIDIA)で"
-                "GPU向けwheelを入れ直してください。CPUでも動作しますが低速です。"
-            )
+        env = scan_environment(settings)
     except Exception:
-        pass
+        return
+    gpu = env["gpu"]
+    if gpu:
+        vram = f"{gpu['vram_total_mb'] / 1024:.0f}GB"
+        print(
+            f"環境: {gpu['name']} ({env['accel']}, VRAM {vram}) / "
+            f"エンコーダ: {env['encoder'] or 'ffmpeg未検出'} / "
+            f"Ollama: {'稼働中 ' + str(len(env['ollama']['models'])) + 'モデル' if env['ollama']['reachable'] else '未起動'}"
+        )
+    else:
+        print(
+            "⚠ torchがGPUを認識していません。"
+            "`./dev.sh sync`(AMD)または WL_TORCH_GROUP=cu128(NVIDIA)で"
+            "GPU向けwheelを入れ直してください。CPUでも動作しますが低速です。"
+        )
+    if not env["ffmpeg"]:
+        print("⚠ ffmpegが見つかりません。書き出しには `sudo apt install ffmpeg` が必要です。")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    _warn_if_no_gpu_wheel()
+    _scan_and_report_environment()
     app.state.db = schema.init_db(settings.db_path)
     project_settings.load_global_overrides(app.state.db)  # UI変更値の復元
     app.state.jobs = JobQueue(app.state.db)

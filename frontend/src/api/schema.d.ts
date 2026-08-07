@@ -223,6 +223,26 @@ export interface paths {
         patch: operations["update_segment_api_segments__segment_id__patch"];
         trace?: never;
     };
+    "/api/environment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Environment
+         * @description 環境スキャン結果と、割当VRAMに収まるASR/LLMの推奨を返す(設定タブの環境パネル用)
+         */
+        get: operations["get_environment_api_environment_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/fonts": {
         parameters: {
             query?: never;
@@ -1018,6 +1038,8 @@ export interface components {
             subtitle_bg_color?: string | null;
             /** Subtitle Bg Opacity */
             subtitle_bg_opacity?: number | null;
+            /** Vram Budget Mb */
+            vram_budget_mb?: number | null;
             /** Diarization Enabled */
             diarization_enabled?: boolean | null;
             /** Num Speakers */
@@ -1608,6 +1630,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_environment_api_environment_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
         };

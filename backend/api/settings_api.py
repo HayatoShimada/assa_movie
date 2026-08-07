@@ -11,6 +11,7 @@ from pydantic import BaseModel
 
 from backend.api.deps import get_db
 from backend.core.config import settings
+from backend.core.environment import recommend, scan_environment
 from backend.core.project_settings import MUTABLE_FIELDS, save_global_overrides
 from backend.engines.asr.registry import ENGINES, MODELS
 from backend.engines.llm.gemini import load_api_key
@@ -42,6 +43,7 @@ class SettingsUpdate(BaseModel):
     subtitle_bg: str | None = None
     subtitle_bg_color: str | None = None
     subtitle_bg_opacity: float | None = None
+    vram_budget_mb: int | None = None
     diarization_enabled: bool | None = None
     num_speakers: int | None = None
     male_name: str | None = None
@@ -51,6 +53,40 @@ class SettingsUpdate(BaseModel):
     llm_provider: str | None = None
     ollama_model: str | None = None
     gemini_model: str | None = None
+
+
+@router.get("/environment")
+def get_environment() -> dict:
+    """環境スキャン結果と、割当VRAMに収まるASR/LLMの推奨を返す(設定タブの環境パネル用)"""
+    env = scan_environment(settings)
+    total = env["gpu"].get("vram_total_mb", 0)
+    budget = int(settings.vram_budget_mb or 0)
+    effective = min(budget, total) if budget > 0 else total
+    has_gpu = bool(env["gpu"])
+
+    asr_options = [
+        {
+            "model": m.id,
+            "engine": engine,
+            "vram_mb": vram,
+            # CPU実行はVRAM制約なし。GPUがあれば割当内に収まるかを判定
+            "fits": (not has_gpu) or vram <= effective,
+        }
+        for m in MODELS.values()
+        for engine, vram in (("faster_whisper", m.vram_fw_mb), ("transformers", m.vram_tf_mb))
+    ]
+    ollama_options = [
+        {**m, "fits": has_gpu and m["vram_mb"] <= effective}
+        for m in env["ollama"]["models"]
+    ]
+    return {
+        **env,
+        "vram_budget_mb": budget,
+        "effective_vram_mb": effective,
+        "recommendations": recommend(effective, env["accel"], env["ollama"]["models"]),
+        "asr_options": asr_options,
+        "ollama_options": ollama_options,
+    }
 
 
 def parse_fc_list(output: str) -> list[str]:

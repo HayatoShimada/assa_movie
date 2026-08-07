@@ -43,9 +43,26 @@ export function SettingsFields({
   onReset?: (key: string) => void
 }) {
   const fonts = useQuery({ queryKey: ['fonts'], queryFn: api.getFonts })
+  const env = useQuery({ queryKey: ['environment'], queryFn: api.getEnvironment })
   const v = values
   const set = (key: string) => (value: unknown) => onSet(key, value)
   const asrNote = meta.asr_models.find((m) => m.id === v.asr_model)?.note
+
+  // Ollamaモデル: インストール済み(VRAM目安付き)+レジストリの推奨候補
+  const installed = env.data?.ollama_options ?? []
+  const suggested = meta.llm_providers.find((p) => p.id === 'ollama')?.models ?? []
+  const ollamaModels = [
+    ...installed.map((m) => ({
+      name: m.name,
+      label: `${m.name}(VRAM目安 ${(m.vram_mb / 1024).toFixed(1)}GB${m.fits ? '' : ' ⚠割当超過'})`,
+    })),
+    ...suggested
+      .filter((name) => !installed.some((m) => m.name === name))
+      .map((name) => ({ name, label: `${name}(未インストール)` })),
+  ]
+  if (v.ollama_model && !ollamaModels.some((m) => m.name === v.ollama_model)) {
+    ollamaModels.unshift({ name: String(v.ollama_model), label: String(v.ollama_model) })
+  }
 
   const resetBtn = (key: string) =>
     overriddenKeys?.has(key) && onReset ? (
@@ -367,6 +384,41 @@ export function SettingsFields({
             ))}
           </select>
         </Row>
+        {v.llm_provider === 'ollama' && (
+          <Row label="Ollamaモデル">
+            <span>
+              <select
+                data-testid={`${idPrefix}-ollama-model`}
+                className={`${selectCls} max-w-64`}
+                value={String(v.ollama_model ?? '')}
+                onChange={(e) => set('ollama_model')(e.target.value)}
+              >
+                {ollamaModels.map((m) => (
+                  <option key={m.name} value={m.name}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+              {resetBtn('ollama_model')}
+            </span>
+          </Row>
+        )}
+        {v.llm_provider === 'gemini' && (
+          <Row label="Geminiモデル">
+            <select
+              data-testid={`${idPrefix}-gemini-model`}
+              className={selectCls}
+              value={String(v.gemini_model ?? '')}
+              onChange={(e) => set('gemini_model')(e.target.value)}
+            >
+              {(meta.llm_providers.find((p) => p.id === 'gemini')?.models ?? []).map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </Row>
+        )}
         <p className="text-xs text-neutral-500">
           {meta.llm_providers.find((p) => p.id === v.llm_provider)?.note}
         </p>

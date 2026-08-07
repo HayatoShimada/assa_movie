@@ -82,6 +82,11 @@ class Settings(BaseSettings):
     llm_chunk_size: int = 30
     llm_context_size: int = 15
 
+    # ---- リソース ----
+    # torch系コンポーネントのVRAM使用上限(MB)。0=無制限。
+    # ASR/LLMモデルの推奨判定にも使う(設定タブの環境パネル)
+    vram_budget_mb: int = 0
+
     # ---- ジョブ ----
     max_replacement_len: int = 40
     llm_retries: int = 3

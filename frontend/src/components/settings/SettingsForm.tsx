@@ -1,6 +1,7 @@
 /** 設定タブ(グローバル設定)。GET/PATCH /api/settings と双方向バインドする。 */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../../api/client'
+import { EnvironmentPanel } from './EnvironmentPanel'
 import { SettingsFields } from './SettingsFields'
 
 export function SettingsForm() {
@@ -16,6 +17,7 @@ export function SettingsForm() {
 
   return (
     <div className="p-4">
+      <EnvironmentPanel />
       <p className="mb-2 text-xs text-neutral-500">
         全体設定。新規プロジェクトの既定値になります(プロジェクト単位で上書き可能)。
       </p>

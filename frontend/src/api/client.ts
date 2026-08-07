@@ -115,6 +115,20 @@ export const api = {
   updateSettings: (patch: Record<string, unknown>) =>
     request<SettingsResponse>('/api/settings', { method: 'PATCH', body: JSON.stringify(patch) }),
   getFonts: () => request<{ fonts: string[] }>('/api/fonts'),
+  getEnvironment: () => request<EnvironmentResponse>('/api/environment'),
+}
+
+export interface EnvironmentResponse {
+  accel: 'cuda' | 'rocm' | 'cpu'
+  gpu: { name?: string; vram_total_mb?: number; vram_free_mb?: number }
+  ffmpeg: boolean
+  encoder: string | null
+  ollama: { reachable: boolean; models: { name: string; vram_mb: number }[] }
+  vram_budget_mb: number
+  effective_vram_mb: number
+  recommendations: { asr_engine: string; asr_model: string; ollama_model: string | null }
+  asr_options: { model: string; engine: string; vram_mb: number; fits: boolean }[]
+  ollama_options: { name: string; vram_mb: number; fits: boolean }[]
 }
 
 export interface AssistResponse {

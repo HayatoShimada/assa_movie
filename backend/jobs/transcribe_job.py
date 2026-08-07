@@ -8,6 +8,7 @@ import sqlite3
 from pathlib import Path
 from typing import Callable
 
+from backend.core.device import apply_vram_budget
 from backend.core.project_settings import resolve_settings
 from backend.engines.asr.registry import build_engine
 from backend.engines.diarize import pyannote as diarize
@@ -34,6 +35,7 @@ def run_transcribe(
 
     s = resolve_settings(conn, media_id=media_id)
     language = params.get("language", s.asr_language)
+    apply_vram_budget(s.vram_budget_mb)  # torch系(transformers ASR・pyannote)の上限
     # 長尺のデコードや初回のモデルDL中に0%のまま見えないよう、開始を即時通知する
     progress(0.01)
     audio = audio_io.decode(Path(row["path"]))

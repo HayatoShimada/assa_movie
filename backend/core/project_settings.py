@@ -26,10 +26,12 @@ MUTABLE_FIELDS = {
     "subtitle_bg", "subtitle_bg_color", "subtitle_bg_opacity",
     "convert_method",
     "llm_provider", "ollama_model", "gemini_model",
+    "vram_budget_mb",
 }
 
-# プロジェクト単位で上書きできる項目(現状はUI変更可能項目と同一)
-PROJECT_OVERRIDABLE = set(MUTABLE_FIELDS)
+# プロジェクト単位で上書きできる項目。
+# VRAM割当はマシン全体の資源なのでプロジェクト単位化しない
+PROJECT_OVERRIDABLE = set(MUTABLE_FIELDS) - {"vram_budget_mb"}
 
 
 def project_overrides(conn: sqlite3.Connection, project_id: int) -> dict:

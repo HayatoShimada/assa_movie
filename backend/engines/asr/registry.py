@@ -11,7 +11,7 @@
 
 from dataclasses import dataclass
 
-from backend.core.device import detect_accel
+from backend.core.device import detect_accel, gpu_info
 from backend.engines.asr.base import ASREngine
 from backend.engines.asr.fasterwhisper import FasterWhisperEngine
 from backend.engines.asr.transformers_whisper import TransformersWhisperEngine
@@ -24,6 +24,8 @@ class ModelInfo:
     rtf: int          # 実時間比(RTX PRO 6000実測)
     word_timestamps: bool
     hf_id: str = ""   # transformersエンジンで使うHugging FaceのモデルID
+    vram_fw_mb: int = 0  # faster-whisper(float16)でのVRAM目安
+    vram_tf_mb: int = 0  # transformers(float16)でのVRAM目安
     note: str = ""
 
 
@@ -34,6 +36,8 @@ MODELS: dict[str, ModelInfo] = {
         rtf=25,
         word_timestamps=True,
         hf_id="openai/whisper-large-v3",
+        vram_fw_mb=5000,
+        vram_tf_mb=10000,
         note="方言や言い回しをそのまま保持します。75分の動画で約3分。",
     ),
     "large-v3-turbo": ModelInfo(
@@ -42,6 +46,8 @@ MODELS: dict[str, ModelInfo] = {
         rtf=111,
         word_timestamps=True,
         hf_id="openai/whisper-large-v3-turbo",
+        vram_fw_mb=2500,
+        vram_tf_mb=6500,
         note="約4.5倍高速ですが、発話が標準語化される場合があります。",
     ),
 }
@@ -53,6 +59,20 @@ ENGINES: dict[str, str] = {
     "faster_whisper": "faster-whisper(CUDA/CPU)",
     "transformers": "transformers Whisper(ROCm/CUDA)",
 }
+
+
+def _transformers_batch_size(settings) -> int:
+    """割当VRAMに応じて30秒チャンクの並列数を決める(長尺の処理速度に直結)"""
+    total = gpu_info().get("vram_total_mb", 0)
+    budget = int(getattr(settings, "vram_budget_mb", 0) or 0)
+    effective = min(budget, total) if budget > 0 else total
+    if effective >= 16000:
+        return 8
+    if effective >= 10000:
+        return 4
+    if effective >= 6500:
+        return 2
+    return 1
 
 
 def build_engine(settings) -> ASREngine:
@@ -76,6 +96,7 @@ def build_engine(settings) -> ASREngine:
             model_id=MODELS[settings.asr_model].hf_id,
             # ROCmのHIPはtorch上で"cuda"を名乗るのでそのまま渡す
             device="cuda" if accel in ("cuda", "rocm") else "cpu",
+            batch_size=_transformers_batch_size(settings),
         )
 
     if accel == "cuda":

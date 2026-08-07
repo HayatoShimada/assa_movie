@@ -79,6 +79,15 @@ def test_words_to_segments_table(name, words, expected_texts):
     assert [s.text for s in segments] == expected_texts, name
 
 
+def test_words_to_segments_force_splits_long_speech():
+    # 句読点もポーズも無い60秒の発話でも、字幕1枚に収まる単位に分割される
+    words = [_w(i * 0.5, i * 0.5 + 0.4, "あい") for i in range(120)]
+    segments = words_to_segments(words)
+    assert len(segments) > 5
+    assert all(s.end - s.start <= 8.5 for s in segments)
+    assert all(len(s.text) <= 32 for s in segments)
+
+
 def test_words_to_segments_keeps_word_timestamps():
     words = [_w(0.0, 0.5, "あの"), _w(0.6, 1.2, "それで")]
     segments = words_to_segments(words)
