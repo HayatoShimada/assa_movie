@@ -2,6 +2,24 @@
 
 [DESIGN.md](DESIGN.md) のフロントエンド部分の詳細設計。[BACKEND_DESIGN.md](BACKEND_DESIGN.md) のAPI・データモデルと1対1で対応する。
 
+## 開発基盤(構築済み・2026-08-07)
+
+UI実装前に土台を固めてある。詳しい規約は [CLAUDE.md](CLAUDE.md)。
+
+```bash
+./dev.sh          # バックエンド(8000)+フロント(5173)を起動
+./dev.sh check    # pytest + typecheck + lint + vitest + build を一括実行
+./dev.sh e2e      # Playwright(GPUもLLMも不要)
+
+cd frontend && npm run gen:api   # APIを変えたら型を再生成
+```
+
+- **API型は自動生成**: FastAPIのOpenAPI → `src/api/schema.d.ts`。
+  サーバー未起動でもFastAPIアプリから直接生成できる
+- **E2Eは実LLM/GPU不要**: `backend/e2e_server.py` がFakeLLM+一時DB+シードAPIで起動するため、
+  「文字起こし→指示語提案→承認」まで決定的にテストできる
+- TypeScriptは5.9系に固定(6系はopenapi-typescriptと非互換)
+
 ## 技術スタック
 
 | 項目 | 採用 | 理由 |

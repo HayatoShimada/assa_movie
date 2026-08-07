@@ -13,7 +13,7 @@ ASRは **faster-whisper large-v3 を既定**とする(2026-08-07決定: 精度�
 | ASR(不採用) | kotoba-whisper v2.0/v2.2 | 単語タイムスタンプ取得不可のため要件(単語TS必須)を満たさない。CT2変換版はセグフォルト |
 | ASR(フォールバック) | whisper.cpp | CPU・省VRAM・Vulkan環境用(Phase 3) |
 | 話者分離 | pyannote.audio 3.1 + ピッチ話者名判定(現行実装を移植) | 実データ検証済み。kotoba-whisper v2.2同梱のdiarizersは代替オプションとして保持 |
-| 指示語解決LLM | Ollama (qwen3:32b) / Claude API 切替 | ローカル/クラウド選択可能の要件 |
+| 指示語解決LLM | Ollama (qwen3:32b) / Gemini API 切替 | ローカル/クラウド選択可能の要件。どちらもJSON Schema構造化出力に対応 |
 | ジョブ管理 | SQLite + 単一ワーカー | GPUジョブは直列実行が前提なので分散キュー不要 |
 | 動画処理 | ffmpeg (デコード・切り出し・NVENC書き出し・libass字幕焼き込み) | |
 
@@ -39,9 +39,10 @@ backend/
 │   ├── diarize/
 │   │   └── pyannote.py     # 現行の話者分離+ピッチ判定を移植
 │   └── llm/
-│       ├── base.py         # 指示語解決クライアント抽象
-│       ├── ollama.py       # 現行resolve_pronouns.pyの移植
-│       └── anthropic.py    # クラウドAPI版
+│       ├── base.py         # LLMClient抽象 + FakeLLMClient(テスト用)
+│       ├── ollama.py       # ローカル(qwen3:32b等)
+│       ├── gemini.py       # クラウド(Gemini API)
+│       └── registry.py     # プロバイダ選択
 ├── pipeline/
 │   ├── audio.py            # PyAVデコード(16kHz mono)・silero-VAD
 │   ├── aizuchi.py          # 相槌フィルタ(現行移植・パターン設定可)
