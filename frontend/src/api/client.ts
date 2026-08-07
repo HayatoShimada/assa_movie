@@ -28,9 +28,10 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const isFormData = init?.body instanceof FormData
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
+    headers: isFormData ? init?.headers : { 'Content-Type': 'application/json', ...init?.headers },
   })
   if (!res.ok) {
     const detail = await res.text().catch(() => res.statusText)
@@ -51,6 +52,11 @@ export const api = {
   getMedia: (mediaId: number) => request<Media>(`/api/media/${mediaId}`),
   addMedia: (projectId: number, path: string) =>
     post<Media>(`/api/projects/${projectId}/media`, { path }),
+  uploadMedia: (projectId: number, file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return request<Media>(`/api/projects/${projectId}/media/upload`, { method: 'POST', body: form })
+  },
 
   createJob: (mediaId: number, type: string, params: Record<string, unknown> = {}) =>
     post<Job>(`/api/media/${mediaId}/jobs`, { type, params }),

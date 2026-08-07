@@ -91,6 +91,30 @@ test('設定タブでASRモデルを切り替えると保存される', async ({
   await request.patch(`${API}/api/settings`, { data: { asr_model: 'large-v3' } })
 })
 
+test('設定タブで字幕サイズを調整すると保存される', async ({ page, request }) => {
+  const seed = await (await request.post(`${API}/api/e2e/seed`)).json()
+  await page.goto(`/#/media/${seed.media_id}`)
+  await page.getByRole('button', { name: '設定' }).click()
+
+  const slider = page.getByTestId('setting-subtitle-font-size')
+  await slider.fill('62')
+  await slider.dispatchEvent('mouseup')
+
+  await expect
+    .poll(async () => {
+      const settings = await (await request.get(`${API}/api/settings`)).json()
+      return settings.values.subtitle_font_size
+    })
+    .toBe(62)
+
+  await page.reload()
+  await page.getByRole('button', { name: '設定' }).click()
+  await expect(page.getByText('字幕サイズ: 62px')).toBeVisible()
+
+  // 後片付け
+  await request.patch(`${API}/api/settings`, { data: { subtitle_font_size: 48 } })
+})
+
 test('LLMプロバイダにGeminiが表示される(キー未設定なら選択不可)', async ({ page, request }) => {
   const seed = await (await request.post(`${API}/api/e2e/seed`)).json()
   await page.goto(`/#/media/${seed.media_id}`)

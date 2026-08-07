@@ -40,3 +40,20 @@ def test_media_file_404_when_deleted(client, tmp_path):
 
 def test_media_file_404_unknown_media(client):
     assert client.get("/api/media/999/file").status_code == 404
+
+
+def test_media_file_uploaded_via_picker_flow(client):
+    pid = client.post("/api/projects", json={"name": "p"}).json()["id"]
+
+    r = client.post(
+        f"/api/projects/{pid}/media/upload",
+        files={"file": ("talk.mov", b"FAKE-MOV-DATA", "video/quicktime")},
+    )
+    assert r.status_code == 200
+    media = r.json()
+    assert media["project_id"] == pid
+    assert media["path"].endswith("talk.mov")
+
+    file_response = client.get(f"/api/media/{media['id']}/file")
+    assert file_response.status_code == 200
+    assert file_response.content == b"FAKE-MOV-DATA"

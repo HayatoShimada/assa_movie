@@ -28,6 +28,8 @@ function Badge({ count }: { count: number }) {
 export function Editor({ mediaId }: { mediaId: number }) {
   const [tab, setTab] = useState<Tab>('transcript')
   const [showAizuchi, setShowAizuchi] = useState(true)
+  const [clipSubtitlePosition, setClipSubtitlePosition] = useState<'top' | 'center' | 'bottom' | null>(null)
+  const [clipSubtitleOffsetY, setClipSubtitleOffsetY] = useState<number | null>(null)
   const selectedSegmentId = usePlayback((s) => s.selectedSegmentId)
 
   const media = useQuery({
@@ -73,7 +75,12 @@ export function Editor({ mediaId }: { mediaId: number }) {
 
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[1fr_440px]">
         <section className="min-w-0 p-4">
-          <VideoPlayer mediaId={mediaId} segments={segments.data ?? []} />
+          <VideoPlayer
+            mediaId={mediaId}
+            segments={segments.data ?? []}
+            subtitlePosition={tab === 'clips' ? (clipSubtitlePosition ?? 'bottom') : 'bottom'}
+            subtitleOffsetY={tab === 'clips' ? (clipSubtitleOffsetY ?? 0) : 0}
+          />
         </section>
 
         <aside className="flex min-h-0 flex-col border-t border-neutral-200 lg:border-l lg:border-t-0 dark:border-neutral-800">
@@ -129,7 +136,13 @@ export function Editor({ mediaId }: { mediaId: number }) {
               <ReviewTab mediaId={mediaId} projectId={media.data?.project_id} />
             )}
             {tab === 'questions' && <QuestionsTab mediaId={mediaId} />}
-            {tab === 'clips' && <ClipsTab mediaId={mediaId} />}
+            {tab === 'clips' && (
+              <ClipsTab
+                mediaId={mediaId}
+                onSubtitlePositionPreviewChange={setClipSubtitlePosition}
+                onSubtitleOffsetPreviewChange={setClipSubtitleOffsetY}
+              />
+            )}
             {tab === 'export' && <ExportTab mediaId={mediaId} />}
             {tab === 'settings' && (
               <div className="h-full overflow-y-auto">

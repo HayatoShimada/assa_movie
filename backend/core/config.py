@@ -54,6 +54,7 @@ class Settings(BaseSettings):
     # ---- 字幕 ----
     subtitle_mode: str = "all"  # all | selective
     subtitle_adoption_rate: float = 0.3  # selective時の採用率
+    subtitle_font_size: int = 48
     subtitle_max_chars_per_line: int = 15
     subtitle_max_lines: int = 2
 

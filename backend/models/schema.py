@@ -104,6 +104,8 @@ CREATE TABLE IF NOT EXISTS clips (
     score              REAL,
     score_reasons_json TEXT,
     layout             TEXT NOT NULL DEFAULT 'landscape',
+    subtitle_position  TEXT NOT NULL DEFAULT 'bottom',
+    subtitle_offset_y  INTEGER NOT NULL DEFAULT 0,
     template_id        INTEGER REFERENCES templates(id) ON DELETE SET NULL,
     target_duration    REAL,
     meta_json          TEXT,
@@ -158,6 +160,8 @@ _MIGRATIONS = [
     ("segments", "filler_candidates_json", "TEXT"),
     ("jobs", "result_json", "TEXT"),
     ("clips", "meta_json", "TEXT"),
+    ("clips", "subtitle_position", "TEXT NOT NULL DEFAULT 'bottom'"),
+    ("clips", "subtitle_offset_y", "INTEGER NOT NULL DEFAULT 0"),
 ]
 
 

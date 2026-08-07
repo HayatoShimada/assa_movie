@@ -18,7 +18,7 @@ MUTABLE_FIELDS = {
     "filler_level",
     "pronoun_enabled", "pronoun_level", "pronoun_form", "pronoun_apply_mode",
     "subtitle_mode", "subtitle_adoption_rate",
-    "subtitle_max_chars_per_line", "subtitle_max_lines",
+    "subtitle_font_size", "subtitle_max_chars_per_line", "subtitle_max_lines",
     "llm_provider", "ollama_model", "gemini_model",
 }
 
@@ -35,6 +35,7 @@ class SettingsUpdate(BaseModel):
     pronoun_apply_mode: str | None = None
     subtitle_mode: str | None = None
     subtitle_adoption_rate: float | None = None
+    subtitle_font_size: int | None = None
     subtitle_max_chars_per_line: int | None = None
     diarization_enabled: bool | None = None
     num_speakers: int | None = None

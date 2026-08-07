@@ -30,6 +30,8 @@ class Clip(BaseModel):
     score: float | None = None
     score_reasons: list[str] = []
     layout: str = "landscape"
+    subtitle_position: str = "bottom"
+    subtitle_offset_y: int = 0
     target_duration: float | None = None
     meta: dict | None = None
     status: str
@@ -48,6 +50,8 @@ class ClipUpdate(BaseModel):
     title: str | None = None
     hook_text: str | None = None
     layout: str | None = None
+    subtitle_position: str | None = None
+    subtitle_offset_y: int | None = None
     status: str | None = None
 
 
@@ -60,7 +64,7 @@ def _to_clip(db: sqlite3.Connection, row: sqlite3.Row) -> Clip:
         id=row["id"], media_id=row["media_id"], start=row["start"], end=row["end"],
         title=row["title"], hook_text=row["hook_text"], score=row["score"],
         score_reasons=json.loads(row["score_reasons_json"] or "[]"),
-        layout=row["layout"], target_duration=row["target_duration"],
+        layout=row["layout"], subtitle_position=row["subtitle_position"], subtitle_offset_y=row["subtitle_offset_y"], target_duration=row["target_duration"],
         meta=json.loads(row["meta_json"] or "null"),
         status=row["status"], cuts=cuts,
     )
@@ -227,6 +231,8 @@ def export_clip(
     job_id = jobs.enqueue(clip["media_id"], "export", {
         "start": clip["start"], "end": clip["end"],
         "burn_subtitles": True, "cuts": cuts, "clip_id": clip_id,
+        "subtitle_position": clip["subtitle_position"],
+        "subtitle_offset_y": clip["subtitle_offset_y"],
     })
     db.execute("UPDATE clips SET status='exporting' WHERE id=?", (clip_id,))
     db.commit()

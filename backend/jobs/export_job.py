@@ -17,6 +17,16 @@ from backend.pipeline import filler as filler_mod
 from backend.pipeline import subtitle as subtitle_mod
 
 
+def subtitle_style_for_position(position: str, offset_y: int = 0) -> subtitle_mod.SubtitleStyle:
+    # offset_y: +で下へ、-で上へ(クリップ画面のプレビューと同じ向き)
+    offset = max(-120, min(120, int(offset_y)))
+    if position == "top":
+        return subtitle_mod.SubtitleStyle(alignment=8, margin_v=max(0, 40 + offset))
+    if position == "center":
+        return subtitle_mod.SubtitleStyle(alignment=5, margin_v=0)
+    return subtitle_mod.SubtitleStyle(alignment=2, margin_v=max(0, 40 - offset))
+
+
 @register("export")
 def run_export_job(
     conn: sqlite3.Connection,
@@ -65,9 +75,12 @@ def run_export_job(
                 text = filler_mod.remove_fillers_weak(text)
             s["text"] = text
 
-        style = subtitle_mod.SubtitleStyle(
-            max_chars_per_line=settings.subtitle_max_chars_per_line,
+        style = subtitle_style_for_position(
+            str(params.get("subtitle_position", "bottom")),
+            int(params.get("subtitle_offset_y", 0)),
         )
+        style.font_size = int(settings.subtitle_font_size)
+        style.max_chars_per_line = settings.subtitle_max_chars_per_line
         events = subtitle_mod.segments_to_events(segments, clip_start=start, clip_end=end)
         ass_path = out_dir / f"{base}_{int(start)}s-{int(end)}s.ass"
         ass_path.write_text(subtitle_mod.build_ass(events, style), encoding="utf-8")

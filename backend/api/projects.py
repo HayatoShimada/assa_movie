@@ -3,13 +3,15 @@
 import shutil
 import sqlite3
 import subprocess
+import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from backend.api.deps import get_db
+from backend.core.config import settings
 from backend.models.dto import Media, MediaCreate, Project, ProjectCreate
 
 router = APIRouter(prefix="/api", tags=["projects"])
@@ -58,6 +60,37 @@ def add_media(
     cur = db.execute(
         "INSERT INTO media (project_id, path, duration) VALUES (?,?,?)",
         (project_id, str(path.resolve()), probe_duration(path)),
+    )
+    db.commit()
+    row = db.execute("SELECT * FROM media WHERE id=?", (cur.lastrowid,)).fetchone()
+    return Media(**dict(row))
+
+
+@router.post("/projects/{project_id}/media/upload", response_model=Media)
+async def upload_media(
+    project_id: int,
+    file: UploadFile = File(...),
+    db: sqlite3.Connection = Depends(get_db),
+):
+    if db.execute("SELECT 1 FROM projects WHERE id=?", (project_id,)).fetchone() is None:
+        raise HTTPException(404, "プロジェクトが見つかりません")
+
+    filename = Path(file.filename or "uploaded_media").name
+    upload_dir = settings.db_path.parent / "uploads" / f"project_{project_id}"
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    saved_path = upload_dir / f"{uuid.uuid4().hex}_{filename}"
+
+    with saved_path.open("wb") as f:
+        while True:
+            chunk = await file.read(1024 * 1024)
+            if not chunk:
+                break
+            f.write(chunk)
+    await file.close()
+
+    cur = db.execute(
+        "INSERT INTO media (project_id, path, duration) VALUES (?,?,?)",
+        (project_id, str(saved_path.resolve()), probe_duration(saved_path)),
     )
     db.commit()
     row = db.execute("SELECT * FROM media WHERE id=?", (cur.lastrowid,)).fetchone()

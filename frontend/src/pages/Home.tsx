@@ -1,6 +1,6 @@
 /** ホーム: プロジェクト・メディアの登録と、文字起こしジョブの投入・進捗表示。 */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { api, type Media, type Project } from '../api/client'
 import { Button, Card, ProgressBar, formatTime } from '../components/ui'
 import { useJobProgress } from '../hooks/useJobProgress'
@@ -71,6 +71,7 @@ function ProjectCard({ project }: { project: Project }) {
     queryFn: () => api.listMedia(project.id),
   })
   const [path, setPath] = useState('')
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
   const addMedia = useMutation({
     mutationFn: () => api.addMedia(project.id, path),
     onSuccess: () => {
@@ -78,6 +79,15 @@ function ProjectCard({ project }: { project: Project }) {
       queryClient.invalidateQueries({ queryKey: ['media', project.id] })
     },
   })
+  const uploadMedia = useMutation({
+    mutationFn: (file: File) => api.uploadMedia(project.id, file),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['media', project.id] })
+    },
+  })
+
+  const adding = addMedia.isPending || uploadMedia.isPending
+  const addError = addMedia.error ?? uploadMedia.error
 
   return (
     <Card title={project.name}>
@@ -98,17 +108,36 @@ function ProjectCard({ project }: { project: Project }) {
         }}
       >
         <input
+          data-testid={`media-file-input-${project.id}`}
+          ref={fileInputRef}
+          type="file"
+          accept="video/*,audio/*,.wav,.mp3,.m4a,.mov,.mp4,.mkv"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.currentTarget.files?.[0]
+            if (file) uploadMedia.mutate(file)
+            e.currentTarget.value = ''
+          }}
+        />
+        <input
           className="flex-1 rounded-md border border-neutral-300 px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-900"
           placeholder="動画ファイルのパス(例: /home/user/対談.mov)"
           value={path}
           onChange={(e) => setPath(e.target.value)}
         />
-        <Button type="submit" variant="ghost" disabled={addMedia.isPending}>
+        <Button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={adding}
+        >
           動画を追加
         </Button>
+        <Button type="submit" variant="ghost" disabled={adding}>
+          パスで追加
+        </Button>
       </form>
-      {addMedia.isError && (
-        <p className="mt-1 text-xs text-red-600">{String(addMedia.error.message)}</p>
+      {addError && (
+        <p className="mt-1 text-xs text-red-600">{String(addError.message)}</p>
       )}
     </Card>
   )

@@ -101,3 +101,26 @@ test('クリップ: 自己完結化でresolveジョブが走り提案がレビ�
   // FakeLLMの提案(review)がレビュータブのバッジに乗る
   await expect(page.getByTestId('tab-review')).toContainText('1')
 })
+
+test('クリップ: 字幕位置を変更して保存できる', async ({ page, request }) => {
+  const mediaId = await seedTranscribed(request)
+  const clip = await (
+    await request.post(`${API}/api/media/${mediaId}/clips`, {
+      data: { start: 0, end: 8, title: '字幕位置テスト' },
+    })
+  ).json()
+
+  await page.goto(`/#/media/${mediaId}`)
+  await page.getByTestId('tab-clips').click()
+  await page.getByText('字幕位置テスト').click()
+
+  await page.getByTestId('clip-subtitle-position').selectOption('top')
+  await page.getByTestId('clip-subtitle-offset').fill('-30')
+  await expect
+    .poll(async () => {
+      const clips = await (await request.get(`${API}/api/media/${mediaId}/clips`)).json()
+      const target = clips.find((c: { id: number }) => c.id === clip.id)
+      return `${target.subtitle_position}:${target.subtitle_offset_y}`
+    })
+    .toBe('top:-30')
+})

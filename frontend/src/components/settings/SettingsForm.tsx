@@ -144,6 +144,19 @@ export function SettingsForm() {
             />
           </Row>
         )}
+        <Row label={`字幕サイズ: ${v.subtitle_font_size}px`}>
+          <input
+            data-testid="setting-subtitle-font-size"
+            type="range"
+            min={24}
+            max={72}
+            step={1}
+            defaultValue={Number(v.subtitle_font_size ?? 48)}
+            onMouseUp={(e) =>
+              set('subtitle_font_size')(Number((e.target as HTMLInputElement).value))
+            }
+          />
+        </Row>
         <Row label={`1行の最大文字数: ${v.subtitle_max_chars_per_line}`}>
           <input
             type="range"

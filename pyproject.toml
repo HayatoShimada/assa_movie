@@ -21,6 +21,7 @@ dependencies = [
     "requests>=2.31",
     # バックエンドAPI
     "fastapi>=0.115",
+    "python-multipart>=0.0.20",
     "uvicorn[standard]>=0.32",
     "pydantic-settings>=2.6",
     "sse-starlette>=2.1",

@@ -19,6 +19,8 @@ export interface Clip {
   score: number | null
   score_reasons: string[]
   layout: string
+  subtitle_position: 'top' | 'center' | 'bottom'
+  subtitle_offset_y: number
   target_duration: number | null
   meta: { title: string; hooks: string[]; description: string; hashtags: string[] } | null
   status: string
@@ -41,7 +43,7 @@ export const clipsApi = {
       method: 'POST',
       body: JSON.stringify({ start, end }),
     }),
-  update: (clipId: number, patch: Partial<Pick<Clip, 'start' | 'end' | 'title' | 'hook_text' | 'status'>>) =>
+  update: (clipId: number, patch: Partial<Pick<Clip, 'start' | 'end' | 'title' | 'hook_text' | 'status' | 'subtitle_position' | 'subtitle_offset_y'>>) =>
     req<Clip>(`/api/clips/${clipId}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   remove: (clipId: number) => req<{ deleted: number }>(`/api/clips/${clipId}`, { method: 'DELETE' }),
   jetcut: (clipId: number) => req<Clip>(`/api/clips/${clipId}/jetcut`, { method: 'POST' }),

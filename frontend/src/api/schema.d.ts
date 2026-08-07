@@ -40,6 +40,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/projects/{project_id}/media/upload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Upload Media */
+        post: operations["upload_media_api_projects__project_id__media_upload_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/media/{media_id}": {
         parameters: {
             query?: never;
@@ -545,6 +562,11 @@ export interface components {
             /** Instruction Suggestion */
             instruction_suggestion?: string | null;
         };
+        /** Body_upload_media_api_projects__project_id__media_upload_post */
+        Body_upload_media_api_projects__project_id__media_upload_post: {
+            /** File */
+            file: string;
+        };
         /** Brief */
         Brief: {
             /**
@@ -589,6 +611,16 @@ export interface components {
              * @default landscape
              */
             layout: string;
+            /**
+             * Subtitle Position
+             * @default bottom
+             */
+            subtitle_position: string;
+            /**
+             * Subtitle Offset Y
+             * @default 0
+             */
+            subtitle_offset_y: number;
             /** Target Duration */
             target_duration?: number | null;
             /** Meta */
@@ -626,6 +658,10 @@ export interface components {
             hook_text?: string | null;
             /** Layout */
             layout?: string | null;
+            /** Subtitle Position */
+            subtitle_position?: string | null;
+            /** Subtitle Offset Y */
+            subtitle_offset_y?: number | null;
             /** Status */
             status?: string | null;
         };
@@ -858,6 +894,8 @@ export interface components {
             subtitle_mode?: string | null;
             /** Subtitle Adoption Rate */
             subtitle_adoption_rate?: number | null;
+            /** Subtitle Font Size */
+            subtitle_font_size?: number | null;
             /** Subtitle Max Chars Per Line */
             subtitle_max_chars_per_line?: number | null;
             /** Diarization Enabled */
@@ -1004,6 +1042,41 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["MediaCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Media"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_media_api_projects__project_id__media_upload_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_media_api_projects__project_id__media_upload_post"];
             };
         };
         responses: {

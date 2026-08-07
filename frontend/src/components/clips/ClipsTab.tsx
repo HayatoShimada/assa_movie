@@ -1,6 +1,6 @@
 /** クリップタブ: 候補生成 → カード一覧 → クリップ編集(トリム・中抜き・メタ・書き出し)。 */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api } from '../../api/client'
 import { clipsApi, type Clip } from '../../api/clips'
 import { useJobProgress } from '../../hooks/useJobProgress'
@@ -151,6 +151,44 @@ function ClipEditor({ clip, mediaId }: { clip: Clip; mediaId: number }) {
       )}
 
       <div className="space-y-1">
+        <label className="block text-xs text-neutral-500">字幕位置</label>
+        <select
+          data-testid="clip-subtitle-position"
+          className="w-full rounded border border-neutral-300 px-2 py-1 text-sm dark:border-neutral-700 dark:bg-neutral-900"
+          value={clip.subtitle_position}
+          onChange={(e) => update.mutate({ subtitle_position: e.target.value as Clip['subtitle_position'] })}
+        >
+          <option value="top">上</option>
+          <option value="center">中央</option>
+          <option value="bottom">下</option>
+        </select>
+        <label className="block text-xs text-neutral-500">上下微調整 ({clip.subtitle_offset_y}px)</label>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => update.mutate({ subtitle_offset_y: Math.max(-120, clip.subtitle_offset_y - 4) })}
+          >
+            上へ
+          </Button>
+          <input
+            data-testid="clip-subtitle-offset"
+            type="range"
+            min={-120}
+            max={120}
+            step={1}
+            value={clip.subtitle_offset_y}
+            onChange={(e) => update.mutate({ subtitle_offset_y: Number(e.target.value) })}
+            className="w-full"
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => update.mutate({ subtitle_offset_y: Math.min(120, clip.subtitle_offset_y + 4) })}
+          >
+            下へ
+          </Button>
+        </div>
         <input
           className="w-full rounded border border-neutral-300 px-2 py-1 text-sm dark:border-neutral-700 dark:bg-neutral-900"
           placeholder="タイトル"
@@ -191,7 +229,15 @@ function ClipEditor({ clip, mediaId }: { clip: Clip; mediaId: number }) {
   )
 }
 
-export function ClipsTab({ mediaId }: { mediaId: number }) {
+export function ClipsTab({
+  mediaId,
+  onSubtitlePositionPreviewChange,
+  onSubtitleOffsetPreviewChange,
+}: {
+  mediaId: number
+  onSubtitlePositionPreviewChange?: (position: Clip['subtitle_position'] | null) => void
+  onSubtitleOffsetPreviewChange?: (offsetY: number | null) => void
+}) {
   const queryClient = useQueryClient()
   const clips = useQuery({ queryKey: ['clips', mediaId], queryFn: () => clipsApi.list(mediaId) })
   const [target, setTarget] = useState(60)
@@ -211,6 +257,16 @@ export function ClipsTab({ mediaId }: { mediaId: number }) {
 
   const running = progress.status === 'running' || progress.status === 'queued'
   const selected = clips.data?.find((c) => c.id === selectedId)
+
+  useEffect(() => {
+    onSubtitlePositionPreviewChange?.(selected?.subtitle_position ?? null)
+    onSubtitleOffsetPreviewChange?.(selected?.subtitle_offset_y ?? null)
+  }, [
+    onSubtitleOffsetPreviewChange,
+    onSubtitlePositionPreviewChange,
+    selected?.subtitle_offset_y,
+    selected?.subtitle_position,
+  ])
 
   return (
     <div className="flex h-full flex-col overflow-y-auto">

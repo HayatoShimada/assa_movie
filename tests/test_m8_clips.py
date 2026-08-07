@@ -188,9 +188,16 @@ def test_clip_crud_and_range_validation(client, media):
     mid = media["media_id"]
     clip = client.post(f"/api/media/{mid}/clips", json={"start": 5, "end": 20}).json()
     assert clip["status"] == "draft"
+    assert clip["subtitle_position"] == "bottom"
+    assert clip["subtitle_offset_y"] == 0
 
     r = client.patch(f"/api/clips/{clip['id']}", json={"end": 25, "title": "手動クリップ"})
     assert r.json()["end"] == 25 and r.json()["title"] == "手動クリップ"
+
+    r2 = client.patch(f"/api/clips/{clip['id']}", json={"subtitle_position": "top"})
+    assert r2.json()["subtitle_position"] == "top"
+    r3 = client.patch(f"/api/clips/{clip['id']}", json={"subtitle_offset_y": -24})
+    assert r3.json()["subtitle_offset_y"] == -24
 
     assert client.patch(f"/api/clips/{clip['id']}", json={"end": 3}).status_code == 400
     assert client.delete(f"/api/clips/{clip['id']}").status_code == 200
@@ -261,4 +268,6 @@ def test_clip_export_enqueues_job_with_cuts(client, media):
     params = json.loads(job["params_json"])
     assert params["clip_id"] == clip["id"]
     assert len(params["cuts"]) == 1  # 有効な中抜きが渡っている
+    assert params["subtitle_position"] == "bottom"
+    assert params["subtitle_offset_y"] == 0
     # 偽メディアなのでffmpegは失敗するが、パラメータの受け渡しが検証できれば良い
