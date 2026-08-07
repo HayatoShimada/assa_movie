@@ -28,6 +28,10 @@ class ModelInfo:
     vram_tf_mb: int = 0  # transformers(float16)でのVRAM目安
     note: str = ""
 
+    def vram_mb(self, engine: str) -> int:
+        """指定エンジンで動かしたときのVRAM目安(推奨判定と選択UIで共用)"""
+        return self.vram_tf_mb if engine == "transformers" else self.vram_fw_mb
+
 
 MODELS: dict[str, ModelInfo] = {
     "large-v3": ModelInfo(
@@ -61,21 +65,27 @@ ENGINES: dict[str, str] = {
 }
 
 
+def resolve_engine(engine_id: str, accel: str) -> str:
+    """`auto` を実際のエンジンに解決する(実行と推奨表示で同じ規則を使う)"""
+    if engine_id != "auto":
+        return engine_id
+    # CTranslate2はROCm非対応なのでROCmではtransformers版を使う
+    return "transformers" if accel == "rocm" else "faster_whisper"
+
+
 def build_engine(settings) -> ASREngine:
     """設定からASRエンジンを組み立てる"""
     if settings.asr_model not in MODELS:
         raise ValueError(
             f"未知のASRモデル: {settings.asr_model}(選択肢: {', '.join(MODELS)})"
         )
-    engine_id = getattr(settings, "asr_engine", "auto")
-    if engine_id not in ENGINES:
+    if settings.asr_engine not in ENGINES:
         raise ValueError(
-            f"未知のASRエンジン: {engine_id}(選択肢: {', '.join(ENGINES)})"
+            f"未知のASRエンジン: {settings.asr_engine}(選択肢: {', '.join(ENGINES)})"
         )
 
     accel = detect_accel()
-    if engine_id == "auto":
-        engine_id = "transformers" if accel == "rocm" else "faster_whisper"
+    engine_id = resolve_engine(settings.asr_engine, accel)
 
     if engine_id == "transformers":
         return TransformersWhisperEngine(
@@ -84,19 +94,15 @@ def build_engine(settings) -> ASREngine:
             device="cuda" if accel in ("cuda", "rocm") else "cpu",
         )
 
-    if accel == "cuda":
-        return FasterWhisperEngine(
-            model_size=settings.asr_model,
-            device="cuda",
-            compute_type=settings.asr_compute_type,
-            beam_size=settings.asr_beam_size,
-            vad_filter=settings.asr_vad_filter,
-        )
     # CTranslate2はROCm非対応のため、rocm/cpuともCPU実行にフォールバック
+    # (int8クラッシュはBlackwell GPU限定でCPUは安全)
+    device, compute_type = (
+        ("cuda", settings.asr_compute_type) if accel == "cuda" else ("cpu", "int8")
+    )
     return FasterWhisperEngine(
         model_size=settings.asr_model,
-        device="cpu",
-        compute_type="int8",
+        device=device,
+        compute_type=compute_type,
         beam_size=settings.asr_beam_size,
         vad_filter=settings.asr_vad_filter,
     )

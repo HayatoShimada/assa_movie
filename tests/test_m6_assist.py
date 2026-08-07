@@ -13,18 +13,6 @@ TEXTS = [
 
 
 @pytest.fixture
-def client(tmp_path, monkeypatch):
-    from backend.core import config
-
-    monkeypatch.setattr(config.settings, "db_path", tmp_path / "assist.db")
-    from backend.app import app
-
-    with TestClient(app) as c:
-        yield c
-    resolve_job.set_client_factory(None)
-
-
-@pytest.fixture
 def seg_ids(client, tmp_path):
     pid = client.post("/api/projects", json={"name": "p"}).json()["id"]
     f = tmp_path / "a.wav"

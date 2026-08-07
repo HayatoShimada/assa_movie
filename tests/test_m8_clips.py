@@ -102,18 +102,6 @@ def test_build_export_cmd_ignores_empty_cuts():
 
 # ---- API統合(FakeLLM) ----
 @pytest.fixture
-def client(tmp_path, monkeypatch):
-    from backend.core import config
-
-    monkeypatch.setattr(config.settings, "db_path", tmp_path / "m8.db")
-    from backend.app import app
-
-    with TestClient(app) as c:
-        yield c
-    resolve_job.set_client_factory(None)
-
-
-@pytest.fixture
 def media(client, tmp_path):
     pid = client.post("/api/projects", json={"name": "p"}).json()["id"]
     f = tmp_path / "a.wav"

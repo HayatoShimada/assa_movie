@@ -669,11 +669,6 @@ export interface components {
              */
             score_reasons: string[];
             /**
-             * Layout
-             * @default landscape
-             */
-            layout: string;
-            /**
              * Subtitle Position
              * @default bottom
              */
@@ -725,8 +720,6 @@ export interface components {
             title?: string | null;
             /** Hook Text */
             hook_text?: string | null;
-            /** Layout */
-            layout?: string | null;
             /** Subtitle Position */
             subtitle_position?: string | null;
             /** Subtitle Offset Y */
@@ -998,66 +991,74 @@ export interface components {
         };
         /** SettingsUpdate */
         SettingsUpdate: {
-            /** Asr Model */
-            asr_model?: string | null;
+            /** Aizuchi Filter Enabled */
+            aizuchi_filter_enabled?: boolean | null;
+            /** Aizuchi Max Duration */
+            aizuchi_max_duration?: number | null;
+            /** Asr Beam Size */
+            asr_beam_size?: number | null;
             /** Asr Engine */
             asr_engine?: string | null;
             /** Asr Language */
             asr_language?: string | null;
+            /** Asr Model */
+            asr_model?: string | null;
+            /** Asr Vad Filter */
+            asr_vad_filter?: boolean | null;
+            /** Convert Method */
+            convert_method?: string | null;
+            /** Diarization Enabled */
+            diarization_enabled?: boolean | null;
+            /** Female Name */
+            female_name?: string | null;
             /** Filler Level */
             filler_level?: string | null;
-            /** Pronoun Enabled */
-            pronoun_enabled?: boolean | null;
-            /** Pronoun Level */
-            pronoun_level?: string | null;
-            /** Pronoun Form */
-            pronoun_form?: string | null;
+            /** Gemini Model */
+            gemini_model?: string | null;
+            /** Llm Provider */
+            llm_provider?: string | null;
+            /** Male Name */
+            male_name?: string | null;
+            /** Num Speakers */
+            num_speakers?: number | null;
+            /** Ollama Model */
+            ollama_model?: string | null;
             /** Pronoun Apply Mode */
             pronoun_apply_mode?: string | null;
-            /** Subtitle Mode */
-            subtitle_mode?: string | null;
+            /** Pronoun Enabled */
+            pronoun_enabled?: boolean | null;
+            /** Pronoun Form */
+            pronoun_form?: string | null;
+            /** Pronoun Level */
+            pronoun_level?: string | null;
             /** Subtitle Adoption Rate */
             subtitle_adoption_rate?: number | null;
-            /** Subtitle Font Size */
-            subtitle_font_size?: number | null;
-            /** Subtitle Position */
-            subtitle_position?: string | null;
-            /** Subtitle Offset Y */
-            subtitle_offset_y?: number | null;
-            /** Subtitle Max Chars Per Line */
-            subtitle_max_chars_per_line?: number | null;
-            /** Subtitle Font Family */
-            subtitle_font_family?: string | null;
-            /** Subtitle Text Color */
-            subtitle_text_color?: string | null;
-            /** Subtitle Speaker Colors */
-            subtitle_speaker_colors?: boolean | null;
             /** Subtitle Bg */
             subtitle_bg?: string | null;
             /** Subtitle Bg Color */
             subtitle_bg_color?: string | null;
             /** Subtitle Bg Opacity */
             subtitle_bg_opacity?: number | null;
+            /** Subtitle Font Family */
+            subtitle_font_family?: string | null;
+            /** Subtitle Font Size */
+            subtitle_font_size?: number | null;
+            /** Subtitle Max Chars Per Line */
+            subtitle_max_chars_per_line?: number | null;
+            /** Subtitle Max Lines */
+            subtitle_max_lines?: number | null;
+            /** Subtitle Mode */
+            subtitle_mode?: string | null;
+            /** Subtitle Offset Y */
+            subtitle_offset_y?: number | null;
+            /** Subtitle Position */
+            subtitle_position?: string | null;
+            /** Subtitle Speaker Colors */
+            subtitle_speaker_colors?: boolean | null;
+            /** Subtitle Text Color */
+            subtitle_text_color?: string | null;
             /** Vram Budget Mb */
             vram_budget_mb?: number | null;
-            /** Diarization Enabled */
-            diarization_enabled?: boolean | null;
-            /** Num Speakers */
-            num_speakers?: number | null;
-            /** Male Name */
-            male_name?: string | null;
-            /** Female Name */
-            female_name?: string | null;
-            /** Aizuchi Filter Enabled */
-            aizuchi_filter_enabled?: boolean | null;
-            /** Convert Method */
-            convert_method?: string | null;
-            /** Llm Provider */
-            llm_provider?: string | null;
-            /** Ollama Model */
-            ollama_model?: string | null;
-            /** Gemini Model */
-            gemini_model?: string | null;
         };
         /** ValidationError */
         ValidationError: {

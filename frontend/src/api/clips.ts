@@ -18,7 +18,6 @@ export interface Clip {
   hook_text: string | null
   score: number | null
   score_reasons: string[]
-  layout: string
   subtitle_position: 'top' | 'center' | 'bottom'
   subtitle_offset_y: number
   convert_method: 'crop' | 'blur_pad' | 'face' | null

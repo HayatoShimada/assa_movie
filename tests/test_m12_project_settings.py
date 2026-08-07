@@ -11,17 +11,6 @@ from backend.models import schema
 
 
 @pytest.fixture
-def client(tmp_path, monkeypatch):
-    from backend.core import config
-
-    monkeypatch.setattr(config.settings, "db_path", tmp_path / "m12.db")
-    from backend.app import app
-
-    with TestClient(app) as c:
-        yield c
-
-
-@pytest.fixture
 def conn(tmp_path):
     c = schema.init_db(tmp_path / "m12_unit.db")
     yield c
@@ -162,26 +151,22 @@ def test_delete_project_not_found(client):
 
 # ---- グローバル設定のDB永続化 ----
 
-def test_global_settings_persist_across_restart(tmp_path, monkeypatch):
+def test_global_settings_persist_across_restart(tmp_path):
+    # singletonの復元は conftest の _isolate_settings が行う
+    from backend.app import app
     from backend.core import config
 
-    db_path = tmp_path / "persist.db"
-    monkeypatch.setattr(config.settings, "db_path", db_path)
     original = config.settings.subtitle_font_size
-    try:
-        from backend.app import app
+    config.settings.db_path = tmp_path / "persist.db"
 
-        with TestClient(app) as c:
-            c.patch("/api/settings", json={"subtitle_font_size": 61})
-            assert c.get("/api/settings").json()["values"]["subtitle_font_size"] == 61
+    with TestClient(app) as c:
+        c.patch("/api/settings", json={"subtitle_font_size": 61})
+        assert c.get("/api/settings").json()["values"]["subtitle_font_size"] == 61
 
-        # 再起動相当: singletonを既定値に戻してからもう一度起動
-        config.settings.subtitle_font_size = original
-        with TestClient(app) as c:
-            assert c.get("/api/settings").json()["values"]["subtitle_font_size"] == 61
-    finally:
-        # PATCHはsingletonを直接書き換えるため、monkeypatchでは戻らない
-        config.settings.subtitle_font_size = original
+    # 再起動相当: singletonを既定値に戻してからもう一度起動
+    config.settings.subtitle_font_size = original
+    with TestClient(app) as c:
+        assert c.get("/api/settings").json()["values"]["subtitle_font_size"] == 61
 
 
 # ---- ジョブ層がグローバルsettingsを直接importしていないことの担保 ----

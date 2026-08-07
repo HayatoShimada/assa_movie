@@ -12,6 +12,7 @@ import logging
 
 import numpy as np
 
+from backend.core.device import detect_accel
 from backend.engines.asr.base import ProgressFn, Segment, TranscribeResult, Word
 
 logger = logging.getLogger(__name__)
@@ -110,10 +111,11 @@ class TransformersWhisperEngine:
                 model = AutoModelForSpeechSeq2Seq.from_pretrained(
                     self.model_id, dtype=dtype, low_cpu_mem_usage=True
                 )
-                if self.device != "cpu":
-                    # 通常メモリ→GPUの転送はIOMMU構成によっては1回0.5秒超の
-                    # オーバーヘッドがあり、約1000テンソルのロードが数分かかる
-                    # (RX 7900 XTX実測)。page-locked経由なら数秒で済む
+                if self.device != "cpu" and detect_accel() == "rocm":
+                    # ROCm環境では通常メモリ→GPUの転送がIOMMU構成の影響で
+                    # 1テンソルあたり0.5秒超かかることがあり、約1000テンソルの
+                    # ロードが数分に達する(RX 7900 XTX実測: 9分→7秒)。
+                    # page-lockedメモリ経由なら本来の帯域が出る
                     for p in model.parameters():
                         p.data = p.data.pin_memory()
                     for b in model.buffers():

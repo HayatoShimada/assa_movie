@@ -9,17 +9,6 @@ from fastapi.testclient import TestClient
 
 
 @pytest.fixture
-def client(tmp_path, monkeypatch):
-    from backend.core import config
-
-    monkeypatch.setattr(config.settings, "db_path", tmp_path / "m14.db")
-    from backend.app import app
-
-    with TestClient(app) as c:
-        yield c
-
-
-@pytest.fixture
 def captured(monkeypatch):
     """ffmpeg実行を捕捉し、組み立てられたコマンドを記録する"""
     from backend.pipeline import export as export_mod

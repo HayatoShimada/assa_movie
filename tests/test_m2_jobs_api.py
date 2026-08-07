@@ -92,17 +92,6 @@ def test_progress_is_persisted(db):
 
 
 # ---- API ----
-@pytest.fixture
-def client(tmp_path, monkeypatch):
-    from backend.core import config
-
-    monkeypatch.setattr(config.settings, "db_path", tmp_path / "api.db")
-    from backend.app import app
-
-    with TestClient(app) as c:
-        yield c
-
-
 def _make_media(client, tmp_path) -> int:
     pid = client.post("/api/projects", json={"name": "p"}).json()["id"]
     media_file = tmp_path / "sample.wav"

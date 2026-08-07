@@ -7,6 +7,9 @@ from pathlib import Path
 
 
 VAAPI_DEVICE = "/dev/dri/renderD128"
+FFMPEG_MISSING_MSG = (
+    "ffmpegが見つかりません。`sudo apt install ffmpeg` でインストールしてください"
+)
 
 
 def _pick_encoder(encoders_output: str, has_nvidia: bool, has_dri: bool) -> str:
@@ -127,9 +130,7 @@ def build_export_cmd(
     if encoder is None:
         encoder = detect_encoder()
     if encoder is None:
-        raise RuntimeError(
-            "ffmpegが見つかりません。`sudo apt install ffmpeg` でインストールしてください"
-        )
+        raise RuntimeError(FFMPEG_MISSING_MSG)
     duration = max(0.1, end - start)
     cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-progress", "pipe:1"]
     if encoder == "h264_vaapi":
@@ -138,7 +139,7 @@ def build_export_cmd(
 
     ass_filter = f"ass='{_escape_filter_path(ass_path)}'" if ass_path else None
     keeps = keep_intervals(duration, cuts or []) if cuts else []
-    has_cuts = bool(keeps) and (len(keeps) > 1 or keeps != [(0.0, duration)])
+    has_cuts = bool(keeps) and keeps != [(0.0, duration)]
     hw_tail = "format=nv12,hwupload" if encoder == "h264_vaapi" else None
 
     if layout_filter or has_cuts:
@@ -174,10 +175,10 @@ def build_export_cmd(
             graph.append(f"{src_v}{hw_tail}[vhw]")
             src_v = "[vhw]"
         cmd += ["-filter_complex", ";".join(graph), "-map", src_v, "-map", map_a]
-    elif ass_filter:
-        cmd += ["-vf", ass_filter + (f",{hw_tail}" if hw_tail else "")]
-    elif hw_tail:
-        cmd += ["-vf", hw_tail]
+    else:
+        vf = ",".join(f for f in (ass_filter, hw_tail) if f)
+        if vf:
+            cmd += ["-vf", vf]
 
     if encoder == "h264_nvenc":
         cmd += ["-c:v", "h264_nvenc", "-preset", "p4", "-cq", "23"]

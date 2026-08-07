@@ -6,6 +6,7 @@ numpy<2固定でtorch 2.8系と衝突するため採用しない。検出その�
 """
 
 import os
+from functools import lru_cache
 from pathlib import Path
 from statistics import median
 
@@ -25,6 +26,8 @@ SAMPLE_FRACTIONS = (0.1, 0.3, 0.5, 0.7, 0.9)
 CLUSTER_GAP = 0.2
 # クラスタとして信頼する最小検出数(誤検出の外れ値を捨てる)
 MIN_CLUSTER_MEMBERS = 2
+FRONTAL_XML = "haarcascade_frontalface_default.xml"
+PROFILE_XML = "haarcascade_profileface.xml"
 
 
 def sample_times(start: float, end: float) -> list[float]:
@@ -47,6 +50,14 @@ def sample_frames(path: Path, times: list[float]) -> list:
     finally:
         cap.release()
     return frames
+
+
+@lru_cache(maxsize=4)
+def _cascade(filename: str):
+    """Haarカスケードは状態を持たないので読み込みを使い回す(1回12ms)"""
+    import cv2
+
+    return cv2.CascadeClassifier(cv2.data.haarcascades + filename)
 
 
 def _merge_boxes(boxes: list[Box]) -> list[Box]:
@@ -77,26 +88,22 @@ def detect_faces(frame) -> list[Box]:
     if frame is None:
         return []
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    # 注: 検出前の縮小は高速だが、Haarの検出結果が変わり誤検出が増えることを
+    #     実機で確認したため行わない(雑談編.movで話者中心が31%/72%→5%/31%に劣化)
     # 引きの映像でも顔は画面高さの1/24程度はある想定。小さすぎる検出はノイズ
-    min_size = max(40, frame.shape[0] // 24)
-    frontal = cv2.CascadeClassifier(
-        cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
-    )
-    profile = cv2.CascadeClassifier(
-        cv2.data.haarcascades + "haarcascade_profileface.xml"
-    )
+    min_size = max(40, gray.shape[0] // 24)
 
-    def run(cascade, image) -> list[Box]:
-        found = cascade.detectMultiScale(
+    def run(cascade_file: str, image) -> list[Box]:
+        found = _cascade(cascade_file).detectMultiScale(
             image, scaleFactor=1.1, minNeighbors=5, minSize=(min_size, min_size)
         )
         return [tuple(int(v) for v in f) for f in found]
 
-    boxes = run(frontal, gray) + run(profile, gray)
+    boxes = run(FRONTAL_XML, gray) + run(PROFILE_XML, gray)
     # profilefaceは左向きのみ対応のため、反転画像で右向きも検出する
     width = gray.shape[1]
     boxes += [
-        (width - x - w, y, w, h) for x, y, w, h in run(profile, cv2.flip(gray, 1))
+        (width - x - w, y, w, h) for x, y, w, h in run(PROFILE_XML, cv2.flip(gray, 1))
     ]
     return _merge_boxes(boxes)
 

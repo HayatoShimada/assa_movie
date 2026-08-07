@@ -4,10 +4,9 @@
 推奨ロジックは純関数(recommend)としてテーブル駆動テストする。
 """
 
-import shutil
 from urllib.parse import urlparse
 
-from backend.core.device import detect_accel, gpu_info
+from backend.core.device import probe_gpu
 
 # OllamaのVRAM目安 = モデルファイルサイズ × オーバーヘッド係数(KVキャッシュ等)
 OLLAMA_VRAM_FACTOR = 1.15
@@ -36,14 +35,21 @@ def scan_ollama(ollama_url: str) -> dict:
 
 
 def scan_environment(settings) -> dict:
-    """GPU・エンコーダ・ffmpeg・Ollamaをスキャンする(起動時と設定タブで使用)"""
+    """GPU・エンコーダ・ffmpeg・Ollamaをスキャンする(設定タブの環境パネル用)"""
     from backend.pipeline.export import detect_encoder
 
+    probe = probe_gpu()  # torch初期化は子プロセスで行う(APIを止めないため)
+    encoder = detect_encoder()
+    gpu = (
+        {k: probe[k] for k in ("name", "vram_total_mb", "vram_free_mb")}
+        if probe.get("name")
+        else {}
+    )
     return {
-        "accel": detect_accel(),
-        "gpu": gpu_info(),
-        "ffmpeg": bool(shutil.which("ffmpeg")),
-        "encoder": detect_encoder(),
+        "accel": probe.get("accel", "cpu"),
+        "gpu": gpu,
+        "ffmpeg": encoder is not None,
+        "encoder": encoder,
         "ollama": scan_ollama(settings.ollama_url),
     }
 
@@ -53,22 +59,20 @@ def recommend(vram_mb: int, accel: str, ollama_models: list[dict]) -> dict:
 
     ASRとLLMは直列実行(ASRはunloadしてからLLM)なので、それぞれ個別に判定する。
     """
-    from backend.engines.asr.registry import MODELS
+    from backend.engines.asr.registry import MODELS, resolve_engine
 
-    # エンジン: CUDA→faster-whisper(最速) / ROCm→transformers(CTranslate2非対応)
-    engine = "transformers" if accel == "rocm" else "faster_whisper"
+    engine = resolve_engine("auto", accel)  # 実行時と同じ選択規則
 
     if accel == "cpu":
-        # CPUはVRAM制約なし。実用速度を優先してturboを推奨
-        asr_model = "large-v3-turbo"
+        # CPUはVRAM制約なし。実用速度を優先して速い方(rtfが大きい)を推奨
+        asr_model = max(MODELS.values(), key=lambda m: m.rtf).id
     else:
-        # 精度優先: 収まる最大モデル。何も収まらなければ最小を提示
-        ordered = ["large-v3", "large-v3-turbo"]
-        vram_of = {
-            m: (MODELS[m].vram_tf_mb if engine == "transformers" else MODELS[m].vram_fw_mb)
-            for m in ordered
-        }
-        asr_model = next((m for m in ordered if vram_of[m] <= vram_mb), ordered[-1])
+        # 精度優先(rtfが小さい=低速だが高精度)で、収まる最大モデルを選ぶ。
+        # 何も収まらなければ最も軽いものを提示する
+        ordered = sorted(MODELS.values(), key=lambda m: m.rtf)
+        asr_model = next(
+            (m.id for m in ordered if m.vram_mb(engine) <= vram_mb), ordered[-1].id
+        )
 
     # LLM: インストール済みOllamaモデルのうち収まる最大(=最も高性能とみなす)
     fitting = [m for m in ollama_models if 0 < m["vram_mb"] <= vram_mb]

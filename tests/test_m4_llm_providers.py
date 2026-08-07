@@ -13,17 +13,6 @@ from backend.engines.llm.registry import PROVIDERS, build_client
 from backend.pipeline.pronoun import EDITS_SCHEMA
 
 
-@pytest.fixture
-def client(tmp_path, monkeypatch):
-    from backend.core import config
-
-    monkeypatch.setattr(config.settings, "db_path", tmp_path / "llm.db")
-    from backend.app import app
-
-    with TestClient(app) as c:
-        yield c
-
-
 # ---- プロバイダ選択 ----
 def test_build_client_ollama_by_default():
     c = build_client(Settings(_env_file=None))

@@ -57,30 +57,21 @@ def run_diarization(
         # pyannote.audio 3.x は引数名が use_auth_token
         pipeline = Pipeline.from_pretrained(model, use_auth_token=token)
     # ROCmのHIPビルドもtorch上では"cuda"を名乗るのでこの判定で両対応になる
+    # (ROCm固有のtorch設定は core/device.py apply_rocm_workarounds が起動時に適用済み)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    if getattr(torch.version, "hip", None):
-        # torch(rocm wheel)同梱のMIOpenはDropoutカーネルの実行時コンパイルに失敗する
-        # (rocrandヘッダ不整合)。cudnn APIを無効化しLSTMを通常のHIPカーネルで
-        # 実行する(RX 7900 XTX実測: CPU比 約2.8倍高速で結果は同一)
-        torch.backends.cudnn.enabled = False
     pipeline.to(device)
 
     inputs = {"waveform": torch.from_numpy(audio).unsqueeze(0), "sample_rate": SAMPLE_RATE}
+    kwargs = {"num_speakers": num_speakers} if num_speakers is not None else {}
     try:
-        if num_speakers is not None:
-            result = pipeline(inputs, num_speakers=num_speakers)
-        else:
-            result = pipeline(inputs)
+        result = pipeline(inputs, **kwargs)
     except RuntimeError:
         if device.type != "cuda":
             raise
         # ROCm初期環境でのMIOpenカーネル生成失敗等に備え、CPUで1回だけ再試行する
         print("⚠ GPUでの話者分離に失敗したため、CPUで再試行します。")
         pipeline.to(torch.device("cpu"))
-        if num_speakers is not None:
-            result = pipeline(inputs, num_speakers=num_speakers)
-        else:
-            result = pipeline(inputs)
+        result = pipeline(inputs, **kwargs)
 
     # pyannote.audio 4.x はコンテナ型、3.x はAnnotationを直接返す
     annotation = getattr(result, "speaker_diarization", result)

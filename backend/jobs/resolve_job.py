@@ -22,11 +22,9 @@ def set_client_factory(factory: Callable[[], LLMClient] | None) -> None:
     _client_factory = factory
 
 
-def _get_client(s: Settings | None = None) -> LLMClient:
-    """解決済み設定sからLLMクライアントを作る(省略時はグローバル既定)"""
-    if _client_factory:
-        return _client_factory()
-    return build_client(s if s is not None else resolve_settings())
+def _get_client(s: Settings) -> LLMClient:
+    """解決済み設定(resolve_settings の戻り値)からLLMクライアントを作る"""
+    return _client_factory() if _client_factory else build_client(s)
 
 
 def _load_prompt_parts(conn: sqlite3.Connection, media_id: int, level: str) -> pronoun.PromptParts:

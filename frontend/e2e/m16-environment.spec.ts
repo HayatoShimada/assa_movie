@@ -9,11 +9,14 @@ test('環境パネル: スキャン結果とおすすめが表示される', asy
 
   const panel = page.getByTestId('environment-panel')
   await expect(panel).toBeVisible()
+  // GPU情報は子プロセスで調べるため初回は数秒かかる
+  // おすすめ行にはASRモデルが必ず入る(GPU有無に依らず)
+  await expect(page.getByTestId('env-recommendation')).toContainText(/large-v3/, {
+    timeout: 30000,
+  })
   await expect(panel).toContainText('GPU')
   await expect(panel).toContainText('動画エンコード')
   await expect(panel).toContainText('Ollama')
-  // おすすめ行にはASRモデルが必ず入る(GPU有無に依らず)
-  await expect(page.getByTestId('env-recommendation')).toContainText(/large-v3/)
 })
 
 test('環境パネル: おすすめ設定を適用するとASR設定が変わる', async ({ page, request }) => {

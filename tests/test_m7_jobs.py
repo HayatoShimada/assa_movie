@@ -11,18 +11,6 @@ from backend.pipeline.export import build_export_cmd
 from backend.pipeline.judge import JudgeInput, score, select_subtitles
 
 
-@pytest.fixture
-def client(tmp_path, monkeypatch):
-    from backend.core import config
-
-    monkeypatch.setattr(config.settings, "db_path", tmp_path / "m7.db")
-    from backend.app import app
-
-    with TestClient(app) as c:
-        yield c
-    resolve_job.set_client_factory(None)
-
-
 SEGS = [
     # (text, words, filler_candidates)
     ("そのー、人と話すときに", [{"start": 0.0, "end": 0.6, "text": "そのー", "probability": 0.4}]),

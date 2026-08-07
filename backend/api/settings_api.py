@@ -7,10 +7,10 @@
 import sqlite3
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, create_model
 
 from backend.api.deps import get_db
-from backend.core.config import settings
+from backend.core.config import Settings, settings
 from backend.core.environment import recommend, scan_environment
 from backend.core.project_settings import MUTABLE_FIELDS, save_global_overrides
 from backend.engines.asr.registry import ENGINES, MODELS
@@ -20,39 +20,16 @@ from backend.engines.llm.registry import PROVIDERS
 router = APIRouter(prefix="/api", tags=["settings"])
 
 
-class SettingsUpdate(BaseModel):
-    model_config = {"extra": "forbid"}
-
-    asr_model: str | None = None
-    asr_engine: str | None = None
-    asr_language: str | None = None
-    filler_level: str | None = None
-    pronoun_enabled: bool | None = None
-    pronoun_level: str | None = None
-    pronoun_form: str | None = None
-    pronoun_apply_mode: str | None = None
-    subtitle_mode: str | None = None
-    subtitle_adoption_rate: float | None = None
-    subtitle_font_size: int | None = None
-    subtitle_position: str | None = None
-    subtitle_offset_y: int | None = None
-    subtitle_max_chars_per_line: int | None = None
-    subtitle_font_family: str | None = None
-    subtitle_text_color: str | None = None
-    subtitle_speaker_colors: bool | None = None
-    subtitle_bg: str | None = None
-    subtitle_bg_color: str | None = None
-    subtitle_bg_opacity: float | None = None
-    vram_budget_mb: int | None = None
-    diarization_enabled: bool | None = None
-    num_speakers: int | None = None
-    male_name: str | None = None
-    female_name: str | None = None
-    aizuchi_filter_enabled: bool | None = None
-    convert_method: str | None = None
-    llm_provider: str | None = None
-    ollama_model: str | None = None
-    gemini_model: str | None = None
+# 変更可能項目とその型は Settings が持つ唯一の定義から組み立てる。
+# 手書きすると項目の追加漏れで「UIに出るのに保存できない設定」が生まれる
+SettingsUpdate = create_model(
+    "SettingsUpdate",
+    __config__=ConfigDict(extra="forbid"),
+    **{
+        name: (Settings.model_fields[name].annotation | None, None)
+        for name in sorted(MUTABLE_FIELDS)
+    },
+)
 
 
 @router.get("/environment")

@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from backend.core.project_settings import resolve_settings
 from backend.api.deps import get_db, get_jobs
 from backend.jobs.queue import JobQueue
+from backend.pipeline import export as export_mod
 from backend.pipeline.attention import parse_silences
 from backend.pipeline.layout import CONVERT_METHODS
 
@@ -24,9 +25,7 @@ SILENCE_NOISE_DB = -35
 
 def _require_ffmpeg() -> None:
     if shutil.which("ffmpeg") is None:
-        raise HTTPException(
-            400, "ffmpegが見つかりません。`sudo apt install ffmpeg` でインストールしてください"
-        )
+        raise HTTPException(400, export_mod.FFMPEG_MISSING_MSG)
 
 
 class Clip(BaseModel):
@@ -38,7 +37,6 @@ class Clip(BaseModel):
     hook_text: str | None = None
     score: float | None = None
     score_reasons: list[str] = []
-    layout: str = "landscape"  # 旧カラム(未使用)。互換のため残置
     subtitle_position: str = "bottom"
     subtitle_offset_y: int = 0
     convert_method: str | None = None  # None=プロジェクト既定(crop|blur_pad|face)
@@ -60,7 +58,6 @@ class ClipUpdate(BaseModel):
     end: float | None = None
     title: str | None = None
     hook_text: str | None = None
-    layout: str | None = None
     subtitle_position: str | None = None
     subtitle_offset_y: int | None = None
     convert_method: str | None = None
@@ -77,7 +74,7 @@ def _to_clip(db: sqlite3.Connection, row: sqlite3.Row) -> Clip:
         id=row["id"], media_id=row["media_id"], start=row["start"], end=row["end"],
         title=row["title"], hook_text=row["hook_text"], score=row["score"],
         score_reasons=json.loads(row["score_reasons_json"] or "[]"),
-        layout=row["layout"], subtitle_position=row["subtitle_position"],
+        subtitle_position=row["subtitle_position"],
         subtitle_offset_y=row["subtitle_offset_y"],
         convert_method=row["convert_method"], crop_x=row["crop_x"],
         target_duration=row["target_duration"],

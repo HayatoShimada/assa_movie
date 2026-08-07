@@ -37,7 +37,15 @@ export function EnvironmentPanel() {
   })
 
   if (env.isPending)
-    return <p className="p-2 text-sm text-neutral-500">環境をスキャン中...</p>
+    return (
+      <div
+        data-testid="environment-panel"
+        className="mb-3 rounded-lg border border-neutral-200 p-3 text-sm text-neutral-500 dark:border-neutral-800"
+      >
+        <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">実行環境</h3>
+        <p className="mt-1">確認中...</p>
+      </div>
+    )
   if (env.isError) return null
   const e = env.data
   const rec = e.recommendations

@@ -1,5 +1,6 @@
 """FastAPIアプリ本体。"""
 
+import threading
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -25,35 +26,39 @@ from backend.jobs.queue import JobQueue
 from backend.models import schema
 
 
-def _scan_and_report_environment() -> None:
-    """起動時に環境をスキャンして1行サマリを出す(詳細は GET /api/environment)"""
-    from backend.core.environment import scan_environment
+def _report_startup_checks() -> None:
+    """起動時の軽い確認だけを行う。
 
-    try:
-        env = scan_environment(settings)
-    except Exception:
-        return
-    gpu = env["gpu"]
-    if gpu:
-        vram = f"{gpu['vram_total_mb'] / 1024:.0f}GB"
-        print(
-            f"環境: {gpu['name']} ({env['accel']}, VRAM {vram}) / "
-            f"エンコーダ: {env['encoder'] or 'ffmpeg未検出'} / "
-            f"Ollama: {'稼働中 ' + str(len(env['ollama']['models'])) + 'モデル' if env['ollama']['reachable'] else '未起動'}"
-        )
+    GPU情報(torchの初期化)は実測5秒かかり、その間GILを握るため別スレッドに
+    逃がしても起動が止まる。GPU・VRAM・Ollamaの詳細は GET /api/environment
+    (設定タブの環境パネルが初回に1回だけ呼ぶ)に任せる。
+    """
+    from backend.core.device import probe_gpu
+    from backend.pipeline.export import FFMPEG_MISSING_MSG, detect_encoder
+
+    encoder = detect_encoder()  # ffmpeg -encoders の実行のみ(実測33ms)
+    if encoder is None:
+        print(f"⚠ 書き出しには ffmpeg が必要です。{FFMPEG_MISSING_MSG}")
     else:
-        print(
-            "⚠ torchがGPUを認識していません。"
-            "`./dev.sh sync`(AMD)または WL_TORCH_GROUP=cu128(NVIDIA)で"
-            "GPU向けwheelを入れ直してください。CPUでも動作しますが低速です。"
-        )
-    if not env["ffmpeg"]:
-        print("⚠ ffmpegが見つかりません。書き出しには `sudo apt install ffmpeg` が必要です。")
+        print(f"起動: 動画エンコーダ={encoder}")
+
+    def warm_gpu_probe() -> None:
+        """GPU情報を先に取っておく(子プロセスなのでGILを握らず起動を止めない)"""
+        gpu = probe_gpu()
+        if gpu.get("name"):
+            print(f"環境: {gpu['name']} ({gpu['accel']}, VRAM {gpu['vram_total_mb'] / 1024:.0f}GB)")
+        else:
+            print(
+                "⚠ torchがGPUを認識していません。`./dev.sh sync`(AMD)または "
+                "WL_TORCH_GROUP=cu128(NVIDIA)で入れ直してください。CPUでも動きますが低速です。"
+            )
+
+    threading.Thread(target=warm_gpu_probe, daemon=True).start()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    _scan_and_report_environment()
+    _report_startup_checks()
     app.state.db = schema.init_db(settings.db_path)
     project_settings.load_global_overrides(app.state.db)  # UI変更値の復元
     app.state.jobs = JobQueue(app.state.db)

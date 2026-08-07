@@ -9,17 +9,6 @@ from backend.core.environment import recommend, scan_ollama
 from backend.core.device import apply_vram_budget, gpu_info
 
 
-@pytest.fixture
-def client(tmp_path, monkeypatch):
-    from backend.core import config
-
-    monkeypatch.setattr(config.settings, "db_path", tmp_path / "m16.db")
-    from backend.app import app
-
-    with TestClient(app) as c:
-        yield c
-
-
 # ---- gpu_info / apply_vram_budget(fake torchで検証) ----
 
 def _fake_torch(total_mb=24560, free_mb=20000, available=True):
@@ -152,8 +141,6 @@ def test_vram_budget_setting_persists(client):
     r = client.patch("/api/settings", json={"vram_budget_mb": 12000})
     assert r.status_code == 200
     assert r.json()["values"]["vram_budget_mb"] == 12000
-    # 後片付け
-    client.patch("/api/settings", json={"vram_budget_mb": 0})
 
 
 def test_vram_budget_is_not_project_overridable(client):
