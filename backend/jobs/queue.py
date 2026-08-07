@@ -38,6 +38,29 @@ class JobQueue:
         # DBへ書くとロック競合するため。終端状態の書き込み時に確定させる)
         self._progress: dict[int, float] = {}
 
+    def recover_orphans(self) -> int:
+        """前回プロセスの中断(--reload・強制終了)で残ったジョブを整理する。
+
+        running のまま残ったジョブは再開できないため、明示的に失敗させてUIに伝える。
+        queued のものは安全に再実行できるのでキューに積み直す。
+        """
+        with self.lock:
+            cur = self.conn.execute(
+                "UPDATE jobs SET status='failed',"
+                " error='サーバー再起動により中断されました。再実行してください。'"
+                " WHERE status='running'"
+            )
+            orphaned = cur.rowcount
+            requeued = [
+                r["id"] for r in self.conn.execute(
+                    "SELECT id FROM jobs WHERE status='queued' ORDER BY id"
+                )
+            ]
+            self.conn.commit()
+        for job_id in requeued:
+            self._q.put(job_id)
+        return orphaned
+
     # ---- 台帳操作(呼び出し側スレッドから) ----
     def enqueue(self, media_id: int | None, job_type: str, params: dict | None = None) -> int:
         if job_type not in _HANDLERS:

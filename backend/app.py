@@ -57,6 +57,9 @@ async def lifespan(app: FastAPI):
     app.state.db = schema.init_db(settings.db_path)
     project_settings.load_global_overrides(app.state.db)  # UI変更値の復元
     app.state.jobs = JobQueue(app.state.db)
+    orphaned = app.state.jobs.recover_orphans()  # 前回中断分の整理(--reload対策)
+    if orphaned:
+        print(f"⚠ 中断されたジョブ{orphaned}件を失敗としてマークしました(再実行してください)")
     app.state.jobs.start()
     yield
     app.state.jobs.stop()
