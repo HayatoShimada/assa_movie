@@ -48,6 +48,10 @@ def scan_environment(settings) -> dict:
     return {
         "accel": probe.get("accel", "cpu"),
         "gpu": gpu,
+        # 積んでいることと、計算に使えることは別。AMDのWindows機はGPUが見えても
+        # ROCmが無く、CTranslate2もCUDA専用なので文字起こしはCPUで動く。
+        # VRAMを前提にしたモデル推奨をここで止める
+        "gpu_compute": probe.get("accel", "cpu") != "cpu",
         "ffmpeg": encoder is not None,
         "encoder": encoder,
         "ollama": scan_ollama(settings.ollama_url),

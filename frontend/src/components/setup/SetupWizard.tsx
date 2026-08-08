@@ -48,13 +48,16 @@ function EnvironmentStep() {
 
   if (!env.data) return <p className="text-sm text-neutral-500">環境を調べています…</p>
   const e = env.data
-  const gpu = e.gpu.name ? `${e.gpu.name} (${e.accel})` : 'GPUなし(CPUで動きます)'
   const rec = e.recommendations
 
   return (
     <Section title="この機体の環境">
       <div data-testid="wizard-env">
-        <Line label="GPU" value={gpu} ok={Boolean(e.gpu.name)} />
+        <Line
+          label="GPU"
+          value={e.gpu.name || '見つかりません'}
+          ok={Boolean(e.gpu.name) && e.gpu_compute}
+        />
         {e.gpu.vram_total_mb ? (
           <Line label="VRAM" value={`${(e.gpu.vram_total_mb / 1024).toFixed(1)}GB`} />
         ) : null}

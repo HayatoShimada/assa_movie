@@ -109,6 +109,8 @@ def test_どこからも取れなければcpu(monkeypatch):
     device.probe_gpu.cache_clear()
     monkeypatch.setattr(device, "probe_gpu_cli", lambda: {})
     monkeypatch.setattr(device, "_probe_gpu_torch", lambda: {})
+    # OSへの問い合わせも塞ぐ(実機のWindowsで動かすとGPUが見つかってしまう)
+    monkeypatch.setattr(device, "probe_gpu_windows", lambda: {})
     assert device.probe_gpu() == {
         "accel": "cpu", "name": "", "vram_total_mb": 0, "vram_free_mb": 0
     }

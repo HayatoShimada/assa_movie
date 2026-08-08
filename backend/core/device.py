@@ -7,6 +7,11 @@ whisper.cppがあるのに遅いエンジンが黙って選ばれてしまう(ro
 torchが要るのはASRエンジン側だけなので、そこでは従来どおり
 torch.version.hip の有無で cuda / rocm を見分ける
 (ROCm版torchはHIPがCUDA APIを名乗るため)。
+
+ベンダーCLIが無い環境ではOSに聞く(Windowsはレジストリ)。nvidia-smiはドライバ
+同梱物、rocm-smiはROCmスタックの一部でLinux専用なので、AMDのWindows機には
+どちらも存在せず、CLIだけに頼ると「GPUなし」と誤判定する。ただしOSから分かるのは
+搭載の有無だけで、計算に使えるかは別問題(accelは"cpu"のまま)。
 """
 
 import json
@@ -89,6 +94,80 @@ def parse_rocm_smi(memory_json: str, name_json: str) -> dict:
         "vram_total_mb": int(total / 1024**2),
         "vram_free_mb": int((total - used) / 1024**2),
     }
+
+
+# 表示アダプタのクラスGUID(Windows)。ここ配下に各アダプタが 0000, 0001... で並ぶ
+WINDOWS_DISPLAY_CLASS = r"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}"
+# GPUとして数えないもの(リモートデスクトップ等で出てくる)
+WINDOWS_SOFTWARE_ADAPTERS = ("microsoft basic display", "microsoft remote display", "rdpdd")
+
+
+def parse_windows_adapters(entries: list[dict]) -> dict:
+    """レジストリから読んだ表示アダプタの一覧から、主GPUを選ぶ(純関数)。
+
+    VRAMは64bitの qwMemorySize を使う。32bitの MemorySize は4GBで頭打ちになり、
+    24GBのカードが4GBに見える(実機で確認)。
+
+    accelは "cpu" のまま返す。ここで分かるのは「積んでいること」だけで、
+    計算に使えるかどうか(CUDA/ROCmが入っているか)は別の話だから。
+    """
+    best: dict = {}
+    for entry in entries:
+        name = str(entry.get("DriverDesc") or "").strip()
+        if not name or any(s in name.lower() for s in WINDOWS_SOFTWARE_ADAPTERS):
+            continue
+        size = entry.get("HardwareInformation.qwMemorySize")
+        if not size:
+            size = entry.get("HardwareInformation.MemorySize") or 0
+        try:
+            vram_mb = int(int(size) / 1024**2)
+        except (TypeError, ValueError):
+            vram_mb = 0
+        # 内蔵と外付けが両方見えることがある。VRAMの大きいほうを主GPUとみなす
+        if not best or vram_mb > best["vram_total_mb"]:
+            best = {"accel": "cpu", "name": name, "vram_total_mb": vram_mb, "vram_free_mb": 0}
+    return best
+
+
+def probe_gpu_windows() -> dict:
+    """Windowsの表示アダプタをレジストリから読む。
+
+    ベンダーCLIに頼らない。nvidia-smiはドライバ同梱物、rocm-smiはLinux専用で、
+    AMDのWindows機ではどちらも存在しない。レジストリなら外部プロセスを
+    起こさずに済むので速い。
+    """
+    if platform.system() != "Windows":
+        return {}
+    try:
+        import winreg
+    except ImportError:
+        return {}
+
+    entries: list[dict] = []
+    try:
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, WINDOWS_DISPLAY_CLASS) as root:
+            for index in range(64):  # 実際は数個。暴走しないよう上限を置く
+                try:
+                    subkey = winreg.EnumKey(root, index)
+                except OSError:
+                    break
+                if not subkey.isdigit():
+                    continue
+                try:
+                    with winreg.OpenKey(root, subkey) as key:
+                        values = {}
+                        for i in range(winreg.QueryInfoKey(key)[1]):
+                            try:
+                                vname, vdata, _ = winreg.EnumValue(key, i)
+                            except OSError:
+                                break
+                            values[vname] = vdata
+                        entries.append(values)
+                except OSError:
+                    continue
+    except OSError:
+        return {}
+    return parse_windows_adapters(entries)
 
 
 def parse_mac_gpu(chipset_output: str, total_ram_bytes: int) -> dict:
@@ -195,9 +274,13 @@ def apply_vram_budget(budget_mb: int, torch_module=None) -> None:
 def probe_gpu() -> dict:
     """GPUを調べる: {accel, name, vram_total_mb, vram_free_mb}。
 
-    まずベンダーCLI(実測55ms)。無い環境だけtorchに聞く。
+    まずベンダーCLI(実測55ms)。無ければtorch。それも無ければOSに聞く。
+
+    最後のOS問い合わせで分かるのは「積んでいること」だけなので accel は "cpu" の
+    ままになる。それでも名前を出す価値はある: RX 7900 XTX を積んだWindows機に
+    「GPUなし」と言うのは、事実として誤りだった。
     """
-    return probe_gpu_cli() or _probe_gpu_torch() or dict(EMPTY_GPU)
+    return probe_gpu_cli() or _probe_gpu_torch() or probe_gpu_windows() or dict(EMPTY_GPU)
 
 
 def _probe_gpu_torch() -> dict:

@@ -38,10 +38,12 @@ SettingsUpdate = create_model(
 def get_environment() -> dict:
     """環境スキャン結果と、割当VRAMに収まるASR/LLMの推奨を返す(設定タブの環境パネル用)"""
     env = scan_environment(settings)
-    total = env["gpu"].get("vram_total_mb", 0)
+    # 「積んでいる」ではなく「計算に使える」で判断する。GPUが見えていても
+    # CUDA/ROCmが無ければモデルはCPUに載るので、VRAMを前提に選ばせてはいけない
+    has_gpu = env["gpu_compute"]
+    total = env["gpu"].get("vram_total_mb", 0) if has_gpu else 0
     budget = int(settings.vram_budget_mb or 0)
     effective = min(budget, total) if budget > 0 else total
-    has_gpu = bool(env["gpu"])
 
     asr_options = [
         {

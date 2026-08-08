@@ -192,6 +192,8 @@ export interface LicenseStatus {
 export interface EnvironmentResponse {
   accel: 'cuda' | 'rocm' | 'cpu'
   gpu: { name?: string; vram_total_mb?: number; vram_free_mb?: number }
+  /** GPUを計算に使えるか。搭載していてもCUDA/ROCmが無ければfalse(書き出しには使える) */
+  gpu_compute: boolean
   ffmpeg: boolean
   encoder: string | null
   ollama: { reachable: boolean; models: { name: string; vram_mb: number }[] }
