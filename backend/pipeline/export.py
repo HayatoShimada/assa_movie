@@ -1,5 +1,6 @@
 """ffmpegによるクリップ切り出しと字幕焼き込み。"""
 
+import platform
 import shutil
 import subprocess
 from functools import lru_cache
@@ -12,16 +13,39 @@ FFMPEG_MISSING_MSG = (
 )
 
 
-def _pick_encoder(encoders_output: str, has_nvidia: bool, has_dri: bool) -> str:
+def _pick_encoder(
+    encoders_output: str,
+    has_nvidia: bool,
+    has_dri: bool,
+    os_name: str | None = None,
+) -> str:
     """ffmpegのエンコーダ一覧と実デバイスの有無からH264エンコーダを選ぶ(純関数)。
 
     ffmpegはNVIDIA機でなくてもh264_nvencを列挙するため、
     実デバイス(/dev/nvidia0等)の存在まで確認する。
+
+    ハードウェアエンコーダはOSごとに別物なので、そのOSに無いものは候補にしない
+    (指定すると書き出しが落ちる)。列挙されていないものも選ばない。
     """
-    if "h264_nvenc" in encoders_output and has_nvidia:
-        return "h264_nvenc"
-    if "h264_vaapi" in encoders_output and has_dri:
-        return "h264_vaapi"
+    os_name = os_name or platform.system()
+    if os_name == "Darwin":
+        # Apple SiliconのハードウェアエンコーダはVideoToolbox経由
+        candidates = ["h264_videotoolbox"]
+    elif os_name == "Windows":
+        # VAAPIはLinux専用。Windowsはベンダーごとに別のエンコーダ
+        candidates = ["h264_nvenc", "h264_qsv", "h264_amf"]
+    else:
+        candidates = ["h264_nvenc", "h264_vaapi"]
+
+    for name in candidates:
+        if name not in encoders_output:
+            continue
+        # 実デバイスの確認が要るのはLinuxだけ(他OSは列挙が実態に即している)
+        if os_name == "Linux" and name == "h264_nvenc" and not has_nvidia:
+            continue
+        if os_name == "Linux" and name == "h264_vaapi" and not has_dri:
+            continue
+        return name
     return "libx264"
 
 

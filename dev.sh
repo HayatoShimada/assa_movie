@@ -33,7 +33,7 @@ case "${1:-all}" in
     # cargo/rustcはrustupの既定の場所に入る
     export PATH="$HOME/.cargo/bin:$PATH"
     ./scripts/build_sidecar.sh
-    ./scripts/build_whispercpp_vulkan.sh
+    ./scripts/build_whispercpp.sh
     cd frontend && exec npm run app:build
     ;;
   app)

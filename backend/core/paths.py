@@ -14,6 +14,7 @@ OS標準の場所(Linux は XDG Base Directory)に置く。
 """
 
 import os
+import platform
 from pathlib import Path
 
 APP_NAME = "kirinuki-studio"
@@ -32,24 +33,47 @@ def _xdg(env: str, home: Path, fallback: str) -> Path:
     return (Path(base) if base else home / fallback) / APP_NAME
 
 
-def data_dir(home: Path | None = None, repo: Path | None = None) -> Path:
+def _win_dir(env: str, home: Path, fallback: str) -> Path:
+    """Windowsの標準的な置き場所。環境変数が無ければホーム配下に落とす"""
+    base = os.environ.get(env, "").strip()
+    return (Path(base) if base else home / fallback) / APP_NAME
+
+
+def data_dir(
+    home: Path | None = None, repo: Path | None = None, os_name: str | None = None
+) -> Path:
     """DB・アップロード動画・書き出しの置き場所"""
     repo = repo or PROJECT_ROOT
     if (repo / LEGACY_DB_NAME).exists():
         return repo
-    return _xdg("XDG_DATA_HOME", home or Path.home(), ".local/share")
+    home = home or Path.home()
+    os_name = os_name or platform.system()
+    if os_name == "Darwin":
+        return home / "Library/Application Support" / APP_NAME
+    if os_name == "Windows":
+        return _win_dir("APPDATA", home, "AppData/Roaming")
+    return _xdg("XDG_DATA_HOME", home, ".local/share")
 
 
-def db_path(home: Path | None = None, repo: Path | None = None) -> Path:
-    directory = data_dir(home=home, repo=repo)
+def db_path(
+    home: Path | None = None, repo: Path | None = None, os_name: str | None = None
+) -> Path:
+    directory = data_dir(home=home, repo=repo, os_name=os_name)
     legacy = directory / LEGACY_DB_NAME
     # 既存DBを使う環境ではファイル名も変えない(変えると空DBが新規作成される)
     return legacy if legacy.exists() else directory / DB_NAME
 
 
-def cache_dir(home: Path | None = None) -> Path:
+def cache_dir(home: Path | None = None, os_name: str | None = None) -> Path:
     """モデル・ビルド済みバイナリの置き場所(消えても再取得できるもの)"""
     home = home or Path.home()
+    os_name = os_name or platform.system()
+    if os_name == "Darwin":
+        return home / "Library/Caches" / APP_NAME
+    if os_name == "Windows":
+        # 数GBのモデルを置くので、同期対象になりうるRoamingではなくLocalへ
+        return _win_dir("LOCALAPPDATA", home, "AppData/Local") / "cache"
+
     base = os.environ.get("XDG_CACHE_HOME", "").strip()
     root = Path(base) if base else home / ".cache"
     new = root / APP_NAME
@@ -59,9 +83,16 @@ def cache_dir(home: Path | None = None) -> Path:
     return new
 
 
-def config_dir(home: Path | None = None) -> Path:
+def config_dir(home: Path | None = None, os_name: str | None = None) -> Path:
     """APIトークン等の置き場所"""
-    return _xdg("XDG_CONFIG_HOME", home or Path.home(), ".config")
+    home = home or Path.home()
+    os_name = os_name or platform.system()
+    if os_name == "Darwin":
+        # Macは設定も Application Support にまとめるのが標準
+        return home / "Library/Application Support" / APP_NAME
+    if os_name == "Windows":
+        return _win_dir("APPDATA", home, "AppData/Roaming")
+    return _xdg("XDG_CONFIG_HOME", home, ".config")
 
 
 def config_file(name: str, home: Path | None = None, repo: Path | None = None) -> Path:

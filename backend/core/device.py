@@ -10,6 +10,7 @@ torch.version.hip の有無で cuda / rocm を見分ける
 """
 
 import json
+import platform
 import shutil
 import subprocess
 import sys
@@ -90,8 +91,40 @@ def parse_rocm_smi(memory_json: str, name_json: str) -> dict:
     }
 
 
+def parse_mac_gpu(chipset_output: str, total_ram_bytes: int) -> dict:
+    """macOSのGPU情報を読む(純関数)。
+
+    Apple Siliconはユニファイドメモリなので、搭載RAMがそのままGPUから使える量。
+    Intel MacのdGPUは扱いが違うため、ここでは対象にしない。
+    """
+    line = next(
+        (l for l in chipset_output.splitlines() if "Chipset Model:" in l), ""
+    )
+    name = line.split(":", 1)[1].strip() if ":" in line else ""
+    if not name.startswith("Apple ") or total_ram_bytes <= 0:
+        return {}
+    total_mb = int(total_ram_bytes / 1024**2)
+    return {
+        "accel": "metal",
+        "name": name,
+        "vram_total_mb": total_mb,
+        "vram_free_mb": total_mb,
+    }
+
+
+def probe_gpu_mac() -> dict:
+    """macOSのGPUを調べる。Apple Silicon以外は空dict"""
+    try:
+        ram = int(_run(["sysctl", "-n", "hw.memsize"]).strip() or 0)
+    except ValueError:
+        return {}
+    return parse_mac_gpu(_run(["system_profiler", "SPDisplaysDataType"]), ram)
+
+
 def probe_gpu_cli() -> dict:
     """ベンダーCLIからGPUを調べる。見つからなければ空dict"""
+    if platform.system() == "Darwin":
+        return probe_gpu_mac()
     nvidia = parse_nvidia_smi(
         _run(["nvidia-smi", "--query-gpu=name,memory.total,memory.free",
               "--format=csv,noheader,nounits"])

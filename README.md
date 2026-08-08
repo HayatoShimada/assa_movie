@@ -1,7 +1,7 @@
 # KirinukiStudio
 
 対談・イベント動画から **文字起こし → 話者分離 → 指示語の解決 → 字幕生成 → 切り抜き動画作成** までを、
-すべてローカルGPUで行うアプリケーションです。バージョン **0.9.0**。
+すべてローカルGPUで行うアプリケーションです。バージョン **0.9.1**。
 
 <https://github.com/HayatoShimada/assa_movie>
 
@@ -49,15 +49,24 @@ LLMはローカル(Ollama)とクラウド(Gemini API)を切り替え可能。ロ
 
 ## インストール(使うだけの人向け)
 
-Linux(Ubuntu 24.04で確認)は `.deb` をインストールするだけです。
-Pythonの用意もリポジトリのcloneも要りません。
+[リリースページ](https://github.com/HayatoShimada/assa_movie/releases)から、
+お使いのOSのインストーラを落としてください。Pythonの用意もcloneも要りません。
 
-```bash
-sudo apt install ./KirinukiStudio_0.9.0_amd64.deb
-```
+| OS | ファイル | 備考 |
+|---|---|---|
+| Ubuntu / Debian | `.deb` | `sudo apt install ./KirinukiStudio_*.deb` |
+| Linux(その他) | `.AppImage` | `chmod +x` して実行 |
+| macOS | `.dmg` | Apple Silicon 向け。初回は右クリック →「開く」 |
+| Windows | `.msi` または `.exe` | |
 
-アプリメニューに **KirinukiStudio** が登録されます。AppImageもあります
-(`chmod +x` して実行)。データは `~/.local/share/kirinuki-studio/` に作られます。
+アプリメニューに **KirinukiStudio** が登録されます。
+データの置き場所はOSの標準に従います。
+
+| OS | 置き場所 |
+|---|---|
+| Linux | `~/.local/share/kirinuki-studio/` |
+| macOS | `~/Library/Application Support/kirinuki-studio/` |
+| Windows | `%APPDATA%\kirinuki-studio\` |
 
 初回起動後、設定タブの「セットアップ」から次を取得してください。
 
@@ -66,10 +75,15 @@ sudo apt install ./KirinukiStudio_0.9.0_amd64.deb
 | 話者分離モデル | 76MB | 話者を自動で見分けます |
 | 高速な文字起こし | 3.1GB | 文字起こしが数倍速くなります |
 
-本体(whisper.cpp)はアプリに同梱済みです。GPUドライバのVulkanで動くので、
-AMD・NVIDIA・Intelのどれでも追加の準備は要りません。
+高速な文字起こしの本体(whisper.cpp)はアプリに同梱済みです。
+LinuxはVulkan、macOSはMetalで動くので、GPUの追加設定は要りません。
 
-**Windowsは未対応です**(v1.0.0で対応予定)。
+**書き出しにはffmpegが必要です。** `.deb` は依存として自動で入りますが、
+macOS(`brew install ffmpeg`)とWindows(公式サイトから導入しPATHを通す)は
+別途インストールしてください。
+
+**macOSの署名について**: 現状のインストーラはApple公証を通していないため、
+初回起動時にGatekeeperの警告が出ます。右クリック →「開く」で起動できます。
 
 ## 開発環境のセットアップ
 
