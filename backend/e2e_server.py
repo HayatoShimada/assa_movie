@@ -19,6 +19,8 @@ from fastapi import APIRouter, Request
 from backend.core.config import settings
 from backend.engines.llm.base import FakeLLMClient
 from backend.jobs import queue as job_queue
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
 from backend.jobs import resolve_job
 
 E2E_PORT = 8001
@@ -106,6 +108,9 @@ def _fake_transcribe(
 
 router = APIRouter(prefix="/api/e2e", tags=["e2e"])
 
+# E2E用の使い捨てライセンス発行鍵(プロセスごとに作り直す)
+_E2E_ISSUER = Ed25519PrivateKey.generate()
+
 
 @router.post("/reset")
 def reset(request: Request) -> dict:
@@ -115,6 +120,10 @@ def reset(request: Request) -> dict:
                   "segments", "jobs", "glossary", "llm_instructions", "media", "projects"):
         db.execute(f"DELETE FROM {table}")
     db.commit()
+    # 登録済みライセンスも消す(specの実行順に結果が左右されないように)
+    from backend.api import license_api
+
+    license_api.key_path().unlink(missing_ok=True)
     return {"status": "reset"}
 
 
@@ -141,13 +150,36 @@ def seed(request: Request, output_orientation: str = "landscape") -> dict:
     return {"project_id": project_id, "media_id": cur.lastrowid}
 
 
+@router.post("/license-key")
+def issue_license_key() -> dict:
+    """テスト用の正規キーを1本発行する。
+
+    本番の秘密鍵はリポジトリに無いので、E2Eでは使い捨ての鍵ペアを作り、
+    アプリ側の公開鍵をそれに差し替えている(build_app参照)。
+    """
+    from backend.core import license as lic
+
+    return {"key": lic.sign_payload(
+        {"p": lic.PRODUCT, "e": "pro", "i": "2026-01-01", "x": "2099-01-01",
+         "l": "E2Eテスト", "s": 1},
+        _E2E_ISSUER,
+    )}
+
+
 def build_app():
     tmp = Path(tempfile.gettempdir()) / "whisper_e2e.db"
     tmp.unlink(missing_ok=True)
     settings.db_path = tmp
     settings.diarization_enabled = False
 
+    from backend.api import license_api
     from backend.app import app
+    from backend.core import license as lic
+
+    # ライセンスは使い捨ての鍵ペアで検証し、保存先も一時ディレクトリにする
+    license_api.PUBLIC_KEY = lic.public_key_to_text(_E2E_ISSUER.public_key())
+    license_dir = Path(tempfile.mkdtemp(prefix="ks-e2e-license-"))
+    license_api.key_path = lambda: license_dir / "license.key"
 
     app.include_router(router)
     resolve_job.set_client_factory(lambda: FakeLLMClient(responses=_fake_llm))

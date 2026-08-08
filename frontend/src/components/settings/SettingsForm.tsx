@@ -8,6 +8,7 @@ import { useState } from 'react'
 import { api } from '../../api/client'
 import type { SettingsValues } from '../../lib/settings'
 import { EnvironmentPanel } from './EnvironmentPanel'
+import { LicensePanel } from './LicensePanel'
 import { SaveBar } from './SaveBar'
 import { SettingsFields } from './SettingsFields'
 
@@ -31,6 +32,7 @@ export function SettingsForm() {
 
   return (
     <div className="p-4">
+      <LicensePanel />
       <EnvironmentPanel />
       <p className="mb-2 text-xs text-neutral-500">
         全体設定。新規プロジェクトの既定値になります(プロジェクト単位で上書き可能)。

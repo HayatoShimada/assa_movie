@@ -22,13 +22,21 @@ dependencies = [
     # 話者分離の既定エンジン。ONNX Runtimeで動くのでtorch不要・HFトークン不要。
     # 実測でpyannote(torch/GPU)の約4倍速く、話者割り当ての一致率94.8%
     # (docs/V1_PLAN.md M23)。モデルは ./dev.sh diarize-models で取得する
-    "sherpa-onnx>=1.13",
+    "sherpa-onnx==1.13.4",
+    # 本体(libonnxruntime等)。sherpa-onnxのwheelは依存として宣言しているが
+    # sdistのメタデータには入っておらず、uvはsdist側を読むためロックに載らない。
+    # 明示しないと `uv sync` が黙って削除し、話者分離が
+    # 「libonnxruntime.so が無い」で落ちる。バージョンは本体と一致必須
+    "sherpa-onnx-core==1.13.4",
     # 4.x系は同意済みでないpyannote/speaker-diarization-community-1を要求するため3.x系に固定
     "pyannote-audio>=3.3,<4",
     # pyannote-audio 3.x はhuggingface_hub 1.0で削除されたuse_auth_token引数を使うため0.x系に固定
     "huggingface-hub<1.0",
     # resolve_pronouns.py がOllama APIを叩くのに使用
     "requests>=2.31",
+    # ライセンスキーのEd25519署名検証(オフライン)。
+    # 自前実装は避ける。検証だけとはいえ、監査された実装を使う
+    "cryptography>=43",
     # バックエンドAPI
     "fastapi>=0.115",
     "python-multipart>=0.0.20",

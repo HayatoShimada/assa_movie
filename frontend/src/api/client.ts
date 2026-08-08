@@ -133,6 +133,9 @@ export const api = {
   updateSettings: (patch: Record<string, unknown>) =>
     request<SettingsResponse>('/api/settings', { method: 'PATCH', body: JSON.stringify(patch) }),
   getFonts: () => request<{ fonts: string[] }>('/api/fonts'),
+  getLicense: () => request<LicenseStatus>('/api/license'),
+  registerLicense: (key: string) =>
+    request<LicenseStatus>('/api/license', { method: 'POST', body: JSON.stringify({ key }) }),
   getEnvironment: () => request<EnvironmentResponse>('/api/environment'),
 }
 
@@ -144,6 +147,19 @@ export const api = {
  * パネルを開くたびに再スキャンしない(変わる操作の後は明示的にinvalidateする)。
  */
 export const machineQueryOptions = { staleTime: Infinity } as const
+
+export interface LicenseStatus {
+  status: 'valid' | 'grace' | 'expired' | 'invalid' | 'missing'
+  is_usable: boolean
+  edition: string
+  licensee: string
+  issued: string | null
+  expires: string | null
+  seats: number
+  /** 期限までの残り日数。無期限ならnull(猶予期間中は負) */
+  days_left: number | null
+  expiring_soon: boolean
+}
 
 export interface EnvironmentResponse {
   accel: 'cuda' | 'rocm' | 'cpu'
