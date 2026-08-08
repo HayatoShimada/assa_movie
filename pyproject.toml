@@ -1,6 +1,6 @@
 [project]
 name = "whisper-local"
-version = "0.3.0"
+version = "0.4.0"
 description = "ローカル文字起こし・切り抜き (CUDA / ROCm 両対応。extraで切替)"
 readme = "README.md"
 authors = [

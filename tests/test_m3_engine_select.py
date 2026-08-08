@@ -49,11 +49,32 @@ def test_build_engine_auto_selects_by_accel(
     from backend.engines.asr import registry
 
     monkeypatch.setattr(registry, "detect_accel", lambda: accel)
+    # whisper.cppは外部ビルドなので、無い環境の挙動として固定する
+    monkeypatch.setattr(registry, "whispercpp_available", lambda: False)
     engine = build_engine(Settings(_env_file=None))  # asr_engine="auto"
     assert isinstance(engine, expected_type)
     assert engine.device == expected_device
     if expected_compute is not None:
         assert engine.compute_type == expected_compute
+
+
+def test_build_engine_prefers_whispercpp_on_rocm_when_built(monkeypatch):
+    """whisper.cppが用意されていればROCmではそれを使う(公式版の約2.6倍速)"""
+    from backend.engines.asr import registry
+    from backend.engines.asr.whispercpp import WhisperCppEngine
+
+    monkeypatch.setattr(registry, "detect_accel", lambda: "rocm")
+    monkeypatch.setattr(registry, "whispercpp_available", lambda: True)
+    assert isinstance(build_engine(Settings(_env_file=None)), WhisperCppEngine)
+
+
+def test_build_engine_falls_back_when_whispercpp_missing(monkeypatch):
+    """ビルドしていない環境では公式Whisperに落ちる(壊れない)"""
+    from backend.engines.asr import registry
+
+    monkeypatch.setattr(registry, "detect_accel", lambda: "rocm")
+    monkeypatch.setattr(registry, "whispercpp_available", lambda: False)
+    assert isinstance(build_engine(Settings(_env_file=None)), OpenAIWhisperEngine)
 
 
 def test_build_engine_explicit_transformers_on_cpu(monkeypatch):

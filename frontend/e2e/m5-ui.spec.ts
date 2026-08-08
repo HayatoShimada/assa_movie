@@ -136,3 +136,26 @@ test('LLMプロバイダにGeminiが表示される(キー未設定なら選択�
     await expect(gemini).toContainText('APIキー未設定')
   }
 })
+
+test('エディタ: 境界バーのドラッグで動画とパネルの幅を変えられる', async ({ page, request }) => {
+  const seed = await (await request.post(`${API}/api/e2e/seed`)).json()
+  await page.setViewportSize({ width: 1500, height: 900 })
+  await page.goto(`/#/media/${seed.media_id}`)
+
+  const handle = page.getByTestId('split-handle')
+  await expect(handle).toBeVisible()
+  const panelWidth = async () => (await page.locator('aside').boundingBox())!.width
+  const before = await panelWidth()
+
+  // 境界を左へ動かすとパネルが広がる
+  const box = (await handle.boundingBox())!
+  await page.mouse.move(box.x + box.width / 2, box.y + 200)
+  await page.mouse.down()
+  await page.mouse.move(box.x - 250, box.y + 200, { steps: 10 })
+  await page.mouse.up()
+  await expect.poll(panelWidth).toBeGreaterThan(before + 100)
+
+  // ダブルクリックで既定に戻る
+  await handle.dblclick()
+  await expect.poll(panelWidth).toBeCloseTo(before, -1)
+})

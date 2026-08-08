@@ -78,7 +78,13 @@ INSTALLED = [
         ("CPUのみ", 0, "cpu", "faster_whisper", "large-v3-turbo", "なし"),
     ],
 )
-def test_recommend_table(name, vram_mb, accel, expected_engine, expected_model, expected_llm):
+def test_recommend_table(
+    monkeypatch, name, vram_mb, accel, expected_engine, expected_model, expected_llm
+):
+    from backend.engines.asr import registry
+
+    # whisper.cppは外部ビルドなので、無い環境の推奨として固定する
+    monkeypatch.setattr(registry, "whispercpp_available", lambda: False)
     rec = recommend(vram_mb, accel, INSTALLED)
     assert rec["asr_engine"] == expected_engine, name
     assert rec["asr_model"] == expected_model, name

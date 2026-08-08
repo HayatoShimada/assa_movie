@@ -34,10 +34,13 @@ cd frontend && npm run gen:api    # バックエンドのAPIを変えたら必�
 ## 設計上の重要な決定(変えるときは相談)
 
 - **ASRエンジンはGPUで自動選択(`asr_engine=auto`)。** CUDA→faster-whisper /
-  ROCm→公式Whisper(openai-whisper。CTranslate2がCUDA専用ビルドのため)/
-  GPUなし→faster-whisper CPU。モデルは large-v3 が既定
+  ROCm→whisper.cpp(ビルド済みなら。無ければ公式Whisper)/ GPUなし→faster-whisper CPU。
+  CTranslate2はCUDA専用ビルドなのでROCmでは使えない。モデルは large-v3 が既定
   (精度優先・単語タイムスタンプ必須。BACKEND_DESIGN.md)。
   transformers版も選べるが**単語確率とinitial_promptが取れない**ので既定にしない。
+- **whisper.cppは `--output-json-full` で呼ぶ(`-ml` を付けない)。**
+  句読点・トークンのタイムスタンプ・確率が一度に取れる。`-ml` を付けると
+  句読点が落ちる(実測)。セグメント分割は `words_to_segments` で自前に行う。
 - **torchはdependency-groupsで切替。** 既定は rocm(RX 7900系)。NVIDIA機は
   `WL_TORCH_GROUP=cu128 ./dev.sh sync`。依存バージョンは固定
   (torch 2.8 / pyannote 3.x / huggingface_hub 0.x / TypeScript 5.9)。上げない。

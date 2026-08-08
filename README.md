@@ -1,13 +1,14 @@
 # Attention Subtitle Separate Application
 
 対談・イベント動画から **文字起こし → 話者分離 → 指示語の解決 → 字幕生成 → 切り抜き動画作成** までを、
-すべてローカルGPUで行うアプリケーションです。バージョン **0.3.0**。
+すべてローカルGPUで行うアプリケーションです。バージョン **0.4.0**。
 
 <https://github.com/> ※公開リポジトリのURLが決まったらここに記載
 
 ## 何ができるか
 
-- **文字起こし**: faster-whisper (large-v3) による高精度な日本語文字起こし。単語タイムスタンプ付き
+- **文字起こし**: Whisper large-v3 による高精度な日本語文字起こし。単語タイムスタンプ・単語確率付き
+  (GPUに応じて faster-whisper / whisper.cpp / 公式Whisper を自動選択)
 - **話者分離**: pyannote.audio + 声の高さによる話者名の自動割り当て(男女2人の対談に最適化)
 - **相槌・フィラー処理**: 「うん」「なるほど」等の相槌除外、「あのー」「なんか」等の言い淀みを
   字幕からだけ除去(原文は常に保持)。曖昧なものはAIがユーザーに質問する
@@ -34,7 +35,7 @@ LLMはローカル(Ollama)とクラウド(Gemini API)を切り替え可能。ロ
 
 | 項目 | 要件 |
 |---|---|
-| OS | Ubuntu 22.04+ (Windowsは未対応・計画中) |
+| OS | Ubuntu 22.04+ (Windowsは未対応・v1.0で対応予定) |
 | GPU | NVIDIA GPU(CUDA 12.x)または AMD GPU(ROCm 6.4+。RX 7900系で検証)。VRAM 8GB以上推奨 |
 | Python | 3.12(uvが自動で管理) |
 | Node.js | 20以上(フロントエンド用) |
@@ -57,7 +58,11 @@ git clone <このリポジトリ> && cd whisper-local
 #    NVIDIA GPU (CUDA):
 # WL_TORCH_GROUP=cu128 ./dev.sh sync
 #    ASRエンジンはGPUに合わせて自動選択される
-#    (CUDA→faster-whisper / ROCm→transformers版Whisper / GPUなし→CPU)
+#    (CUDA→faster-whisper / ROCm→whisper.cppか公式Whisper / GPUなし→CPU)
+
+# 1b. (任意・ROCmのみ)whisper.cppを用意すると文字起こしが約3倍速くなる
+#     sudo apt install cmake
+#     ./dev.sh whispercpp
 
 # 2. フロントエンド依存
 cd frontend && npm install && cd ..
@@ -123,7 +128,7 @@ uv run python resolve_pronouns.py 動画 --form annotate  # 指示語の注釈�
 ## 開発
 
 ```bash
-./dev.sh check    # 全テスト+型チェック+ビルド(backend 243 / frontend 28 / E2E 18)
+./dev.sh check    # 全テスト+型チェック+ビルド(backend 407 / frontend 48 / E2E 30)
 ./dev.sh e2e      # E2Eテスト(FakeLLM+一時DBなのでGPUもLLMも不要)
 cd frontend && npm run gen:api   # バックエンドAPIを変えたら型を再生成
 ```
@@ -139,8 +144,9 @@ AIで開発を続ける場合の規約は [CLAUDE.md](CLAUDE.md)。
 - 複数クリップの一括書き出しUIは未実装
 - Windows は未対応
 - 話者分離は2人の対談に最適化(3人以上は「話者N」表示)
-- ROCm環境ではASRが公式Whisper(PyTorch版・実時間比約4.4倍)になる。
-  faster-whisperはCUDA専用ビルドのためAMD GPUでは使えない
+- ROCm環境ではfaster-whisper(CUDA専用ビルド)が使えないため、
+  whisper.cpp(`./dev.sh whispercpp` でビルド。実時間比約11.6倍)か、
+  未ビルドなら公式Whisper(約4.4倍)を自動で使う
   (機能は同等。実測値は docs/verify_rocm.md 参照)
 
 ## ライセンス

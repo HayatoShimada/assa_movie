@@ -16,6 +16,8 @@ from backend.engines.asr.base import ASREngine
 from backend.engines.asr.fasterwhisper import FasterWhisperEngine
 from backend.engines.asr.openai_whisper import OpenAIWhisperEngine
 from backend.engines.asr.transformers_whisper import TransformersWhisperEngine
+from backend.engines.asr.whispercpp import WhisperCppEngine
+from backend.engines.asr.whispercpp import is_available as whispercpp_available
 
 
 @dataclass(frozen=True)
@@ -31,7 +33,8 @@ class ModelInfo:
 
     def vram_mb(self, engine: str) -> int:
         """指定エンジンで動かしたときのVRAM目安(推奨判定と選択UIで共用)"""
-        # PyTorch実装は重みに加えて注意重み等を持つため目安が大きい
+        # PyTorch実装は重みに加えて注意重み等を持つため目安が大きい。
+        # whisper.cppはggml量子化なしでもfaster-whisper並に収まる
         torch_engines = ("transformers", "openai_whisper")
         return self.vram_tf_mb if engine in torch_engines else self.vram_fw_mb
 
@@ -64,18 +67,24 @@ DEFAULT_MODEL = "large-v3"
 ENGINES: dict[str, str] = {
     "auto": "自動(GPUに合わせて選択)",
     "faster_whisper": "faster-whisper(CUDA/CPU)",
+    "whispercpp": "whisper.cpp(ROCm最速・要ビルド)",
     "openai_whisper": "公式Whisper(ROCm/CUDA)",
     "transformers": "transformers Whisper(単語確率なし)",
 }
 
 
 def resolve_engine(engine_id: str, accel: str) -> str:
-    """`auto` を実際のエンジンに解決する(実行と推奨表示で同じ規則を使う)"""
+    """`auto` を実際のエンジンに解決する(実行と推奨表示で同じ規則を使う)。
+
+    ROCmでは whisper.cpp が最速(公式版の約2.6倍)だが外部ビルドが要るので、
+    用意されているときだけ使い、無ければ公式Whisperに落とす。
+    CTranslate2(faster-whisper)はCUDA専用ビルドなのでROCmでは使えない。
+    """
     if engine_id != "auto":
         return engine_id
-    # CTranslate2(faster-whisper)はCUDA専用ビルドなのでROCmでは公式Whisperを使う。
-    # 公式版なら単語確率とinitial_promptも取れ、CUDA機と機能が揃う
-    return "openai_whisper" if accel == "rocm" else "faster_whisper"
+    if accel != "rocm":
+        return "faster_whisper"
+    return "whispercpp" if whispercpp_available() else "openai_whisper"
 
 
 def build_engine(settings) -> ASREngine:
@@ -91,6 +100,9 @@ def build_engine(settings) -> ASREngine:
 
     accel = detect_accel()
     engine_id = resolve_engine(settings.asr_engine, accel)
+
+    if engine_id == "whispercpp":
+        return WhisperCppEngine(beam_size=settings.asr_beam_size)
 
     # ROCmのHIPはtorch上で"cuda"を名乗るのでそのまま渡す
     torch_device = "cuda" if accel in ("cuda", "rocm") else "cpu"

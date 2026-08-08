@@ -23,6 +23,7 @@ import {
 } from '../components/icons'
 import { Button } from '../components/ui'
 import { navigate } from '../hooks/useHashRoute'
+import { useSplitPane } from '../hooks/useSplitPane'
 import { usePlayback } from '../stores/playback'
 
 type Tab = 'transcript' | 'review' | 'questions' | 'clips' | 'export' | 'settings'
@@ -44,6 +45,7 @@ export function Editor({ mediaId }: { mediaId: number }) {
   // 「同じクリップの値である」ことが構造的に保証される
   const [selectedClip, setSelectedClip] = useState<Clip | null>(null)
   const selectedSegmentId = usePlayback((s) => s.selectedSegmentId)
+  const split = useSplitPane()
 
   const media = useQuery({
     queryKey: ['mediaItem', mediaId],
@@ -103,7 +105,12 @@ export function Editor({ mediaId }: { mediaId: number }) {
         </h1>
       </header>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[1fr_440px]">
+      {/* 幅は割合で持ち、境界バーのドラッグで変えられる。
+          lg未満はflexの縦積みになり gridTemplateColumns は無視される */}
+      <div
+        className="flex min-h-0 flex-1 flex-col lg:grid"
+        style={{ gridTemplateColumns: `minmax(0, 1fr) auto ${(split.ratio * 100).toFixed(2)}%` }}
+      >
         <section className="min-w-0 p-4">
           <VideoPlayer
             mediaId={mediaId}
@@ -117,7 +124,31 @@ export function Editor({ mediaId }: { mediaId: number }) {
           />
         </section>
 
-        <aside className="flex min-h-0 flex-col border-t border-neutral-200 lg:border-l lg:border-t-0 dark:border-neutral-800">
+        {/* 境界バー: ドラッグで比率を変える。ダブルクリックで既定に戻す */}
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="動画とパネルの幅を調整"
+          aria-valuenow={Math.round(split.ratio * 100)}
+          tabIndex={0}
+          data-testid="split-handle"
+          onPointerDown={(e) => {
+            e.preventDefault()
+            split.startDrag()
+          }}
+          onDoubleClick={split.reset}
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowLeft') split.nudge(0.02)
+            if (e.key === 'ArrowRight') split.nudge(-0.02)
+          }}
+          className={`hidden w-1.5 shrink-0 cursor-col-resize items-center justify-center border-x border-neutral-200 transition-colors hover:bg-blue-400 lg:flex dark:border-neutral-800 ${
+            split.dragging ? 'bg-blue-500' : 'bg-neutral-100 dark:bg-neutral-900'
+          }`}
+        >
+          <span className="h-8 w-0.5 rounded bg-neutral-400 dark:bg-neutral-600" />
+        </div>
+
+        <aside className="flex min-h-0 flex-col border-t border-neutral-200 lg:border-t-0 dark:border-neutral-800">
           <nav className="flex items-center border-b border-neutral-200 dark:border-neutral-800">
             {tabs.map((t) => (
               <button
