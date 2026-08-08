@@ -121,6 +121,17 @@ if (-not $app.HasExited) {
         Start-Sleep -Milliseconds 500
     }
 
+    # PyInstallerのonefileは実行時に %TEMP%\_MEI* へ展開する。ここに必要な
+    # データが入っていないと、起動は通るのに処理の途中で落ちる。
+    # v0.9.3は faster-whisper のVADモデルが入っておらず、文字起こしが必ず
+    # NO_SUCHFILE で止まった(起動確認だけでは見つけられなかった)
+    $required = @("faster_whisper\assets\*.onnx")
+    foreach ($pattern in $required) {
+        $hit = Get-ChildItem "$env:TEMP\_MEI*\$pattern" -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+        if ($hit) { Ok "同梱データ: $pattern" } else { Ng "同梱データが無い: $pattern" }
+    }
+
     if (-not $base) {
         Ng "shell.log にAPIのURLが出てこない(バックエンドが起動していない)"
     } else {

@@ -48,7 +48,12 @@ VIRTUAL_ENV="$VENV" uv pip install -q -r "$BUILD_DIR/requirements.txt" pyinstall
 
 echo "=== 1ファイルに固める ==="
 # --collect-all: 動的importで拾えない同梱データ(ONNXの共有ライブラリ、
-# ctranslate2のバイナリ、opencvのカスケードxml)を取りこぼさないため
+# ctranslate2のバイナリ、opencvのカスケードxml、faster-whisperのVADモデル)を
+# 取りこぼさないため。
+#
+# faster_whisper を忘れると silero_vad_v6.onnx が入らず、VAD(既定で有効)を通る
+# 文字起こしが必ず NO_SUCHFILE で落ちる。v0.9.3までこれが入っておらず、
+# faster-whisperを使う全環境(Windows / NVIDIAのLinux)で文字起こしができなかった
 "$VENV_BIN/pyinstaller$EXE" \
   --noconfirm --clean --onefile \
   --name kirinuki-studio-backend \
@@ -59,6 +64,7 @@ echo "=== 1ファイルに固める ==="
   --collect-all ctranslate2 \
   --collect-all cv2 \
   --collect-all anthropic \
+  --collect-all faster_whisper \
   --hidden-import uvicorn.lifespan.on \
   --hidden-import uvicorn.protocols.http.httptools_impl \
   --hidden-import uvicorn.protocols.websockets.websockets_impl \
