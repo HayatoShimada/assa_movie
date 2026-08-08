@@ -38,9 +38,13 @@ echo "=== 分離モデルを取得 ==="
 rm -rf "$CACHE/extract"
 mkdir -p "$CACHE/extract"
 tar -xf "$CACHE/segmentation.tar.bz2" -C "$CACHE/extract"
-cp "$(find "$CACHE/extract" -name model.onnx | head -1)" "$SEG_OUT"
+# `find | head -1` にしない。headが先に閉じてfindがSIGPIPEで落ち、pipefailで
+# スクリプトごと終了する(CIのLinux/macOSで実際に踏んだ)。-quitで1件目で止める
+seg="$(find "$CACHE/extract" -name model.onnx -print -quit)"
+[ -n "$seg" ] || { echo "model.onnx が見つかりません" >&2; exit 1; }
+cp "$seg" "$SEG_OUT"
 # 配布物に付属しているライセンス本文をそのまま持っていく
-license="$(find "$CACHE/extract" -name LICENSE | head -1)"
+license="$(find "$CACHE/extract" -name LICENSE -print -quit)"
 if [ -n "$license" ]; then
   cp "$license" "$LICENSE_DEST/LICENSE-segmentation.txt"
 else
