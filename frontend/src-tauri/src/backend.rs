@@ -4,14 +4,29 @@
 //! 開発中の `./dev.sh`(8000番)とぶつかって起動できなくなるため。
 //! 確保したポートはwebviewに注入する(frontend/src/api/client.ts の resolveApiBase)。
 
-use std::io::{Read, Write};
+use std::fs::{self, File, OpenOptions};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{Ipv4Addr, SocketAddr, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
+use std::thread;
 use std::time::{Duration, Instant};
 
-/// 配布物に同梱するバックエンドの実行ファイル名(M28でPyInstallerが作る)
+/// 配布物に同梱するバックエンドの実行ファイル名(M28でPyInstallerが作る)。
+///
+/// Windowsでは `.exe` が付く。ここを拡張子なしのままにしていたため、v0.9.2の
+/// Windows版は同梱バックエンドを見つけられず、開発用のuvフォールバックに落ちて
+/// 「program not found」で即終了していた(M32)
+#[cfg(windows)]
+const SIDECAR_NAME: &str = "kirinuki-studio-backend.exe";
+#[cfg(not(windows))]
 const SIDECAR_NAME: &str = "kirinuki-studio-backend";
+
+/// 開発中に使う仮想環境のPython。Windowsは bin/ ではなく Scripts/ に入る
+#[cfg(windows)]
+const VENV_PYTHON: &str = ".venv/Scripts/python.exe";
+#[cfg(not(windows))]
+const VENV_PYTHON: &str = ".venv/bin/python";
 /// 起動を待つ上限。初回はDBの作成とマイグレーションが走るので長めに取る
 const READY_TIMEOUT: Duration = Duration::from_secs(90);
 const POLL_INTERVAL: Duration = Duration::from_millis(200);
@@ -43,8 +58,120 @@ fn sidecar_path(exe_dir: &Path) -> Option<PathBuf> {
 /// 開発中に使うPythonインタプリタ。`uv run` を挟むと中間プロセスが1つ増え、
 /// 親の死を伝える PR_SET_PDEATHSIG が uv にしか効かずPythonが生き残ってしまう
 fn venv_python(repo_root: &Path) -> Option<PathBuf> {
-    let python = repo_root.join(".venv/bin/python");
+    let python = repo_root.join(VENV_PYTHON);
     python.is_file().then_some(python)
+}
+
+// ---- ログ ---------------------------------------------------------------
+//
+// GUIアプリの標準出力・標準エラーはどこにも出ない(Windowsでは端末に繋がらない)。
+// v0.9.2のWindows版は起動に失敗しても理由が誰にも見えず、利用者からは
+// 「ダブルクリックしても何も起きない」だけだった。だからファイルにも残す。
+
+/// データの置き場所。backend/core/paths.py と同じ規則にする
+fn data_dir() -> Option<PathBuf> {
+    #[cfg(windows)]
+    {
+        std::env::var_os("APPDATA").map(|p| PathBuf::from(p).join("kirinuki-studio"))
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::env::var_os("HOME")
+            .map(|h| PathBuf::from(h).join("Library/Application Support/kirinuki-studio"))
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        std::env::var_os("XDG_DATA_HOME")
+            .map(PathBuf::from)
+            .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local/share")))
+            .map(|p| p.join("kirinuki-studio"))
+    }
+}
+
+pub fn log_dir() -> Option<PathBuf> {
+    data_dir().map(|d| d.join("logs"))
+}
+
+fn open_log(name: &str, truncate: bool) -> Option<File> {
+    let dir = log_dir()?;
+    fs::create_dir_all(&dir).ok()?;
+    OpenOptions::new()
+        .create(true)
+        .append(!truncate)
+        .write(true)
+        .truncate(truncate)
+        .open(dir.join(name))
+        .ok()
+}
+
+/// 起動のたびにログを空にする。
+///
+/// 追記のままだと際限なく育つうえ、障害報告のときに前回の失敗と混ざって読みにくい。
+/// 見たいのはいつも「今回の起動で何が起きたか」だけ。
+pub fn start_log_session() {
+    for name in ["shell.log", "backend.log"] {
+        let _ = open_log(name, true);
+    }
+}
+
+/// シェル自身のログ。端末にもファイルにも出す
+pub fn log_line(msg: &str) {
+    eprintln!("{msg}");
+    if let Some(mut file) = open_log("shell.log", false) {
+        let _ = writeln!(file, "{msg}");
+    }
+}
+
+/// バックエンドの出力を、端末とログファイルの両方へ流す
+fn tee<R: Read + Send + 'static>(reader: Option<R>, is_err: bool) {
+    let Some(reader) = reader else { return };
+    thread::spawn(move || {
+        let mut file = open_log("backend.log", false);
+        for line in BufReader::new(reader).lines() {
+            // 文字化けした行があっても読み続ける(そこで止めると以降が全部消える)
+            let Ok(line) = line else { continue };
+            if is_err {
+                eprintln!("{line}");
+            } else {
+                println!("{line}");
+            }
+            if let Some(file) = file.as_mut() {
+                let _ = writeln!(file, "{line}");
+            }
+        }
+    });
+}
+
+/// 起動できなかったことを利用者に伝える。
+///
+/// 黙って終了すると「ダブルクリックしても何も起きない」ようにしか見えない。
+/// ログの場所まで含めて出す(そのまま障害報告に貼れる)
+pub fn report_fatal(msg: &str) {
+    log_line(msg);
+    let detail = match log_dir() {
+        Some(dir) => format!("{msg}\n\nログ: {}", dir.display()),
+        None => msg.to_string(),
+    };
+    show_dialog(&detail);
+}
+
+#[cfg(windows)]
+fn show_dialog(msg: &str) {
+    use std::ffi::OsStr;
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONERROR, MB_OK};
+
+    let wide = |s: &str| -> Vec<u16> { OsStr::new(s).encode_wide().chain([0]).collect() };
+    let text = wide(msg);
+    let title = wide("KirinukiStudio");
+    unsafe {
+        MessageBoxW(std::ptr::null_mut(), text.as_ptr(), title.as_ptr(), MB_OK | MB_ICONERROR);
+    }
+}
+
+#[cfg(not(windows))]
+fn show_dialog(_msg: &str) {
+    // Linux/macOSは端末から起動されることが多く、標準エラーで足りている
 }
 
 /// バックエンドを起動するコマンドを組み立てる。
@@ -96,10 +223,77 @@ fn kill_with_parent(cmd: &mut Command) {
 #[cfg(not(target_os = "linux"))]
 fn kill_with_parent(_cmd: &mut Command) {}
 
+/// 親が死んだら子も道連れにする(Windows)。
+///
+/// WindowsにはPR_SET_PDEATHSIGに相当するものが無い。ジョブオブジェクトに入れると
+/// ハンドルが閉じた時点で中のプロセスがまとめて終了する。プロセスが強制終了されても
+/// カーネルがハンドルを閉じるので、Dropが走らない経路(releaseプロファイルは
+/// panic="abort")でも効く。
+///
+/// PyInstallerのonefileは自分の子として本体を起動するため、実測ではバックエンドが
+/// 2プロセスになる。ジョブは子孫にも及ぶので両方まとめて片付く。
+#[cfg(windows)]
+mod job {
+    use std::os::windows::io::AsRawHandle;
+    use std::process::Child;
+
+    use windows_sys::Win32::Foundation::{CloseHandle, HANDLE};
+    use windows_sys::Win32::System::JobObjects::{
+        AssignProcessToJobObject, CreateJobObjectW, JobObjectExtendedLimitInformation,
+        SetInformationJobObject, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+        JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+    };
+
+    pub struct Job(HANDLE);
+
+    // ハンドルはこのプロセスのもので、閉じる以外の操作はしない
+    unsafe impl Send for Job {}
+    unsafe impl Sync for Job {}
+
+    impl Job {
+        /// 子プロセスをジョブに入れる。失敗してもアプリは動かす(後始末が甘くなるだけ)
+        pub fn capture(child: &Child) -> Option<Self> {
+            unsafe {
+                let handle = CreateJobObjectW(std::ptr::null(), std::ptr::null());
+                if handle.is_null() {
+                    return None;
+                }
+                let mut info: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = std::mem::zeroed();
+                info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+                let ok = SetInformationJobObject(
+                    handle,
+                    JobObjectExtendedLimitInformation,
+                    &info as *const _ as *const std::ffi::c_void,
+                    std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
+                );
+                if ok == 0 {
+                    CloseHandle(handle);
+                    return None;
+                }
+                if AssignProcessToJobObject(handle, child.as_raw_handle() as HANDLE) == 0 {
+                    CloseHandle(handle);
+                    return None;
+                }
+                Some(Self(handle))
+            }
+        }
+    }
+
+    impl Drop for Job {
+        fn drop(&mut self) {
+            // 閉じた瞬間に中のプロセスが終了する
+            unsafe { CloseHandle(self.0) };
+        }
+    }
+}
+
 /// 起動したバックエンド。アプリ終了時に確実に止める。
 pub struct Backend {
     child: Child,
     pub port: u16,
+    /// 保持しているだけ。落ちた時にバックエンドを道連れにするのが役目
+    #[cfg(windows)]
+    _job: Option<job::Job>,
 }
 
 impl Backend {
@@ -114,11 +308,21 @@ impl Backend {
         if let Some(dir) = resource_dir {
             cmd.env("KS_RESOURCE_DIR", dir);
         }
-        // ログはシェルの標準出力にそのまま流す(起動失敗の原因が見えるように)
-        cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());
+        // 受け取ってから端末とログファイルの両方へ流す。
+        // inheritのままだとGUIアプリでは出力が消え、起動失敗の原因が追えない
+        cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
         kill_with_parent(&mut cmd);
-        let child = cmd.spawn()?;
-        Ok(Self { child, port })
+        let mut child = cmd.spawn()?;
+        #[cfg(windows)]
+        let job = job::Job::capture(&child);
+        tee(child.stdout.take(), false);
+        tee(child.stderr.take(), true);
+        Ok(Self {
+            child,
+            port,
+            #[cfg(windows)]
+            _job: job,
+        })
     }
 
     /// `/api/health` が200を返すまで待つ。時間内に応答しなければfalse
@@ -198,14 +402,15 @@ mod tests {
     #[test]
     fn 同梱バイナリが無ければリポジトリのvenvで起動する() {
         let repo = std::env::temp_dir().join("ks-venv-repo");
-        std::fs::create_dir_all(repo.join(".venv/bin")).unwrap();
-        std::fs::write(repo.join(".venv/bin/python"), b"#!/bin/sh\n").unwrap();
+        let python = repo.join(VENV_PYTHON);
+        std::fs::create_dir_all(python.parent().unwrap()).unwrap();
+        std::fs::write(&python, b"#!/bin/sh\n").unwrap();
         let empty = std::env::temp_dir().join("ks-no-sidecar");
         std::fs::create_dir_all(&empty).unwrap();
 
         let cmd = build_command(&empty, &repo, 49152);
         // uvを挟むと中間プロセスが増え、親の死がPythonまで伝わらない
-        assert!(cmd.get_program().to_string_lossy().ends_with(".venv/bin/python"));
+        assert_eq!(cmd.get_program(), python.as_os_str());
         let args = args_of(&cmd);
         assert!(args.contains(&"49152".to_string()));
         assert!(args.contains(&"127.0.0.1".to_string()), "外部には開かない");
@@ -251,6 +456,33 @@ mod tests {
         std::fs::write(dir.join(SIDECAR_NAME), b"#!/bin/sh\n").unwrap();
         let cmd = build_command(&dir, Path::new("/repo"), 49153);
         assert!(cmd.get_program().to_string_lossy().ends_with(SIDECAR_NAME));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windowsのサイドカーは拡張子付きで探す() {
+        // Tauriが配置するのは kirinuki-studio-backend.exe。拡張子なしで探すと
+        // is_file()がfalseになり、uvフォールバックに落ちて起動できなかった(v0.9.2)
+        assert!(SIDECAR_NAME.ends_with(".exe"), "実際に配置される名前と一致させる");
+
+        let dir = std::env::temp_dir().join("ks-win-sidecar");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("kirinuki-studio-backend.exe"), b"").unwrap();
+
+        // repo_root には .venv を置かない。拾えていなければuvに落ちるので違いが出る
+        let cmd = build_command(&dir, &std::env::temp_dir().join("ks-win-norepo"), 49155);
+        assert!(
+            cmd.get_program().to_string_lossy().ends_with("kirinuki-studio-backend.exe"),
+            "同梱バックエンドではなく {:?} を起動しようとしている",
+            cmd.get_program()
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windowsのvenvはScripts配下を見る() {
+        // Windowsのvenvは bin/ ではなく Scripts/ で、実行ファイルに .exe が付く
+        assert_eq!(VENV_PYTHON, ".venv/Scripts/python.exe");
     }
 
     #[test]

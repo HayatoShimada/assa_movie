@@ -1,6 +1,6 @@
 [package]
 name = "kirinuki-studio"
-version = "0.9.2"
+version = "0.9.3"
 description = "対談動画からローカルで文字起こし・話者分離・切り抜きを作る"
 authors = ["HayatoShimada"]
 edition = "2021"
@@ -21,6 +21,20 @@ tauri = { version = "2", features = [] }
 # Dropだけではシグナルで殺されたときに走らず、Pythonが残ってポートを掴み続ける
 [target.'cfg(target_os = "linux")'.dependencies]
 libc = "0.2"
+
+# WindowsにはPR_SET_PDEATHSIGに相当するものが無い。ジョブオブジェクトに入れて
+# 親と一緒に片付ける(JobObjects)。起動に失敗したことを画面で伝えるため
+# メッセージボックスも使う(WindowsAndMessaging)。
+# 版はtauriが既に引いているものに合わせる(重複ビルドを避ける)
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = [
+  "Win32_Foundation",
+  "Win32_Security",
+  "Win32_System_JobObjects",
+  # JOBOBJECT_EXTENDED_LIMIT_INFORMATION がこのfeatureの下にある
+  "Win32_System_Threading",
+  "Win32_UI_WindowsAndMessaging",
+] }
 
 [profile.release]
 # 配布サイズを削る。実測(依存クレートがコンパイル済みの状態):

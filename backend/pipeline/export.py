@@ -1,4 +1,7 @@
-"""ffmpegによるクリップ切り出しと字幕焼き込み。"""
+"""ffmpegによるクリップ切り出しと字幕焼き込み。
+
+ffmpeg本体の場所は backend/core/ffmpeg.py が決める(配布版は同梱物を使う)。
+"""
 
 import platform
 import shutil
@@ -7,10 +10,28 @@ from functools import lru_cache
 from pathlib import Path
 
 
+from backend.core.ffmpeg import ffmpeg_path, ffprobe_path, missing_message
+
 VAAPI_DEVICE = "/dev/dri/renderD128"
-FFMPEG_MISSING_MSG = (
-    "ffmpegが見つかりません。`sudo apt install ffmpeg` でインストールしてください"
-)
+
+# エンコーダごとの品質指定。同じ「だいたいCRF 23相当」でも指定方法が全部違う。
+#
+# ここを libx264 決め打ちにしていたため、_pick_encoder が qsv/amf/mf/openh264 を
+# 選んでも実際には libx264 で書き出そうとしていた。同梱するLGPLビルドに
+# libx264 は入っていないので、選ばれた側をそのまま使う
+ENCODER_QUALITY: dict[str, list[str]] = {
+    "libx264": ["-preset", "veryfast", "-crf", "20"],
+    "h264_nvenc": ["-preset", "p4", "-cq", "23"],
+    "h264_vaapi": ["-qp", "23"],
+    "h264_qsv": ["-global_quality", "23"],
+    "h264_amf": ["-rc", "cqp", "-qp_i", "23", "-qp_p", "23"],
+    # MediaFoundationは品質指定の受け付け方がドライバ依存なので既定に任せる
+    "h264_mf": [],
+    # openh264にはCRF相当が無く、ビットレート指定しかできない
+    "libopenh264": ["-b:v", "6M"],
+}
+# 入れ方はOSごとに違う。Linuxの案内をWindows/macOSに出しても意味がない
+FFMPEG_MISSING_MSG = missing_message()
 
 
 def _pick_encoder(
@@ -22,7 +43,9 @@ def _pick_encoder(
     """ffmpegのエンコーダ一覧と実デバイスの有無からH264エンコーダを選ぶ(純関数)。
 
     ffmpegはNVIDIA機でなくてもh264_nvencを列挙するため、
-    実デバイス(/dev/nvidia0等)の存在まで確認する。
+    実デバイス(/dev/nvidia0 や nvidia-smi)の存在まで確認する。これはLinuxに
+    限った話ではなく、Windowsでも同じだった(NVIDIA非搭載機で選ばれて書き出しが
+    落ちる)。
 
     ハードウェアエンコーダはOSごとに別物なので、そのOSに無いものは候補にしない
     (指定すると書き出しが落ちる)。列挙されていないものも選ばない。
@@ -32,17 +55,22 @@ def _pick_encoder(
         # Apple SiliconのハードウェアエンコーダはVideoToolbox経由
         candidates = ["h264_videotoolbox"]
     elif os_name == "Windows":
-        # VAAPIはLinux専用。Windowsはベンダーごとに別のエンコーダ
-        candidates = ["h264_nvenc", "h264_qsv", "h264_amf"]
+        # VAAPIはLinux専用。Windowsはベンダーごとに別のエンコーダ。
+        # 同梱するのはLGPLビルドでlibx264が入っていないため、ハードウェアが
+        # 使えない機体向けに h264_mf(Windows標準) と libopenh264(BSD) まで並べる
+        candidates = ["h264_nvenc", "h264_qsv", "h264_amf", "h264_mf", "libopenh264"]
     else:
         candidates = ["h264_nvenc", "h264_vaapi"]
 
     for name in candidates:
         if name not in encoders_output:
             continue
-        # 実デバイスの確認が要るのはLinuxだけ(他OSは列挙が実態に即している)
-        if os_name == "Linux" and name == "h264_nvenc" and not has_nvidia:
+        # nvencの列挙はOSを問わずあてにならない。NVIDIAが無いWindows機でも
+        # h264_nvenc は一覧に出るが、実行すると nvcuda.dll が読めずに失敗する
+        # (実測。BtbNの配布ビルドでも同じ)。ドライバの有無まで見る
+        if name == "h264_nvenc" and not has_nvidia:
             continue
+        # VAAPIはLinux専用。デバイスファイルの有無で判断する
         if os_name == "Linux" and name == "h264_vaapi" and not has_dri:
             continue
         return name
@@ -52,11 +80,12 @@ def _pick_encoder(
 @lru_cache(maxsize=1)
 def detect_encoder() -> str | None:
     """使うH264エンコーダを返す。ffmpeg自体が無ければNone"""
-    if not shutil.which("ffmpeg"):
+    exe = ffmpeg_path()
+    if exe is None:
         return None
     try:
         out = subprocess.run(
-            ["ffmpeg", "-hide_banner", "-encoders"],
+            [exe, "-hide_banner", "-encoders"],
             capture_output=True, text=True, timeout=30,
         )
         encoders = out.stdout
@@ -68,12 +97,13 @@ def detect_encoder() -> str | None:
 
 def probe_media(path: Path) -> tuple[float | None, int | None, int | None]:
     """(再生時間, 幅, 高さ)を返す。ffprobe優先、無ければOpenCVフォールバック"""
-    if shutil.which("ffprobe"):
+    probe = ffprobe_path()
+    if probe:
         try:
             import json
 
             out = subprocess.run(
-                ["ffprobe", "-v", "error", "-select_streams", "v:0",
+                [probe, "-v", "error", "-select_streams", "v:0",
                  "-show_entries", "stream=width,height",
                  "-show_entries", "format=duration", "-of", "json", str(path)],
                 capture_output=True, text=True, timeout=60,
@@ -156,7 +186,9 @@ def build_export_cmd(
     if encoder is None:
         raise RuntimeError(FFMPEG_MISSING_MSG)
     duration = max(0.1, end - start)
-    cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-progress", "pipe:1"]
+    # detect_encoder が通っている = ffmpegは見つかっている
+    cmd = [ffmpeg_path() or "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+           "-progress", "pipe:1"]
     if encoder == "h264_vaapi":
         cmd += ["-vaapi_device", VAAPI_DEVICE]
     cmd += ["-ss", f"{start:.3f}", "-i", str(input_path), "-t", f"{duration:.3f}"]
@@ -204,12 +236,8 @@ def build_export_cmd(
         if vf:
             cmd += ["-vf", vf]
 
-    if encoder == "h264_nvenc":
-        cmd += ["-c:v", "h264_nvenc", "-preset", "p4", "-cq", "23"]
-    elif encoder == "h264_vaapi":
-        cmd += ["-c:v", "h264_vaapi", "-qp", "23"]
-    else:
-        cmd += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20"]
+    cmd += ["-c:v", encoder, *ENCODER_QUALITY.get(encoder, [])]
+    # AACはffmpeg内蔵のエンコーダ。外部ライブラリを足さずに使える
     cmd += ["-c:a", "aac", "-b:a", "192k", str(out_path)]
     return cmd
 

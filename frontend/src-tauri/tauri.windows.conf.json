@@ -1,0 +1,13 @@
+{
+  "bundle": {
+    "resources": {
+      "resources/bin/ffmpeg.exe": "bin/ffmpeg.exe",
+      "resources/bin/ffprobe.exe": "bin/ffprobe.exe",
+      "resources/licenses/ffmpeg/LICENSE.txt": "licenses/ffmpeg/LICENSE.txt",
+      "resources/licenses/ffmpeg/THIRD-PARTY-NOTICES.txt": "licenses/ffmpeg/THIRD-PARTY-NOTICES.txt",
+      "resources/licenses/ffmpeg/NOTICE.md": "licenses/ffmpeg/NOTICE.md",
+      "resources/licenses/ffmpeg/VERSION.txt": "licenses/ffmpeg/VERSION.txt",
+      "resources/licenses/python/THIRD-PARTY-NOTICES.txt": "licenses/python/THIRD-PARTY-NOTICES.txt"
+    }
+  }
+}

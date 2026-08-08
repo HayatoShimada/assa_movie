@@ -23,7 +23,9 @@ from backend.pipeline.export import _pick_encoder, build_export_cmd
     ],
 )
 def test_pick_encoder_table(name, encoders_output, has_nvidia, has_dri, expected):
-    assert _pick_encoder(encoders_output, has_nvidia, has_dri) == expected, name
+    # vaapi/libx264 はLinuxの話。os_nameを渡さないと実行機のOSで結果が変わり、
+    # Windowsランナーで回したときだけ落ちる(他OSの表は test_m31_cross_platform.py)
+    assert _pick_encoder(encoders_output, has_nvidia, has_dri, os_name="Linux") == expected, name
 
 
 # ---- build_export_cmd のエンコーダ別出力 ----

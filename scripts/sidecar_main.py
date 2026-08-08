@@ -19,6 +19,11 @@ def main() -> int:
     parser.add_argument("--port", type=int, default=8000)
     args = parser.parse_args()
 
+    # uvicornより先に付け替える。uvicorn自身のログも同じ標準出力に流れるため
+    from backend.core.console import force_utf8_stdio
+
+    force_utf8_stdio()
+
     import uvicorn
 
     from backend.app import app

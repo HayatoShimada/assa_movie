@@ -1,7 +1,8 @@
 {
   "bundle": {
     "resources": {
-      "resources/bin/whisper-cli": "bin/whisper-cli"
+      "resources/bin/whisper-cli": "bin/whisper-cli",
+      "resources/licenses/python/THIRD-PARTY-NOTICES.txt": "licenses/python/THIRD-PARTY-NOTICES.txt"
     }
   }
 }

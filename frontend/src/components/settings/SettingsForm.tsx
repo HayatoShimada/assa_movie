@@ -11,6 +11,7 @@ import { ApiKeysPanel } from './ApiKeysPanel'
 import { SetupPanel } from './SetupPanel'
 import { EnvironmentPanel } from './EnvironmentPanel'
 import { LicensePanel } from './LicensePanel'
+import { OpenSourcePanel } from './OpenSourcePanel'
 import { SaveBar } from './SaveBar'
 import { SettingsFields } from './SettingsFields'
 
@@ -57,6 +58,8 @@ export function SettingsForm() {
         meta={settings.data}
         onSet={(key, value) => setDraft((d) => ({ ...d, [key]: value }))}
       />
+      {/* 設定項目ではなく参照情報なので最後に置く */}
+      <OpenSourcePanel />
     </div>
   )
 }

@@ -88,9 +88,46 @@ jobs:
         shell: bash
         run: ./scripts/build_whispercpp.sh
 
+      # WindowsにffmpegはOSに入っていない。同梱しないと書き出しができないうえ、
+      # tauri.windows.conf.json がresourcesとして要求するのでビルド自体も通らない。
+      # 配布ビルドは110MB・GPLなので、使う機能だけに絞って自前でビルドする
+      - name: 同梱ffmpegのキャッシュ
+        if: matrix.os == 'windows-latest'
+        id: ffmpeg-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            frontend/src-tauri/resources/bin
+            frontend/src-tauri/resources/licenses/ffmpeg
+          key: ffmpeg-min-${{ hashFiles('scripts/build_ffmpeg.sh', 'licenses/ffmpeg-NOTICE.md', 'licenses/LGPL-2.1.txt') }}
+
+      - name: MSYS2(ffmpegのビルド環境)
+        if: matrix.os == 'windows-latest' && steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: false
+          install: make diffutils
+          pacboy: gcc:p pkgconf:p nasm:p libass:p openh264:p ffnvcodec-headers:p
+
+      - name: ffmpegをビルドして同梱(Windows)
+        if: matrix.os == 'windows-latest' && steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        shell: msys2 {0}
+        run: ./scripts/build_ffmpeg.sh
+
       - name: パッケージを作る
         working-directory: frontend
         run: npm run app:build
+
+      # ビルドが通ることと、インストールしたアプリが起動することは別問題だった。
+      # v0.9.2はインストーラが3OSぶん出来ていたのにWindows版は起動できず、
+      # それに気付いたのは実機に入れてみたときだった。ここで実際に入れて確かめる
+      - name: インストーラを実機で検証(Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          $installer = (Get-Item frontend/src-tauri/target/release/bundle/nsis/*-setup.exe).FullName
+          ./scripts/verify_windows.ps1 -Installer $installer
 
       - name: 成果物を集める
         uses: actions/upload-artifact@v4

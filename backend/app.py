@@ -51,8 +51,13 @@ def _report_startup_checks() -> None:
     逃がしても起動が止まる。GPU・VRAM・Ollamaの詳細は GET /api/environment
     (設定タブの環境パネルが初回に1回だけ呼ぶ)に任せる。
     """
+    from backend.core.console import force_utf8_stdio
     from backend.core.device import probe_gpu
     from backend.pipeline.export import FFMPEG_MISSING_MSG, detect_encoder
+
+    # 以下のprintには「⚠」が混ざる。日本語Windowsの既定(cp932)では出力できず、
+    # ここで落ちるとFastAPIのstartupごと失敗してアプリが起動しない
+    force_utf8_stdio()
 
     # 旧接頭辞は黙って無視されるため、設定したのに効かない状態を作らないよう伝える
     legacy = paths.legacy_env_vars()

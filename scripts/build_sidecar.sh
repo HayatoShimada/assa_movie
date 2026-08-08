@@ -64,6 +64,14 @@ echo "=== 1ファイルに固める ==="
   --hidden-import uvicorn.protocols.websockets.websockets_impl \
   scripts/sidecar_main.py
 
+echo "=== 取り込んだパッケージのライセンス表記を集める ==="
+# PyInstallerは依存を実行ファイルに取り込む = 実質的な再配布なので表記が要る。
+# この仮想環境が配布物そのものなので、ここから集めるのが最も正確
+NOTICE="licenses/python-THIRD-PARTY-NOTICES.txt"
+"$VENV_BIN/python$EXE" scripts/collect_python_licenses.py --out "$NOTICE"
+mkdir -p frontend/src-tauri/resources/licenses/python
+cp "$NOTICE" frontend/src-tauri/resources/licenses/python/THIRD-PARTY-NOTICES.txt
+
 cp "$BUILD_DIR/dist/kirinuki-studio-backend$EXE" "$OUT$EXE"
 # Tauriのサイドカーはターゲットトリプル付きの名前を要求する。
 # インストール後は実行ファイルの隣にトリプル無しの名前で置かれるので、

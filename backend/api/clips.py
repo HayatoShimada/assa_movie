@@ -1,7 +1,6 @@
 """クリップ(切り抜き)のCRUD・ジェットカット・自己完結化・書き出し。"""
 
 import json
-import shutil
 import sqlite3
 import subprocess
 from pathlib import Path
@@ -9,6 +8,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from backend.core.ffmpeg import ffmpeg_path
 from backend.core.project_settings import resolve_settings
 from backend.api.deps import get_db, get_jobs
 from backend.jobs.queue import JobQueue
@@ -24,7 +24,7 @@ SILENCE_NOISE_DB = -35
 
 
 def _require_ffmpeg() -> None:
-    if shutil.which("ffmpeg") is None:
+    if ffmpeg_path() is None:
         raise HTTPException(400, export_mod.FFMPEG_MISSING_MSG)
 
 
@@ -164,10 +164,11 @@ def jetcut(clip_id: int, db: sqlite3.Connection = Depends(get_db)):
     proposals: list[tuple[float, float, str]] = []
 
     # 無音検出(ffmpegが無い・失敗した場合は相槌のみで続行)
-    if shutil.which("ffmpeg"):
+    ffmpeg_exe = ffmpeg_path()
+    if ffmpeg_exe:
         try:
             out = subprocess.run(
-                ["ffmpeg", "-hide_banner", "-nostats",
+                [ffmpeg_exe, "-hide_banner", "-nostats",
                  "-ss", str(clip["start"]), "-t", str(clip["end"] - clip["start"]),
                  "-i", media["path"], "-af",
                  f"silencedetect=noise={SILENCE_NOISE_DB}dB:d={SILENCE_MIN_DURATION}",

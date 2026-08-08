@@ -1,0 +1,27 @@
+/**
+ * M32: オープンソースソフトウェアの表記。
+ *
+ * FFmpegはLGPLなので、同梱していること・ライセンス・ソースの入手先が
+ * 利用者から見える必要がある。画面から消えていないことを見張る。
+ */
+import { expect, test } from '@playwright/test'
+import { seedTranscribed } from './helpers'
+
+test('設定タブに同梱物のライセンス表記が出る', async ({ page, request }) => {
+  const mediaId = await seedTranscribed(request)
+  await page.goto(`/#/media/${mediaId}`)
+  await page.getByTestId('tab-settings').click()
+
+  const panel = page.getByTestId('oss-panel')
+  await expect(panel).toBeVisible()
+
+  // FFmpegはLGPL。ライセンス名とソースの入手先が揃っていること
+  const ffmpeg = page.getByTestId('oss-ffmpeg')
+  await expect(ffmpeg).toContainText('FFmpeg')
+  await expect(ffmpeg).toContainText('LGPL v2.1')
+  await expect(ffmpeg).toContainText('ffmpeg.org')
+
+  await expect(page.getByTestId('oss-whisper.cpp')).toContainText('MIT')
+  // 全文の在り処も伝える(同梱しているので配布物の中にある)
+  await expect(panel).toContainText('licenses/')
+})

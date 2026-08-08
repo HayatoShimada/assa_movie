@@ -19,6 +19,10 @@
 ./dev.sh check        # コミット前の全チェック(pytest + typecheck + lint + vitest + build)
 ./dev.sh e2e          # E2E(FakeLLM・一時DBなのでGPUもOllamaも不要)
 
+# Windows
+./scripts/build_ffmpeg.sh                         # 同梱ffmpegをビルド(MSYS2のmingw64シェル)
+./scripts/verify_windows.ps1 -Installer <path>    # 入れて・起動して・閉じるまで検証
+
 uv run pytest -q                  # バックエンドのテスト
 uv run pytest -q --run-gpu        # GPUを使うgolden検証も含める(約10秒)
 cd frontend && npm run gen:api    # バックエンドのAPIを変えたら必ず実行(型を再生成)

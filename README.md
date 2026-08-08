@@ -1,7 +1,7 @@
 # KirinukiStudio
 
 対談・イベント動画から **文字起こし → 話者分離 → 指示語の解決 → 字幕生成 → 切り抜き動画作成** までを、
-すべてローカルGPUで行うアプリケーションです。バージョン **0.9.2**。
+すべてローカルGPUで行うアプリケーションです。バージョン **0.9.3**。
 
 <https://github.com/HayatoShimada/assa_movie>
 
@@ -24,7 +24,8 @@
   の3方式。全設定をプロジェクト単位で上書きでき、未変更の項目は全体設定に追従
 - **切り抜き**: LLM+機械特徴(笑い・テンポ・掛け合い)による候補提案、
   マウス操作のトリム、ジェットカット(無音・相槌の中抜き)、タイトル・フック・ハッシュタグ生成
-- **書き出し**: ASS字幕焼き込み+ハードウェアエンコード(NVENC / VAAPI を自動検出、無ければlibx264)
+- **書き出し**: ASS字幕焼き込み+ハードウェアエンコード(NVENC / VAAPI / Media Foundation を
+  自動検出。使えない機体はソフトウェアエンコードに切り替え)
 - **環境スキャン**: 起動時にGPU・VRAM・エンコーダ・Ollamaを自動検出。設定タブの環境パネルで
   VRAM割当を調整でき、割当に収まる最良のASRモデル・LLMをワンクリックで適用できる
 
@@ -78,9 +79,15 @@ LLMはローカル(Ollama)とクラウド(Gemini API)を切り替え可能。ロ
 高速な文字起こしの本体(whisper.cpp)はアプリに同梱済みです。
 LinuxはVulkan、macOSはMetalで動くので、GPUの追加設定は要りません。
 
-**書き出しにはffmpegが必要です。** `.deb` は依存として自動で入りますが、
-macOS(`brew install ffmpeg`)とWindows(公式サイトから導入しPATHを通す)は
-別途インストールしてください。
+**書き出しにはffmpegが必要です。** Windows版はアプリに同梱済み(LGPL v2.1。
+使う機能だけに絞ってビルドしたもの)なので追加の作業は要りません。
+`.deb` は依存として自動で入ります。
+macOSのみ `brew install ffmpeg` で別途インストールしてください。
+自分で入れたffmpegがPATHにあれば、同梱のものより優先して使います。
+
+同梱しているソフトウェアのライセンス表記は [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md)。
+アプリからは **設定タブ →「オープンソースソフトウェア」**、ライセンス全文は
+インストール先の `licenses/` フォルダにあります。
 
 **macOSの署名について**: 現状のインストーラはApple公証を通していないため、
 初回起動時にGatekeeperの警告が出ます。右クリック →「開く」で起動できます。
@@ -180,7 +187,8 @@ AIで開発を続ける場合の規約は [CLAUDE.md](CLAUDE.md)。
 - 顔検出レイアウトは静的クロップ(クリップ内でカメラが大きく動くと追従しない)。
   検出失敗時はぼかし背景に自動フォールバック
 - 複数クリップの一括書き出しUIは未実装
-- Windows は未対応
+- Windows版はwhisper.cppを同梱していない(Vulkan SDKの導入が要るため)。
+  faster-whisperで動きます
 - 話者分離は2人の対談に最適化(3人以上は「話者N」表示)
 - ROCm環境ではfaster-whisper(CUDA専用ビルド)が使えないため、
   whisper.cpp(`./dev.sh whispercpp` でビルド。実時間比約11.6倍)か、
@@ -189,7 +197,9 @@ AIで開発を続ける場合の規約は [CLAUDE.md](CLAUDE.md)。
 
 ## ライセンス
 
-[MIT License](LICENSE)。使用しているモデル・ライブラリには各自のライセンスがあります:
+[MIT License](LICENSE)。配布物に同梱しているソフトウェアの表記は
+[THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md)。
+そのほか使用しているモデル・ライブラリには各自のライセンスがあります:
 
 - Whisper / faster-whisper: MIT
 - pyannote.audio: MIT(モデル利用にはHuggingFaceでの規約同意が必要)

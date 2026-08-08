@@ -19,6 +19,8 @@ hf_token.txt
 *.srt
 *.txt
 !requirements*.txt
+# 同梱物のライセンス本文(配布に必要なのでコミットする)
+!licenses/*.txt
 
 # テスト資産(移植の回帰検証に必要なのでコミットする)
 !tests/golden/**
