@@ -4,13 +4,16 @@
 #   ./dev.sh          バックエンド(8000)とフロント(5173)を同時起動
 #   ./dev.sh api      バックエンドのみ
 #   ./dev.sh web      フロントのみ
-#   ./dev.sh sync     Python依存の同期(既定はROCm。WL_TORCH_EXTRA=cu128 でNVIDIA向け)
+#   ./dev.sh sync     Python依存の同期(既定はROCm。KS_TORCH_GROUP=cu128 でNVIDIA向け)
 #   ./dev.sh whispercpp  whisper.cppをROCm向けにビルド(任意・ASRが約2.6倍速くなる)
 #   ./dev.sh diarize-models  話者分離のONNXモデルを取得(pyannoteより約4倍速い・HFトークン不要)
 #   ./dev.sh check    型・lint・テスト・ビルドを全部走らせる(コミット前用)
 #   ./dev.sh e2e      E2Eテスト(FakeLLM・一時DBなのでGPU/LLM不要)
 set -euo pipefail
 cd "$(dirname "$0")"
+
+# モデルの置き場所の決め方は backend/core/paths.py だけが持つ(ここで二重定義しない)
+cache_dir() { uv run --no-sync python -c 'from backend.core.paths import cache_dir; print(cache_dir())'; }
 
 case "${1:-all}" in
   api)
@@ -25,10 +28,10 @@ case "${1:-all}" in
   whispercpp)
     # ROCmで最速のASR(公式Whisperの約2.6倍)。外部ビルドなので任意。
     # 用意されていればエンジン自動選択がこれを使い、無ければ公式版に落ちる。
-    # 置き場所は WL_WHISPERCPP_HOME で変更できる(既定: ~/.cache/whisper-local)
-    HOME_DIR="${WL_WHISPERCPP_HOME:-$HOME/.cache/whisper-local}"
-    GPU_ARCH="${WL_GPU_ARCH:-gfx1100}"
-    MODEL_NAME="${WL_GGML_MODEL:-ggml-large-v3.bin}"
+    # 置き場所は KS_WHISPERCPP_HOME で変更できる(既定: ~/.cache/kirinuki-studio)
+    HOME_DIR="${KS_WHISPERCPP_HOME:-$(cache_dir)}"
+    GPU_ARCH="${KS_GPU_ARCH:-gfx1100}"
+    MODEL_NAME="${KS_GGML_MODEL:-ggml-large-v3.bin}"
     set -x
     mkdir -p "$HOME_DIR/bin" "$HOME_DIR/models" "$HOME_DIR/src"
     if [ ! -d "$HOME_DIR/src/whisper.cpp" ]; then
@@ -53,7 +56,7 @@ case "${1:-all}" in
   diarize-models)
     # 話者分離のONNXモデル(計76MB)。pyannote(torch 14GB・HFトークン必須)の代わりで、
     # 実測で約4倍速く一致率94.8%(docs/V1_PLAN.md M23)。取得すると自動で使われる。
-    HOME_DIR="${WL_MODELS_HOME:-$HOME/.cache/whisper-local}"
+    HOME_DIR="${KS_MODELS_HOME:-$(cache_dir)}"
     SEG_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-segmentation-models/sherpa-onnx-pyannote-segmentation-3-0.tar.bz2"
     EMB_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_eres2netv2_sv_zh-cn_16k-common.onnx"
     mkdir -p "$HOME_DIR/models"
@@ -72,11 +75,11 @@ case "${1:-all}" in
     ;;
   sync)
     # torchのwheelはGPUベンダーごとにindexが違う(pyproject.tomlのグループ参照)。
-    # 既定はrocm(default-groups)。NVIDIA機: WL_TORCH_GROUP=cu128 ./dev.sh sync
-    if [ "${WL_TORCH_GROUP:-rocm}" = "rocm" ]; then
+    # 既定はrocm(default-groups)。NVIDIA機: KS_TORCH_GROUP=cu128 ./dev.sh sync
+    if [ "${KS_TORCH_GROUP:-rocm}" = "rocm" ]; then
       exec uv sync
     else
-      exec uv sync --no-default-groups --group dev --group "${WL_TORCH_GROUP}"
+      exec uv sync --no-default-groups --group dev --group "${KS_TORCH_GROUP}"
     fi
     ;;
   check)
@@ -93,7 +96,7 @@ case "${1:-all}" in
     cd frontend && npm run dev
     ;;
   *)
-    echo "使い方: ./dev.sh [all|api|web|sync|whispercpp|e2e|check]" >&2
+    echo "使い方: ./dev.sh [all|api|web|sync|whispercpp|diarize-models|e2e|check]" >&2
     exit 1
     ;;
 esac

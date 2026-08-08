@@ -22,13 +22,14 @@ from pathlib import Path
 import numpy as np
 
 from backend.engines.asr.base import ProgressFn, Segment, TranscribeResult, Word
+from backend.core.paths import cache_dir
 from backend.engines.asr.transformers_whisper import words_to_segments
 
 logger = logging.getLogger(__name__)
 
 SAMPLE_RATE = 16000
-# 既定の置き場所(リポジトリを汚さない)。環境変数で差し替えられる
-DEFAULT_HOME = Path(os.environ.get("WL_WHISPERCPP_HOME", Path.home() / ".cache/whisper-local"))
+# 置き場所は backend/core/paths.py が決める(旧名のキャッシュがあればそれを使う)
+DEFAULT_HOME = Path(os.environ.get("KS_WHISPERCPP_HOME") or cache_dir())
 DEFAULT_BINARY = DEFAULT_HOME / "bin/whisper-cli"
 DEFAULT_MODEL = DEFAULT_HOME / "models/ggml-large-v3.bin"
 # 長さ0のトークン(句読点など)に与える最小表示時間(秒)

@@ -1,7 +1,10 @@
 """アプリ設定。UIの設定タブと1対1で対応する。
 
-環境変数(接頭辞 WL_)または .env で上書き可能。
-例: WL_ASR_MODEL=large-v3-turbo
+環境変数(接頭辞 KS_)または .env で上書き可能。
+例: KS_ASR_MODEL=large-v3-turbo
+
+ファイルの置き場所は backend/core/paths.py が決める(既存環境ではリポジトリ直下、
+新規インストールではOS標準の場所)。
 """
 
 from pathlib import Path
@@ -9,17 +12,19 @@ from pathlib import Path
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+from backend.core import paths
+
+PROJECT_ROOT = paths.PROJECT_ROOT
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_prefix="WL_", env_file=".env", extra="ignore"
+        env_prefix="KS_", env_file=".env", extra="ignore"
     )
 
     # ---- 基盤 ----
-    db_path: Path = PROJECT_ROOT / "whisper.db"
-    hf_token_file: Path = PROJECT_ROOT / "hf_token.txt"
+    db_path: Path = Field(default_factory=paths.db_path)
+    hf_token_file: Path = Field(default_factory=lambda: paths.config_file("hf_token.txt"))
 
     # ---- ASR ----
     # 既定はlarge-v3(精度優先・単語タイムスタンプ必須の要件による。BACKEND_DESIGN.md参照)
@@ -80,7 +85,9 @@ class Settings(BaseSettings):
     ollama_url: str = "http://localhost:11434/api/chat"
     ollama_model: str = "qwen3:32b"
     gemini_model: str = "gemini-3.5-flash"
-    gemini_key_file: Path = PROJECT_ROOT / "gemini_api_key.txt"
+    gemini_key_file: Path = Field(
+        default_factory=lambda: paths.config_file("gemini_api_key.txt")
+    )
     llm_chunk_size: int = 30
     llm_context_size: int = 15
 

@@ -69,8 +69,8 @@ def test_health_endpoint(tmp_path, monkeypatch):
 
 
 def test_settings_env_override(monkeypatch):
-    monkeypatch.setenv("WL_ASR_MODEL", "large-v3-turbo")
-    monkeypatch.setenv("WL_PRONOUN_LEVEL", "strong")
+    monkeypatch.setenv("KS_ASR_MODEL", "large-v3-turbo")
+    monkeypatch.setenv("KS_PRONOUN_LEVEL", "strong")
     s = Settings()
     assert s.asr_model == "large-v3-turbo"
     assert s.pronoun_level == "strong"

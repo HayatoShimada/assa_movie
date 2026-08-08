@@ -46,7 +46,7 @@
 ## リポジトリ構成(monorepo)
 
 ```
-whisper-local/
+kirinuki-studio/
 ├── transcribe.py, resolve_pronouns.py   # 既存CLI(M1以降は内部でbackendモジュールを呼ぶ薄いラッパ)
 ├── backend/                             # BACKEND_DESIGN.md のツリーどおり
 ├── frontend/                            # FRONTEND_DESIGN.md のツリーどおり
@@ -65,7 +65,7 @@ whisper-local/
 | 0-3 | `backend/models/schema.py`: BACKEND_DESIGN.md「データモデル」のテーブルをそのままSQLite DDL化 + 起動時 `CREATE TABLE IF NOT EXISTS` | schema.py | pytest: 全テーブルが作成される・二重起動でもエラーなし |
 | 0-4 | `backend/core/config.py`: pydantic-settings。設定項目はBACKEND_DESIGN.mdの設定タブ項目を全列挙(既定値も設計書どおり) | config.py | pytest: 環境変数で上書きできる |
 
-**受け入れ基準**: `uv run uvicorn backend.app:app` が起動し、`whisper.db` が生成され、`uv run pytest` が全て緑。
+**受け入れ基準**: `uv run uvicorn backend.app:app` が起動し、DBが生成され、`uv run pytest` が全て緑。
 
 ## M1: 現行ロジックのモジュール化移植(2日規模)
 

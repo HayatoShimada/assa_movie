@@ -14,9 +14,11 @@ from pathlib import Path
 
 import numpy as np
 
+from backend.core.paths import cache_dir
+
 SAMPLE_RATE = 16000
-# 置き場所はwhisper.cppと揃える(リポジトリ外・環境変数で変更可)
-DEFAULT_HOME = Path(os.environ.get("WL_MODELS_HOME", Path.home() / ".cache/whisper-local"))
+# 置き場所は backend/core/paths.py が決める(whisper.cppと同じディレクトリ)
+DEFAULT_HOME = Path(os.environ.get("KS_MODELS_HOME") or cache_dir())
 DEFAULT_SEGMENTATION = DEFAULT_HOME / "models/sherpa-onnx-pyannote-segmentation-3-0/model.onnx"
 DEFAULT_EMBEDDING = DEFAULT_HOME / "models/speaker-embedding.onnx"
 

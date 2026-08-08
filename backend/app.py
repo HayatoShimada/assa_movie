@@ -13,7 +13,7 @@ from backend.api import projects as projects_api
 from backend.api import questions as questions_api
 from backend.api import settings_api
 from backend.api import transcripts as transcripts_api
-from backend.core import project_settings
+from backend.core import paths, project_settings
 from backend.core.config import settings
 from backend.jobs import attention_job  # noqa: F401  ジョブハンドラの登録に必要
 from backend.jobs import export_job  # noqa: F401
@@ -25,6 +25,9 @@ from backend.jobs import transcribe_job  # noqa: F401
 from backend.jobs.queue import JobQueue
 from backend.models import schema
 
+# 画面・APIドキュメントに出るアプリ名
+APP_TITLE = "KirinukiStudio"
+
 
 def _report_startup_checks() -> None:
     """起動時の軽い確認だけを行う。
@@ -35,6 +38,13 @@ def _report_startup_checks() -> None:
     """
     from backend.core.device import probe_gpu
     from backend.pipeline.export import FFMPEG_MISSING_MSG, detect_encoder
+
+    # 旧接頭辞は黙って無視されるため、設定したのに効かない状態を作らないよう伝える
+    legacy = paths.legacy_env_vars()
+    if legacy:
+        print(
+            f"⚠ 環境変数の接頭辞が KS_ に変わりました。{', '.join(legacy)} は無視されます。"
+        )
 
     encoder = detect_encoder()  # ffmpeg -encoders の実行のみ(実測33ms)
     if encoder is None:
@@ -50,7 +60,7 @@ def _report_startup_checks() -> None:
         else:
             print(
                 "⚠ torchがGPUを認識していません。`./dev.sh sync`(AMD)または "
-                "WL_TORCH_GROUP=cu128(NVIDIA)で入れ直してください。CPUでも動きますが低速です。"
+                "KS_TORCH_GROUP=cu128(NVIDIA)で入れ直してください。CPUでも動きますが低速です。"
             )
 
     threading.Thread(target=warm_gpu_probe, daemon=True).start()
@@ -71,7 +81,7 @@ async def lifespan(app: FastAPI):
     app.state.db.close()
 
 
-app = FastAPI(title="Attention Subtitle Separate Application", lifespan=lifespan)
+app = FastAPI(title=APP_TITLE, lifespan=lifespan)
 app.include_router(projects_api.router)
 app.include_router(jobs_api.router)
 app.include_router(transcripts_api.router)

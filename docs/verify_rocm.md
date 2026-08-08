@@ -17,7 +17,7 @@ groups | grep -E "render|video" || sudo usermod -aG render,video $USER
 ## 2. Python環境
 
 ```bash
-./dev.sh sync   # = uv sync(既定でrocmグループ。NVIDIA機は WL_TORCH_GROUP=cu128)
+./dev.sh sync   # = uv sync(既定でrocmグループ。NVIDIA機は KS_TORCH_GROUP=cu128)
 uv run python -c "import torch; print(torch.__version__, torch.version.hip, torch.cuda.is_available(), torch.cuda.get_device_name(0) if torch.cuda.is_available() else '-')"
 # 期待: 2.8.0+rocm6.4 / 6.4.x / True / Radeon RX 7900 系
 ```
@@ -85,7 +85,8 @@ speed は transformers がわずかに速いが、**句読点が出ないため�
 ROCmのエンジン自動選択がこれを使う。用意していない環境では公式Whisperに
 落ちるので、他マシンへ持っていっても壊れない。
 
-置き場所は `~/.cache/whisper-local`(`WL_WHISPERCPP_HOME` で変更可)。
+置き場所は `~/.cache/kirinuki-studio`(`KS_WHISPERCPP_HOME` で変更可。
+旧名 `~/.cache/whisper-local` が残っている環境はそちらを使い続ける)。
 CLIは音声をファイルで受け取るため、ジョブ側で一時WAVを書き出している。
 
 ビルド手順(再現用):

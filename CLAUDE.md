@@ -42,7 +42,7 @@ cd frontend && npm run gen:api    # バックエンドのAPIを変えたら必�
   句読点・トークンのタイムスタンプ・確率が一度に取れる。`-ml` を付けると
   句読点が落ちる(実測)。セグメント分割は `words_to_segments` で自前に行う。
 - **torchはdependency-groupsで切替。** 既定は rocm(RX 7900系)。NVIDIA機は
-  `WL_TORCH_GROUP=cu128 ./dev.sh sync`。依存バージョンは固定
+  `KS_TORCH_GROUP=cu128 ./dev.sh sync`。依存バージョンは固定
   (torch 2.8 / pyannote 3.x / huggingface_hub 0.x / TypeScript 5.9)。上げない。
 - **Blackwell GPUでは compute_type="float16" 固定。** int8はクラッシュする(CPUのint8は安全)。
 - **設定は3層(グローバル→プロジェクト→クリップ)。** ジョブ・APIは

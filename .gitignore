@@ -23,7 +23,8 @@ hf_token.txt
 # テスト資産(移植の回帰検証に必要なのでコミットする)
 !tests/golden/**
 
-# 生成されるDB
+# 生成されるDB(whisper.dbは旧名。既存環境ではそのまま使い続ける)
+kirinuki-studio.db
 whisper.db
 # フロントエンド
 node_modules/

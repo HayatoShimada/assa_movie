@@ -1,4 +1,4 @@
-# Attention Subtitle Separate Application
+# KirinukiStudio
 
 UIで実行・操作できる、自動切り抜き動画作成アプリ
 

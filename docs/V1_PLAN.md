@@ -103,11 +103,30 @@ GPUに応じて導入する方式にフォールバックする。
 CUDA機は faster-whisper(torch不要・CTranslate2)なので、こちらも外せる。
 → 残りは M28 の配布構成で詰める。
 
-### M24: 名称変更(KirinukiStudio)
+### M24: 名称変更(KirinukiStudio) ✅ 完了
 
-- 表示名・ウィンドウタイトル・README・パッケージ名・アイコン
-- リポジトリ名とURLは最後(参照が切れるため)
-- DB・設定ファイルのパスも `kirinuki-studio` に統一(移行コードを入れる)
+- 表示名(画面のh1・ブラウザタブ・FastAPIのtitle)・README・パッケージ名
+  (`kirinuki-studio` / `kirinuki-studio-frontend`)・favicon を差し替えた
+- 環境変数の接頭辞を `WL_` → `KS_` に変更。旧接頭辞は pydantic-settings が
+  **黙って無視する**ため、設定されていたら起動時に警告する
+- `uv init` の残骸だった `src/whisper_local/`(未参照)と Vite テンプレートの
+  残骸(react.svg / vite.svg / frontend/README.md)を掃除した
+
+**パスの扱い(既存環境は移さない)**: `backend/core/paths.py` を新設し、
+新規インストールでは XDG(`~/.local/share|.cache|.config/kirinuki-studio`)を使う。
+ただし既存環境は**そのまま使い続ける**:
+
+| | 既存環境 | 新規インストール |
+|---|---|---|
+| DB・uploads | リポジトリ直下(`whisper.db`) | `~/.local/share/kirinuki-studio/` |
+| モデルキャッシュ | `~/.cache/whisper-local`(3.4GB) | `~/.cache/kirinuki-studio` |
+
+移さない理由は2つ。`media.path` に**絶対パスが入っている**ため uploads(3.9GB)を
+移すと既存の動画への参照が全部切れること、モデルキャッシュを見失うと whisper.cpp と
+ONNX話者分離が「無い」と判定されて**黙って遅い実装に降格する**こと。
+どちらもユーザーには原因が分からない壊れ方をする。
+
+**リポジトリ名とURLは未変更**(参照が切れるため最後に回す)。
 
 ### M25: Tauri シェル(Linux)
 

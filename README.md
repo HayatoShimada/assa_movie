@@ -1,4 +1,4 @@
-# Attention Subtitle Separate Application
+# KirinukiStudio
 
 対談・イベント動画から **文字起こし → 話者分離 → 指示語の解決 → 字幕生成 → 切り抜き動画作成** までを、
 すべてローカルGPUで行うアプリケーションです。バージョン **0.4.0**。
@@ -50,13 +50,13 @@ LLMはローカル(Ollama)とクラウド(Gemini API)を切り替え可能。ロ
 ## セットアップ
 
 ```bash
-git clone <このリポジトリ> && cd whisper-local
+git clone <このリポジトリ> && cd kirinuki-studio
 
 # 1. Python依存(初回は数GBのダウンロード)
 #    AMD GPU (ROCm、既定):
 ./dev.sh sync            # = uv sync(ROCm版PyTorch)
 #    NVIDIA GPU (CUDA):
-# WL_TORCH_GROUP=cu128 ./dev.sh sync
+# KS_TORCH_GROUP=cu128 ./dev.sh sync
 #    ASRエンジンはGPUに合わせて自動選択される
 #    (CUDA→faster-whisper / ROCm→whisper.cppか公式Whisper / GPUなし→CPU)
 

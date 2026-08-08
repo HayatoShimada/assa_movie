@@ -49,9 +49,10 @@ def test_is_available_requires_both_models(tmp_path):
 
 def test_default_paths_are_outside_the_repo():
     """モデルはリポジトリに置かない(配布物を汚さない)"""
+    repo = Path(__file__).resolve().parents[1]
     for p in (DEFAULT_SEGMENTATION, DEFAULT_EMBEDDING):
-        assert Path.home() in p.parents or str(p).startswith("/")
-        assert "whisper-local/backend" not in str(p)
+        assert p.is_absolute()
+        assert repo not in p.parents
 
 
 def test_run_diarization_uses_injected_backend(monkeypatch, tmp_path):

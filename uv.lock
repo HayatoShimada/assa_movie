@@ -10,8 +10,8 @@ resolution-markers = [
     "python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
 ]
 conflicts = [[
-    { package = "whisper-local", group = "cu128" },
-    { package = "whisper-local", group = "rocm" },
+    { package = "kirinuki-studio", group = "cu128" },
+    { package = "kirinuki-studio", group = "rocm" },
 ]]
 
 [manifest]
@@ -37,7 +37,7 @@ dependencies = [
     { name = "frozenlist" },
     { name = "multidict" },
     { name = "propcache" },
-    { name = "typing-extensions", marker = "python_full_version < '3.13' or (extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
+    { name = "typing-extensions", marker = "python_full_version < '3.13' or (extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
     { name = "yarl" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/58/d9/22ce5786ac0c1653ae8b6c23bded02c1686d11f0dbb45b31ce128e0df985/aiohttp-3.14.3.tar.gz", hash = "sha256:9491196535a88924a60afd5b5f434b5b203b6cc616250878dbdb223a8f7844bc", size = 7971213, upload-time = "2026-07-23T01:57:27.037Z" }
@@ -132,7 +132,7 @@ version = "1.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "frozenlist" },
-    { name = "typing-extensions", marker = "python_full_version < '3.13' or (extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
+    { name = "typing-extensions", marker = "python_full_version < '3.13' or (extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/61/62/06741b579156360248d1ec624842ad0edf697050bbaf7c3e46394e106ad1/aiosignal-1.4.0.tar.gz", hash = "sha256:f47eecd9468083c2029cc99945502cb7708b082c232f9aca65da147157b251c7", size = 25007, upload-time = "2025-07-03T22:54:43.528Z" }
 wheels = [
@@ -183,7 +183,7 @@ version = "4.14.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "idna" },
-    { name = "typing-extensions", marker = "python_full_version < '3.13' or (extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
+    { name = "typing-extensions", marker = "python_full_version < '3.13' or (extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/61/cc/a381afa6efea9f496eff839d4a6a1aed3bfafc7b3ab4b0d1b243a12573dd/anyio-4.14.2.tar.gz", hash = "sha256:cfa139f3ed1a23ee8f88a145ddb5ac7605b8bbfd8592baacd7ce3d8bb4313c7f", size = 260176, upload-time = "2026-07-12T20:29:07.082Z" }
 wheels = [
@@ -196,9 +196,9 @@ version = "0.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy" },
-    { name = "torch", version = "2.8.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "extra == 'group-13-whisper-local-cu128'" },
-    { name = "torch", version = "2.8.0+rocm6.4", source = { registry = "https://download.pytorch.org/whl/rocm6.4" }, marker = "extra == 'group-13-whisper-local-rocm'" },
-    { name = "torch", version = "2.13.0", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm')" },
+    { name = "torch", version = "2.8.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "extra == 'group-15-kirinuki-studio-cu128'" },
+    { name = "torch", version = "2.8.0+rocm6.4", source = { registry = "https://download.pytorch.org/whl/rocm6.4" }, marker = "extra == 'group-15-kirinuki-studio-rocm'" },
+    { name = "torch", version = "2.13.0", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm')" },
     { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/90/fa/5c2be1f96dc179f83cdd3bb267edbd1f47d08f756785c016d5c2163901a7/asteroid-filterbanks-0.4.0.tar.gz", hash = "sha256:415f89d1dcf2b13b35f03f7a9370968ac4e6fa6800633c522dac992b283409b9", size = 24599, upload-time = "2021-04-09T20:03:07.456Z" }
@@ -255,7 +255,7 @@ name = "cffi"
 version = "2.1.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pycparser", marker = "implementation_name != 'PyPy' or (extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
+    { name = "pycparser", marker = "implementation_name != 'PyPy' or (extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/9e/ef/008a1939e372c06329a3fce4279c02f328488f3526744906eeec3da7ad5f/cffi-2.1.1.tar.gz", hash = "sha256:dd31f52ea1086513bb9df30f8fcee9b8918323ae067a3d5b78bc826a000712be", size = 530807, upload-time = "2026-08-03T21:21:18.939Z" }
 wheels = [
@@ -401,7 +401,7 @@ name = "click"
 version = "8.4.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
+    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/76/d4/81420972a676e8ffea40450d8c8c92943e7218a78fe9b64359836cc9876b/click-8.4.2.tar.gz", hash = "sha256:9a6cea6e60b17ebe0a44c5cc636d94f09bd66142c1cd7d8b4cd731c4917a15f6", size = 338000, upload-time = "2026-06-24T17:45:15.148Z" }
 wheels = [
@@ -422,7 +422,7 @@ name = "colorlog"
 version = "6.12.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
+    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/8c/55/ba79756cb90c8d69d599d57785398ac87bba7b19c80e87f4e8a562197c93/colorlog-6.12.0.tar.gz", hash = "sha256:2a7924c1dadf18b22a0eb8b06d1c7b01d5341707ec1641eb6fcc4fde0c3e8e5f", size = 18151, upload-time = "2026-07-23T13:40:40.71Z" }
 wheels = [
@@ -532,7 +532,7 @@ name = "cuda-bindings"
 version = "13.3.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "cuda-pathfinder", marker = "(sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
+    { name = "cuda-pathfinder", marker = "(extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm')" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/ce/67/5e7dba1ba576dd73da5dee894ca076ca5e959450dfff66d6d510a255d1f7/cuda_bindings-13.3.1-cp312-cp312-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:c7855c4868aabc0cfae28abbe83d56734bdfbd08f08fc234ac1912a12858bf49", size = 6025351, upload-time = "2026-05-29T23:11:49.685Z" },
@@ -567,43 +567,43 @@ wheels = [
 
 [package.optional-dependencies]
 cublas = [
-    { name = "nvidia-cublas", marker = "(platform_machine != 'aarch64' and platform_machine != 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (platform_machine == 'aarch64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (platform_machine == 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (sys_platform != 'linux' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
-    { name = "nvidia-cuda-nvrtc", marker = "(platform_machine != 'aarch64' and platform_machine != 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (platform_machine == 'aarch64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (platform_machine == 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (sys_platform != 'linux' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
+    { name = "nvidia-cublas", marker = "(platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (platform_machine == 'AMD64' and sys_platform == 'win32' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (sys_platform != 'linux' and sys_platform != 'win32' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform == 'linux' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform == 'win32' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
+    { name = "nvidia-cuda-nvrtc", marker = "(platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (platform_machine == 'AMD64' and sys_platform == 'win32' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (sys_platform != 'linux' and sys_platform != 'win32' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform == 'linux' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform == 'win32' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
 ]
 cudart = [
-    { name = "nvidia-cuda-runtime", marker = "(platform_machine != 'aarch64' and platform_machine != 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (platform_machine == 'aarch64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (platform_machine == 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (sys_platform != 'linux' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
+    { name = "nvidia-cuda-runtime", marker = "(platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (platform_machine == 'AMD64' and sys_platform == 'win32' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (sys_platform != 'linux' and sys_platform != 'win32' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform == 'linux' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform == 'win32' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
 ]
 cufft = [
-    { name = "nvidia-cufft", marker = "(platform_machine != 'aarch64' and platform_machine != 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (platform_machine == 'aarch64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (platform_machine == 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (sys_platform != 'linux' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
-    { name = "nvidia-nvjitlink", marker = "(platform_machine != 'aarch64' and platform_machine != 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (platform_machine == 'aarch64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (platform_machine == 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (sys_platform != 'linux' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
+    { name = "nvidia-cufft", marker = "(platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (platform_machine == 'AMD64' and sys_platform == 'win32' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (sys_platform != 'linux' and sys_platform != 'win32' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform == 'linux' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform == 'win32' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
+    { name = "nvidia-nvjitlink", marker = "(platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (platform_machine == 'AMD64' and sys_platform == 'win32' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (sys_platform != 'linux' and sys_platform != 'win32' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform == 'linux' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform == 'win32' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
 ]
 cufile = [
-    { name = "nvidia-cufile", marker = "(platform_machine != 'aarch64' and platform_machine != 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (platform_machine == 'aarch64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (platform_machine == 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (sys_platform != 'linux' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
+    { name = "nvidia-cufile", marker = "(platform_machine != 'aarch64' and platform_machine != 'x86_64' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (platform_machine == 'aarch64' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (platform_machine == 'x86_64' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform != 'linux' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
 ]
 cupti = [
-    { name = "nvidia-cuda-cupti", marker = "(platform_machine != 'aarch64' and platform_machine != 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (platform_machine == 'aarch64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (platform_machine == 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (sys_platform != 'linux' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
+    { name = "nvidia-cuda-cupti", marker = "(platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (platform_machine == 'AMD64' and sys_platform == 'win32' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (sys_platform != 'linux' and sys_platform != 'win32' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform == 'linux' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform == 'win32' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
 ]
 curand = [
-    { name = "nvidia-curand", marker = "(platform_machine != 'aarch64' and platform_machine != 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (platform_machine == 'aarch64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (platform_machine == 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (sys_platform != 'linux' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
+    { name = "nvidia-curand", marker = "(platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (platform_machine == 'AMD64' and sys_platform == 'win32' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (sys_platform != 'linux' and sys_platform != 'win32' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform == 'linux' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform == 'win32' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
 ]
 cusolver = [
-    { name = "nvidia-cublas", marker = "(platform_machine != 'aarch64' and platform_machine != 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (platform_machine == 'aarch64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (platform_machine == 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (sys_platform != 'linux' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
-    { name = "nvidia-cusolver", marker = "(platform_machine != 'aarch64' and platform_machine != 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (platform_machine == 'aarch64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (platform_machine == 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (sys_platform != 'linux' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
-    { name = "nvidia-cusparse", marker = "(platform_machine != 'aarch64' and platform_machine != 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (platform_machine == 'aarch64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (platform_machine == 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (sys_platform != 'linux' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
-    { name = "nvidia-nvjitlink", marker = "(platform_machine != 'aarch64' and platform_machine != 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (platform_machine == 'aarch64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (platform_machine == 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (sys_platform != 'linux' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
+    { name = "nvidia-cublas", marker = "(platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (platform_machine == 'AMD64' and sys_platform == 'win32' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (sys_platform != 'linux' and sys_platform != 'win32' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform == 'linux' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform == 'win32' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
+    { name = "nvidia-cusolver", marker = "(platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (platform_machine == 'AMD64' and sys_platform == 'win32' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (sys_platform != 'linux' and sys_platform != 'win32' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform == 'linux' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform == 'win32' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
+    { name = "nvidia-cusparse", marker = "(platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (platform_machine == 'AMD64' and sys_platform == 'win32' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (sys_platform != 'linux' and sys_platform != 'win32' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform == 'linux' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform == 'win32' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
+    { name = "nvidia-nvjitlink", marker = "(platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (platform_machine == 'AMD64' and sys_platform == 'win32' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (sys_platform != 'linux' and sys_platform != 'win32' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform == 'linux' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform == 'win32' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
 ]
 cusparse = [
-    { name = "nvidia-cusparse", marker = "(platform_machine != 'aarch64' and platform_machine != 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (platform_machine == 'aarch64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (platform_machine == 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (sys_platform != 'linux' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
-    { name = "nvidia-nvjitlink", marker = "(platform_machine != 'aarch64' and platform_machine != 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (platform_machine == 'aarch64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (platform_machine == 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (sys_platform != 'linux' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
+    { name = "nvidia-cusparse", marker = "(platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (platform_machine == 'AMD64' and sys_platform == 'win32' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (sys_platform != 'linux' and sys_platform != 'win32' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform == 'linux' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform == 'win32' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
+    { name = "nvidia-nvjitlink", marker = "(platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (platform_machine == 'AMD64' and sys_platform == 'win32' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (sys_platform != 'linux' and sys_platform != 'win32' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform == 'linux' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform == 'win32' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
 ]
 nvjitlink = [
-    { name = "nvidia-nvjitlink", marker = "(platform_machine != 'aarch64' and platform_machine != 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (platform_machine == 'aarch64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (platform_machine == 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (sys_platform != 'linux' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
+    { name = "nvidia-nvjitlink", marker = "(platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (platform_machine == 'AMD64' and sys_platform == 'win32' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (sys_platform != 'linux' and sys_platform != 'win32' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform == 'linux' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform == 'win32' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
 ]
 nvrtc = [
-    { name = "nvidia-cuda-nvrtc", marker = "(platform_machine != 'aarch64' and platform_machine != 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (platform_machine == 'aarch64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (platform_machine == 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (sys_platform != 'linux' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
+    { name = "nvidia-cuda-nvrtc", marker = "(platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (platform_machine == 'AMD64' and sys_platform == 'win32' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (sys_platform != 'linux' and sys_platform != 'win32' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform == 'linux' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform == 'win32' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
 ]
 nvtx = [
-    { name = "nvidia-nvtx", marker = "(platform_machine != 'aarch64' and platform_machine != 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (platform_machine == 'aarch64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (platform_machine == 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (sys_platform != 'linux' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
+    { name = "nvidia-nvtx", marker = "(platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (platform_machine == 'AMD64' and sys_platform == 'win32' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (sys_platform != 'linux' and sys_platform != 'win32' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform == 'linux' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform == 'win32' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
 ]
 
 [[package]]
@@ -994,7 +994,7 @@ source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "filelock" },
     { name = "fsspec" },
-    { name = "hf-xet", marker = "platform_machine == 'aarch64' or platform_machine == 'amd64' or platform_machine == 'arm64' or platform_machine == 'x86_64' or (extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
+    { name = "hf-xet", marker = "platform_machine == 'aarch64' or platform_machine == 'amd64' or platform_machine == 'arm64' or platform_machine == 'x86_64' or (extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
     { name = "packaging" },
     { name = "pyyaml" },
     { name = "requests" },
@@ -1063,13 +1063,80 @@ name = "julius"
 version = "0.2.8"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "torch", version = "2.8.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "extra == 'group-13-whisper-local-cu128'" },
-    { name = "torch", version = "2.8.0+rocm6.4", source = { registry = "https://download.pytorch.org/whl/rocm6.4" }, marker = "extra == 'group-13-whisper-local-rocm'" },
-    { name = "torch", version = "2.13.0", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm')" },
+    { name = "torch", version = "2.8.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "extra == 'group-15-kirinuki-studio-cu128'" },
+    { name = "torch", version = "2.8.0+rocm6.4", source = { registry = "https://download.pytorch.org/whl/rocm6.4" }, marker = "extra == 'group-15-kirinuki-studio-rocm'" },
+    { name = "torch", version = "2.13.0", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/1d/c6/5c2aea2b11ead1680bb5b17c996def31f8ccade471cada37cdb93855e06f/julius-0.2.8.tar.gz", hash = "sha256:d691e651200930affea4f6c849c26e95fec846087281ae3d1a7757eac90253d5", size = 48081, upload-time = "2026-06-03T16:05:34.52Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/86/43/efdb0bcb07c47826fa55857cec0deb743f74cd83b6ba5ec9e413505a72e6/julius-0.2.8-py3-none-any.whl", hash = "sha256:6891235cbc355e629d839f87489bff8ca46e57a0e7cc35abb909c7a2aa538c25", size = 21819, upload-time = "2026-06-03T16:05:33.443Z" },
+]
+
+[[package]]
+name = "kirinuki-studio"
+version = "0.4.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "fastapi" },
+    { name = "faster-whisper" },
+    { name = "huggingface-hub" },
+    { name = "openai-whisper" },
+    { name = "opencv-python-headless" },
+    { name = "pyannote-audio" },
+    { name = "pydantic-settings" },
+    { name = "python-multipart" },
+    { name = "requests" },
+    { name = "sherpa-onnx" },
+    { name = "sse-starlette" },
+    { name = "transformers" },
+    { name = "uvicorn", extra = ["standard"] },
+]
+
+[package.dev-dependencies]
+cu128 = [
+    { name = "torch", version = "2.8.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" } },
+    { name = "torchaudio", version = "2.8.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" } },
+]
+dev = [
+    { name = "httpx" },
+    { name = "pytest" },
+]
+rocm = [
+    { name = "pytorch-triton-rocm" },
+    { name = "torch", version = "2.8.0+rocm6.4", source = { registry = "https://download.pytorch.org/whl/rocm6.4" } },
+    { name = "torchaudio", version = "2.8.0+rocm6.4", source = { registry = "https://download.pytorch.org/whl/rocm6.4" } },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fastapi", specifier = ">=0.115" },
+    { name = "faster-whisper", specifier = ">=1.1.0" },
+    { name = "huggingface-hub", specifier = "<1.0" },
+    { name = "openai-whisper", specifier = ">=20240930" },
+    { name = "opencv-python-headless", specifier = ">=4.10,<5" },
+    { name = "pyannote-audio", specifier = ">=3.3,<4" },
+    { name = "pydantic-settings", specifier = ">=2.6" },
+    { name = "python-multipart", specifier = ">=0.0.20" },
+    { name = "requests", specifier = ">=2.31" },
+    { name = "sherpa-onnx", specifier = ">=1.13" },
+    { name = "sse-starlette", specifier = ">=2.1" },
+    { name = "transformers", specifier = ">=4.44" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.32" },
+]
+
+[package.metadata.requires-dev]
+cu128 = [
+    { name = "torch", specifier = "==2.8.*", index = "https://download.pytorch.org/whl/cu128", conflict = { package = "kirinuki-studio", group = "cu128" } },
+    { name = "torchaudio", specifier = "==2.8.*", index = "https://download.pytorch.org/whl/cu128", conflict = { package = "kirinuki-studio", group = "cu128" } },
+]
+dev = [
+    { name = "httpx", specifier = ">=0.28" },
+    { name = "pytest", specifier = ">=8.3" },
+]
+rocm = [
+    { name = "pytorch-triton-rocm", index = "https://download.pytorch.org/whl/rocm6.4", conflict = { package = "kirinuki-studio", group = "rocm" } },
+    { name = "torch", specifier = "==2.8.*", index = "https://download.pytorch.org/whl/rocm6.4", conflict = { package = "kirinuki-studio", group = "rocm" } },
+    { name = "torchaudio", specifier = "==2.8.*", index = "https://download.pytorch.org/whl/rocm6.4", conflict = { package = "kirinuki-studio", group = "rocm" } },
 ]
 
 [[package]]
@@ -1168,9 +1235,9 @@ dependencies = [
     { name = "packaging" },
     { name = "pytorch-lightning" },
     { name = "pyyaml" },
-    { name = "torch", version = "2.8.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "extra == 'group-13-whisper-local-cu128'" },
-    { name = "torch", version = "2.8.0+rocm6.4", source = { registry = "https://download.pytorch.org/whl/rocm6.4" }, marker = "extra == 'group-13-whisper-local-rocm'" },
-    { name = "torch", version = "2.13.0", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm')" },
+    { name = "torch", version = "2.8.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "extra == 'group-15-kirinuki-studio-cu128'" },
+    { name = "torch", version = "2.8.0+rocm6.4", source = { registry = "https://download.pytorch.org/whl/rocm6.4" }, marker = "extra == 'group-15-kirinuki-studio-rocm'" },
+    { name = "torch", version = "2.13.0", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm')" },
     { name = "torchmetrics" },
     { name = "tqdm" },
     { name = "typing-extensions" },
@@ -1596,7 +1663,7 @@ name = "nvidia-cublas"
 version = "13.1.1.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "nvidia-cuda-nvrtc", marker = "(sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
+    { name = "nvidia-cuda-nvrtc", marker = "(extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm')" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a7/a1/0bd24ee8c8d03adac032fd2909426a00c88f8c57961b1277ded97f91119f/nvidia_cublas-13.1.1.3-py3-none-manylinux_2_27_aarch64.whl", hash = "sha256:b7a210458267ac818974c53038fbec2e969d5c99f305ab15c72522fa9f001dd5", size = 542848918, upload-time = "2026-04-08T18:46:22.985Z" },
@@ -1679,7 +1746,7 @@ name = "nvidia-cudnn-cu12"
 version = "9.10.2.21"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "nvidia-cublas-cu12", marker = "(sys_platform != 'emscripten' and sys_platform != 'win32' and extra == 'group-13-whisper-local-cu128') or (sys_platform == 'emscripten' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (sys_platform == 'win32' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
+    { name = "nvidia-cublas-cu12", marker = "extra == 'group-15-kirinuki-studio-cu128'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/fa/41/e79269ce215c857c935fd86bcfe91a451a584dfc27f1e068f568b9ad1ab7/nvidia_cudnn_cu12-9.10.2.21-py3-none-manylinux_2_27_aarch64.whl", hash = "sha256:c9132cc3f8958447b4910a1720036d9eff5928cc3179b0a51fb6d167c6cc87d8", size = 705026878, upload-time = "2025-06-06T21:52:51.348Z" },
@@ -1692,7 +1759,7 @@ name = "nvidia-cudnn-cu13"
 version = "9.20.0.48"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "nvidia-cublas", marker = "(sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
+    { name = "nvidia-cublas", marker = "(extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm')" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/56/c5/83384d846b2fd17c44bd499b36c75a45ed4f095fbbb2252294e89cea5c5c/nvidia_cudnn_cu13-9.20.0.48-py3-none-manylinux_2_27_aarch64.whl", hash = "sha256:e31454ae00094b0c55319d9d15b6fa2fc50a9e1c0f5c8c80fb75258234e731e1", size = 444574296, upload-time = "2026-03-09T19:28:27.751Z" },
@@ -1705,7 +1772,7 @@ name = "nvidia-cufft"
 version = "12.0.0.61"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "nvidia-nvjitlink", marker = "(sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
+    { name = "nvidia-nvjitlink", marker = "(extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm')" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/8b/ae/f417a75c0259e85c1d2f83ca4e960289a5f814ed0cea74d18c353d3e989d/nvidia_cufft-12.0.0.61-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:2708c852ef8cd89d1d2068bdbece0aa188813a0c934db3779b9b1faa8442e5f5", size = 214053554, upload-time = "2025-09-04T08:31:38.196Z" },
@@ -1718,7 +1785,7 @@ name = "nvidia-cufft-cu12"
 version = "11.3.3.83"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "nvidia-nvjitlink-cu12", marker = "(sys_platform != 'emscripten' and sys_platform != 'win32' and extra == 'group-13-whisper-local-cu128') or (sys_platform == 'emscripten' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (sys_platform == 'win32' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
+    { name = "nvidia-nvjitlink-cu12", marker = "extra == 'group-15-kirinuki-studio-cu128'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/60/bc/7771846d3a0272026c416fbb7e5f4c1f146d6d80704534d0b187dd6f4800/nvidia_cufft_cu12-11.3.3.83-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:848ef7224d6305cdb2a4df928759dca7b1201874787083b6e7550dd6765ce69a", size = 193109211, upload-time = "2025-03-07T01:44:56.873Z" },
@@ -1769,9 +1836,9 @@ name = "nvidia-cusolver"
 version = "12.0.4.66"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "nvidia-cublas", marker = "(sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
-    { name = "nvidia-cusparse", marker = "(sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
-    { name = "nvidia-nvjitlink", marker = "(sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
+    { name = "nvidia-cublas", marker = "(extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm')" },
+    { name = "nvidia-cusparse", marker = "(extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm')" },
+    { name = "nvidia-nvjitlink", marker = "(extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm')" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c8/c3/b30c9e935fc01e3da443ec0116ed1b2a009bb867f5324d3f2d7e533e776b/nvidia_cusolver-12.0.4.66-py3-none-manylinux_2_27_aarch64.whl", hash = "sha256:02c2457eaa9e39de20f880f4bd8820e6a1cfb9f9a34f820eb12a155aa5bc92d2", size = 223467760, upload-time = "2025-09-04T08:33:04.222Z" },
@@ -1784,9 +1851,9 @@ name = "nvidia-cusolver-cu12"
 version = "11.7.3.90"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "nvidia-cublas-cu12", marker = "(sys_platform != 'emscripten' and sys_platform != 'win32' and extra == 'group-13-whisper-local-cu128') or (sys_platform == 'emscripten' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (sys_platform == 'win32' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
-    { name = "nvidia-cusparse-cu12", marker = "(sys_platform != 'emscripten' and sys_platform != 'win32' and extra == 'group-13-whisper-local-cu128') or (sys_platform == 'emscripten' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (sys_platform == 'win32' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
-    { name = "nvidia-nvjitlink-cu12", marker = "(sys_platform != 'emscripten' and sys_platform != 'win32' and extra == 'group-13-whisper-local-cu128') or (sys_platform == 'emscripten' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (sys_platform == 'win32' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
+    { name = "nvidia-cublas-cu12", marker = "extra == 'group-15-kirinuki-studio-cu128'" },
+    { name = "nvidia-cusparse-cu12", marker = "extra == 'group-15-kirinuki-studio-cu128'" },
+    { name = "nvidia-nvjitlink-cu12", marker = "extra == 'group-15-kirinuki-studio-cu128'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c8/32/f7cd6ce8a7690544d084ea21c26e910a97e077c9b7f07bf5de623ee19981/nvidia_cusolver_cu12-11.7.3.90-py3-none-manylinux_2_27_aarch64.whl", hash = "sha256:db9ed69dbef9715071232caa9b69c52ac7de3a95773c2db65bdba85916e4e5c0", size = 267229841, upload-time = "2025-03-07T01:46:54.356Z" },
@@ -1799,7 +1866,7 @@ name = "nvidia-cusparse"
 version = "12.6.3.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "nvidia-nvjitlink", marker = "(sys_platform != 'emscripten' and sys_platform != 'win32' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
+    { name = "nvidia-nvjitlink", marker = "(extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm')" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f8/94/5c26f33738ae35276672f12615a64bd008ed5be6d1ebcb23579285d960a9/nvidia_cusparse-12.6.3.3-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:80bcc4662f23f1054ee334a15c72b8940402975e0eab63178fc7e670aa59472c", size = 162155568, upload-time = "2025-09-04T08:33:42.864Z" },
@@ -1812,7 +1879,7 @@ name = "nvidia-cusparse-cu12"
 version = "12.5.8.93"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "nvidia-nvjitlink-cu12", marker = "(sys_platform != 'emscripten' and sys_platform != 'win32' and extra == 'group-13-whisper-local-cu128') or (sys_platform == 'emscripten' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (sys_platform == 'win32' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
+    { name = "nvidia-nvjitlink-cu12", marker = "extra == 'group-15-kirinuki-studio-cu128'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/bc/f7/cd777c4109681367721b00a106f491e0d0d15cfa1fd59672ce580ce42a97/nvidia_cusparse_cu12-12.5.8.93-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:9b6c161cb130be1a07a27ea6923df8141f3c295852f4b260c65f18f3e0a091dc", size = 288117129, upload-time = "2025-03-07T01:47:40.407Z" },
@@ -1961,11 +2028,11 @@ dependencies = [
     { name = "numba" },
     { name = "numpy" },
     { name = "tiktoken" },
-    { name = "torch", version = "2.8.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "extra == 'group-13-whisper-local-cu128'" },
-    { name = "torch", version = "2.8.0+rocm6.4", source = { registry = "https://download.pytorch.org/whl/rocm6.4" }, marker = "extra == 'group-13-whisper-local-rocm'" },
-    { name = "torch", version = "2.13.0", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm')" },
+    { name = "torch", version = "2.8.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "extra == 'group-15-kirinuki-studio-cu128'" },
+    { name = "torch", version = "2.8.0+rocm6.4", source = { registry = "https://download.pytorch.org/whl/rocm6.4" }, marker = "extra == 'group-15-kirinuki-studio-rocm'" },
+    { name = "torch", version = "2.13.0", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm')" },
     { name = "tqdm" },
-    { name = "triton", marker = "sys_platform == 'no-such-platform' or (extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
+    { name = "triton", marker = "sys_platform == 'no-such-platform' or (extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/35/8e/d36f8880bcf18ec026a55807d02fe4c7357da9f25aebd92f85178000c0dc/openai_whisper-20250625.tar.gz", hash = "sha256:37a91a3921809d9f44748ffc73c0a55c9f366c85a3ef5c2ae0cc09540432eb96", size = 803191, upload-time = "2025-06-26T01:06:13.34Z" }
 
@@ -2022,7 +2089,7 @@ source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy" },
     { name = "python-dateutil" },
-    { name = "tzdata", marker = "sys_platform == 'emscripten' or sys_platform == 'win32' or (extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
+    { name = "tzdata", marker = "sys_platform == 'emscripten' or sys_platform == 'win32' or (extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/be/4f/5f3422a2afec5ffc46308b79e53291365a93748b498ac2e58bead0197916/pandas-3.0.5.tar.gz", hash = "sha256:dca3734d6ab7c906e6730f0788b0a1dbb9f2467731f9711f77995c8e9d62d712", size = 4658219, upload-time = "2026-07-22T22:19:28.819Z" }
 wheels = [
@@ -2279,13 +2346,13 @@ dependencies = [
     { name = "soundfile" },
     { name = "speechbrain" },
     { name = "tensorboardx" },
-    { name = "torch", version = "2.8.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "extra == 'group-13-whisper-local-cu128'" },
-    { name = "torch", version = "2.8.0+rocm6.4", source = { registry = "https://download.pytorch.org/whl/rocm6.4" }, marker = "extra == 'group-13-whisper-local-rocm'" },
-    { name = "torch", version = "2.13.0", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm')" },
+    { name = "torch", version = "2.8.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "extra == 'group-15-kirinuki-studio-cu128'" },
+    { name = "torch", version = "2.8.0+rocm6.4", source = { registry = "https://download.pytorch.org/whl/rocm6.4" }, marker = "extra == 'group-15-kirinuki-studio-rocm'" },
+    { name = "torch", version = "2.13.0", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm')" },
     { name = "torch-audiomentations" },
-    { name = "torchaudio", version = "2.8.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "extra == 'group-13-whisper-local-cu128'" },
-    { name = "torchaudio", version = "2.8.0+rocm6.4", source = { registry = "https://download.pytorch.org/whl/rocm6.4" }, marker = "extra == 'group-13-whisper-local-rocm'" },
-    { name = "torchaudio", version = "2.11.0", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm')" },
+    { name = "torchaudio", version = "2.8.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "extra == 'group-15-kirinuki-studio-cu128'" },
+    { name = "torchaudio", version = "2.8.0+rocm6.4", source = { registry = "https://download.pytorch.org/whl/rocm6.4" }, marker = "extra == 'group-15-kirinuki-studio-rocm'" },
+    { name = "torchaudio", version = "2.11.0", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm')" },
     { name = "torchmetrics" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/ec/1e/efe9619c38f1281ddf21640654d8ea9e3f67c459b76f78657b26d8557bbe/pyannote_audio-3.4.0.tar.gz", hash = "sha256:d523d883cb8d37cb6daf99f3ba83f9138bb193646ad71e6eae7deb89d8ddd642", size = 804850, upload-time = "2025-09-09T07:04:51.17Z" }
@@ -2499,7 +2566,7 @@ name = "pytest"
 version = "9.1.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
+    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
     { name = "iniconfig" },
     { name = "packaging" },
     { name = "pluggy" },
@@ -2549,9 +2616,9 @@ dependencies = [
     { name = "lightning-utilities" },
     { name = "packaging" },
     { name = "pyyaml" },
-    { name = "torch", version = "2.8.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "extra == 'group-13-whisper-local-cu128'" },
-    { name = "torch", version = "2.8.0+rocm6.4", source = { registry = "https://download.pytorch.org/whl/rocm6.4" }, marker = "extra == 'group-13-whisper-local-rocm'" },
-    { name = "torch", version = "2.13.0", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm')" },
+    { name = "torch", version = "2.8.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "extra == 'group-15-kirinuki-studio-cu128'" },
+    { name = "torch", version = "2.8.0+rocm6.4", source = { registry = "https://download.pytorch.org/whl/rocm6.4" }, marker = "extra == 'group-15-kirinuki-studio-rocm'" },
+    { name = "torch", version = "2.13.0", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm')" },
     { name = "torchmetrics" },
     { name = "tqdm" },
     { name = "typing-extensions" },
@@ -2568,9 +2635,9 @@ source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy" },
     { name = "scikit-learn" },
-    { name = "torch", version = "2.8.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "extra == 'group-13-whisper-local-cu128'" },
-    { name = "torch", version = "2.8.0+rocm6.4", source = { registry = "https://download.pytorch.org/whl/rocm6.4" }, marker = "extra == 'group-13-whisper-local-rocm'" },
-    { name = "torch", version = "2.13.0", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm')" },
+    { name = "torch", version = "2.8.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "extra == 'group-15-kirinuki-studio-cu128'" },
+    { name = "torch", version = "2.8.0+rocm6.4", source = { registry = "https://download.pytorch.org/whl/rocm6.4" }, marker = "extra == 'group-15-kirinuki-studio-rocm'" },
+    { name = "torch", version = "2.13.0", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm')" },
     { name = "tqdm" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/9b/80/6e61b1a91debf4c1b47d441f9a9d7fe2aabcdd9575ed70b2811474eb95c3/pytorch-metric-learning-2.9.0.tar.gz", hash = "sha256:27a626caf5e2876a0fd666605a78cb67ef7597e25d7a68c18053dd503830701f", size = 84530, upload-time = "2025-08-17T17:11:19.501Z" }
@@ -2583,7 +2650,7 @@ name = "pytorch-triton-rocm"
 version = "3.4.0"
 source = { registry = "https://download.pytorch.org/whl/rocm6.4" }
 dependencies = [
-    { name = "setuptools", marker = "extra == 'group-13-whisper-local-rocm'" },
+    { name = "setuptools", marker = "extra == 'group-15-kirinuki-studio-rocm'" },
 ]
 wheels = [
     { url = "https://download-r2.pytorch.org/whl/pytorch_triton_rocm-3.4.0-cp312-cp312-linux_x86_64.whl", hash = "sha256:7afe951b9fc38f1a5b3a7b98bebbaa092bf51e6192b699b4fade9b1ad6fc9c2c", upload-time = "2025-08-05T21:10:03Z" },
@@ -2758,7 +2825,7 @@ name = "ruamel-yaml"
 version = "0.18.17"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "ruamel-yaml-clib", marker = "(python_full_version < '3.15' and platform_python_implementation == 'CPython') or (python_full_version >= '3.15' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (platform_python_implementation != 'CPython' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
+    { name = "ruamel-yaml-clib", marker = "(python_full_version < '3.15' and platform_python_implementation == 'CPython') or (python_full_version >= '3.15' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (platform_python_implementation != 'CPython' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/3a/2b/7a1f1ebcd6b3f14febdc003e658778d81e76b40df2267904ee6b13f0c5c6/ruamel_yaml-0.18.17.tar.gz", hash = "sha256:9091cd6e2d93a3a4b157ddb8fabf348c3de7f1fb1381346d985b6b247dcd8d3c", size = 149602, upload-time = "2025-12-17T20:02:55.757Z" }
 wheels = [
@@ -3072,12 +3139,12 @@ dependencies = [
     { name = "scipy" },
     { name = "sentencepiece" },
     { name = "soundfile" },
-    { name = "torch", version = "2.8.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "extra == 'group-13-whisper-local-cu128'" },
-    { name = "torch", version = "2.8.0+rocm6.4", source = { registry = "https://download.pytorch.org/whl/rocm6.4" }, marker = "extra == 'group-13-whisper-local-rocm'" },
-    { name = "torch", version = "2.13.0", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm')" },
-    { name = "torchaudio", version = "2.8.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "extra == 'group-13-whisper-local-cu128'" },
-    { name = "torchaudio", version = "2.8.0+rocm6.4", source = { registry = "https://download.pytorch.org/whl/rocm6.4" }, marker = "extra == 'group-13-whisper-local-rocm'" },
-    { name = "torchaudio", version = "2.11.0", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm')" },
+    { name = "torch", version = "2.8.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "extra == 'group-15-kirinuki-studio-cu128'" },
+    { name = "torch", version = "2.8.0+rocm6.4", source = { registry = "https://download.pytorch.org/whl/rocm6.4" }, marker = "extra == 'group-15-kirinuki-studio-rocm'" },
+    { name = "torch", version = "2.13.0", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm')" },
+    { name = "torchaudio", version = "2.8.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "extra == 'group-15-kirinuki-studio-cu128'" },
+    { name = "torchaudio", version = "2.8.0+rocm6.4", source = { registry = "https://download.pytorch.org/whl/rocm6.4" }, marker = "extra == 'group-15-kirinuki-studio-rocm'" },
+    { name = "torchaudio", version = "2.11.0", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm')" },
     { name = "tqdm" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/95/df/782cca3897a75bbeb5242026bc8f24d3c14d44ffc413c549d611e988e890/speechbrain-1.1.0.tar.gz", hash = "sha256:669ed0903c2aebc0d5daffc69fdbbfc822e1e2c094be45c8160ceecc9c763cd3", size = 1730288, upload-time = "2026-03-31T16:43:03.324Z" }
@@ -3090,7 +3157,7 @@ name = "sqlalchemy"
 version = "2.0.51"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "greenlet", marker = "platform_machine == 'AMD64' or platform_machine == 'WIN32' or platform_machine == 'aarch64' or platform_machine == 'amd64' or platform_machine == 'ppc64le' or platform_machine == 'win32' or platform_machine == 'x86_64' or (extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
+    { name = "greenlet", marker = "platform_machine == 'AMD64' or platform_machine == 'WIN32' or platform_machine == 'aarch64' or platform_machine == 'amd64' or platform_machine == 'ppc64le' or platform_machine == 'win32' or platform_machine == 'x86_64' or (extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
     { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/02/f1/a7a892f18d4d224e6b26f706531eafccc41e37594d37d304786969ee13cb/sqlalchemy-2.0.51.tar.gz", hash = "sha256:804dccd8a4a6242c4e30ad961e540e18a588f6527202f2d6791b01845d59fdc9", size = 9912201, upload-time = "2026-06-15T15:41:20.012Z" }
@@ -3145,7 +3212,7 @@ version = "1.4.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
-    { name = "typing-extensions", marker = "python_full_version < '3.13' or (extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
+    { name = "typing-extensions", marker = "python_full_version < '3.13' or (extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/0f/3c/76d2fd1f1357ed0f0108d8a5aa233dcf16e2946a8559c84912fe08e01ac7/starlette-1.4.1.tar.gz", hash = "sha256:b7332de6e9375593a29ba9eee1e6ecfeb3eb2043e2e19a13b4b71da73ff35540", size = 2709041, upload-time = "2026-08-05T15:17:26.23Z" }
 wheels = [
@@ -3282,28 +3349,28 @@ resolution-markers = [
     "python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
 ]
 dependencies = [
-    { name = "filelock", marker = "extra == 'group-13-whisper-local-cu128'" },
-    { name = "fsspec", marker = "extra == 'group-13-whisper-local-cu128'" },
-    { name = "jinja2", marker = "extra == 'group-13-whisper-local-cu128'" },
-    { name = "networkx", marker = "extra == 'group-13-whisper-local-cu128'" },
-    { name = "nvidia-cublas-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-13-whisper-local-cu128') or (platform_machine != 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (sys_platform != 'linux' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
-    { name = "nvidia-cuda-cupti-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-13-whisper-local-cu128') or (platform_machine != 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (sys_platform != 'linux' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
-    { name = "nvidia-cuda-nvrtc-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-13-whisper-local-cu128') or (platform_machine != 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (sys_platform != 'linux' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
-    { name = "nvidia-cuda-runtime-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-13-whisper-local-cu128') or (platform_machine != 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (sys_platform != 'linux' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
-    { name = "nvidia-cudnn-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-13-whisper-local-cu128') or (platform_machine != 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (sys_platform != 'linux' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
-    { name = "nvidia-cufft-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-13-whisper-local-cu128') or (platform_machine != 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (sys_platform != 'linux' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
-    { name = "nvidia-cufile-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-13-whisper-local-cu128') or (platform_machine != 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (sys_platform != 'linux' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
-    { name = "nvidia-curand-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-13-whisper-local-cu128') or (platform_machine != 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (sys_platform != 'linux' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
-    { name = "nvidia-cusolver-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-13-whisper-local-cu128') or (platform_machine != 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (sys_platform != 'linux' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
-    { name = "nvidia-cusparse-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-13-whisper-local-cu128') or (platform_machine != 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (sys_platform != 'linux' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
-    { name = "nvidia-cusparselt-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-13-whisper-local-cu128') or (platform_machine != 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (sys_platform != 'linux' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
-    { name = "nvidia-nccl-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-13-whisper-local-cu128') or (platform_machine != 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (sys_platform != 'linux' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
-    { name = "nvidia-nvjitlink-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-13-whisper-local-cu128') or (platform_machine != 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (sys_platform != 'linux' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
-    { name = "nvidia-nvtx-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-13-whisper-local-cu128') or (platform_machine != 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (sys_platform != 'linux' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
-    { name = "setuptools", marker = "extra == 'group-13-whisper-local-cu128'" },
-    { name = "sympy", marker = "extra == 'group-13-whisper-local-cu128'" },
-    { name = "triton", marker = "(sys_platform == 'no-such-platform' and extra == 'group-13-whisper-local-cu128') or (extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
-    { name = "typing-extensions", marker = "extra == 'group-13-whisper-local-cu128'" },
+    { name = "filelock", marker = "extra == 'group-15-kirinuki-studio-cu128'" },
+    { name = "fsspec", marker = "extra == 'group-15-kirinuki-studio-cu128'" },
+    { name = "jinja2", marker = "extra == 'group-15-kirinuki-studio-cu128'" },
+    { name = "networkx", marker = "extra == 'group-15-kirinuki-studio-cu128'" },
+    { name = "nvidia-cublas-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-15-kirinuki-studio-cu128') or (platform_machine != 'x86_64' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform != 'linux' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
+    { name = "nvidia-cuda-cupti-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-15-kirinuki-studio-cu128') or (platform_machine != 'x86_64' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform != 'linux' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
+    { name = "nvidia-cuda-nvrtc-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-15-kirinuki-studio-cu128') or (platform_machine != 'x86_64' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform != 'linux' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
+    { name = "nvidia-cuda-runtime-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-15-kirinuki-studio-cu128') or (platform_machine != 'x86_64' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform != 'linux' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
+    { name = "nvidia-cudnn-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-15-kirinuki-studio-cu128') or (platform_machine != 'x86_64' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform != 'linux' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
+    { name = "nvidia-cufft-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-15-kirinuki-studio-cu128') or (platform_machine != 'x86_64' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform != 'linux' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
+    { name = "nvidia-cufile-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-15-kirinuki-studio-cu128') or (platform_machine != 'x86_64' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform != 'linux' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
+    { name = "nvidia-curand-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-15-kirinuki-studio-cu128') or (platform_machine != 'x86_64' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform != 'linux' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
+    { name = "nvidia-cusolver-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-15-kirinuki-studio-cu128') or (platform_machine != 'x86_64' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform != 'linux' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
+    { name = "nvidia-cusparse-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-15-kirinuki-studio-cu128') or (platform_machine != 'x86_64' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform != 'linux' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
+    { name = "nvidia-cusparselt-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-15-kirinuki-studio-cu128') or (platform_machine != 'x86_64' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform != 'linux' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
+    { name = "nvidia-nccl-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-15-kirinuki-studio-cu128') or (platform_machine != 'x86_64' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform != 'linux' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
+    { name = "nvidia-nvjitlink-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-15-kirinuki-studio-cu128') or (platform_machine != 'x86_64' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform != 'linux' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
+    { name = "nvidia-nvtx-cu12", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-15-kirinuki-studio-cu128') or (platform_machine != 'x86_64' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform != 'linux' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
+    { name = "setuptools", marker = "extra == 'group-15-kirinuki-studio-cu128'" },
+    { name = "sympy", marker = "extra == 'group-15-kirinuki-studio-cu128'" },
+    { name = "triton", marker = "(sys_platform == 'no-such-platform' and extra == 'group-15-kirinuki-studio-cu128') or (extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
+    { name = "typing-extensions", marker = "extra == 'group-15-kirinuki-studio-cu128'" },
 ]
 wheels = [
     { url = "https://download-r2.pytorch.org/whl/cu128/torch-2.8.0%2Bcu128-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:4354fc05bb79b208d6995a04ca1ceef6a9547b1c4334435574353d381c55087c", upload-time = "2025-10-01T23:51:02Z" },
@@ -3327,14 +3394,14 @@ resolution-markers = [
     "python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
 ]
 dependencies = [
-    { name = "filelock", marker = "extra == 'group-13-whisper-local-rocm'" },
-    { name = "fsspec", marker = "extra == 'group-13-whisper-local-rocm'" },
-    { name = "jinja2", marker = "extra == 'group-13-whisper-local-rocm'" },
-    { name = "networkx", marker = "extra == 'group-13-whisper-local-rocm'" },
-    { name = "pytorch-triton-rocm", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-13-whisper-local-rocm') or (platform_machine != 'x86_64' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (sys_platform != 'linux' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
-    { name = "setuptools", marker = "extra == 'group-13-whisper-local-rocm'" },
-    { name = "sympy", marker = "extra == 'group-13-whisper-local-rocm'" },
-    { name = "typing-extensions", marker = "extra == 'group-13-whisper-local-rocm'" },
+    { name = "filelock", marker = "extra == 'group-15-kirinuki-studio-rocm'" },
+    { name = "fsspec", marker = "extra == 'group-15-kirinuki-studio-rocm'" },
+    { name = "jinja2", marker = "extra == 'group-15-kirinuki-studio-rocm'" },
+    { name = "networkx", marker = "extra == 'group-15-kirinuki-studio-rocm'" },
+    { name = "pytorch-triton-rocm", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'group-15-kirinuki-studio-rocm') or (platform_machine != 'x86_64' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform != 'linux' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
+    { name = "setuptools", marker = "extra == 'group-15-kirinuki-studio-rocm'" },
+    { name = "sympy", marker = "extra == 'group-15-kirinuki-studio-rocm'" },
+    { name = "typing-extensions", marker = "extra == 'group-15-kirinuki-studio-rocm'" },
 ]
 wheels = [
     { url = "https://download-r2.pytorch.org/whl/rocm6.4/torch-2.8.0%2Brocm6.4-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:b2ee7e4967d4ad38689a38cefff2a60baa1e884fe61d96c390c187e525a02b3a", upload-time = "2025-10-02T00:51:30Z" },
@@ -3355,20 +3422,20 @@ resolution-markers = [
     "python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
 ]
 dependencies = [
-    { name = "cuda-bindings", marker = "(python_full_version < '3.15' and sys_platform == 'linux' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
-    { name = "cuda-toolkit", extra = ["cublas", "cudart", "cufft", "cufile", "cupti", "curand", "cusolver", "cusparse", "nvjitlink", "nvrtc", "nvtx"], marker = "(sys_platform == 'linux' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
-    { name = "filelock", marker = "(extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm')" },
-    { name = "fsspec", marker = "(extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm')" },
-    { name = "jinja2", marker = "(extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm')" },
-    { name = "networkx", marker = "(extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm')" },
-    { name = "nvidia-cudnn-cu13", marker = "(sys_platform == 'linux' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
-    { name = "nvidia-cusparselt-cu13", marker = "(sys_platform == 'linux' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
-    { name = "nvidia-nccl-cu13", marker = "(sys_platform == 'linux' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
-    { name = "nvidia-nvshmem-cu13", marker = "(sys_platform == 'linux' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
-    { name = "setuptools", marker = "(extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm')" },
-    { name = "sympy", marker = "(extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm')" },
-    { name = "triton", marker = "(sys_platform == 'no-such-platform' and extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm') or (extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
-    { name = "typing-extensions", marker = "(extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm')" },
+    { name = "cuda-bindings", marker = "(python_full_version < '3.15' and sys_platform == 'linux' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
+    { name = "cuda-toolkit", extra = ["cublas", "cudart", "cufft", "cufile", "cupti", "curand", "cusolver", "cusparse", "nvjitlink", "nvrtc", "nvtx"], marker = "(sys_platform == 'linux' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
+    { name = "filelock", marker = "(extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm')" },
+    { name = "fsspec", marker = "(extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm')" },
+    { name = "jinja2", marker = "(extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm')" },
+    { name = "networkx", marker = "(extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm')" },
+    { name = "nvidia-cudnn-cu13", marker = "(sys_platform == 'linux' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
+    { name = "nvidia-cusparselt-cu13", marker = "(sys_platform == 'linux' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
+    { name = "nvidia-nccl-cu13", marker = "(sys_platform == 'linux' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
+    { name = "nvidia-nvshmem-cu13", marker = "(sys_platform == 'linux' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
+    { name = "setuptools", marker = "(extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm')" },
+    { name = "sympy", marker = "(extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm')" },
+    { name = "triton", marker = "(sys_platform == 'no-such-platform' and extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm') or (extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
+    { name = "typing-extensions", marker = "(extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm')" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c4/3a/ed0f4d4d1dcde03bced7aac9a28e800abcdc0cbd06b6775044c9fbd877b7/torch-2.13.0-cp312-cp312-macosx_14_0_arm64.whl", hash = "sha256:2fe228aba290d14b9f31b049be550dbd469c3fd3013d7a19705b30454da97027", size = 111213045, upload-time = "2026-07-08T16:05:22.997Z" },
@@ -3395,13 +3462,13 @@ version = "0.12.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "julius" },
-    { name = "torch", version = "2.8.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "extra == 'group-13-whisper-local-cu128'" },
-    { name = "torch", version = "2.8.0+rocm6.4", source = { registry = "https://download.pytorch.org/whl/rocm6.4" }, marker = "extra == 'group-13-whisper-local-rocm'" },
-    { name = "torch", version = "2.13.0", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm')" },
+    { name = "torch", version = "2.8.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "extra == 'group-15-kirinuki-studio-cu128'" },
+    { name = "torch", version = "2.8.0+rocm6.4", source = { registry = "https://download.pytorch.org/whl/rocm6.4" }, marker = "extra == 'group-15-kirinuki-studio-rocm'" },
+    { name = "torch", version = "2.13.0", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm')" },
     { name = "torch-pitch-shift" },
-    { name = "torchaudio", version = "2.8.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "extra == 'group-13-whisper-local-cu128'" },
-    { name = "torchaudio", version = "2.8.0+rocm6.4", source = { registry = "https://download.pytorch.org/whl/rocm6.4" }, marker = "extra == 'group-13-whisper-local-rocm'" },
-    { name = "torchaudio", version = "2.11.0", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm')" },
+    { name = "torchaudio", version = "2.8.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "extra == 'group-15-kirinuki-studio-cu128'" },
+    { name = "torchaudio", version = "2.8.0+rocm6.4", source = { registry = "https://download.pytorch.org/whl/rocm6.4" }, marker = "extra == 'group-15-kirinuki-studio-rocm'" },
+    { name = "torchaudio", version = "2.11.0", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/31/8d/2f8fd7e34c75f5ee8de4310c3bd3f22270acd44d1f809e2fe7c12fbf35f8/torch_audiomentations-0.12.0.tar.gz", hash = "sha256:b02d4c5eb86376986a53eb405cca5e34f370ea9284411237508e720c529f7888", size = 52094, upload-time = "2025-01-15T09:07:01.071Z" }
 wheels = [
@@ -3415,12 +3482,12 @@ source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "packaging" },
     { name = "primepy" },
-    { name = "torch", version = "2.8.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "extra == 'group-13-whisper-local-cu128'" },
-    { name = "torch", version = "2.8.0+rocm6.4", source = { registry = "https://download.pytorch.org/whl/rocm6.4" }, marker = "extra == 'group-13-whisper-local-rocm'" },
-    { name = "torch", version = "2.13.0", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm')" },
-    { name = "torchaudio", version = "2.8.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "extra == 'group-13-whisper-local-cu128'" },
-    { name = "torchaudio", version = "2.8.0+rocm6.4", source = { registry = "https://download.pytorch.org/whl/rocm6.4" }, marker = "extra == 'group-13-whisper-local-rocm'" },
-    { name = "torchaudio", version = "2.11.0", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm')" },
+    { name = "torch", version = "2.8.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "extra == 'group-15-kirinuki-studio-cu128'" },
+    { name = "torch", version = "2.8.0+rocm6.4", source = { registry = "https://download.pytorch.org/whl/rocm6.4" }, marker = "extra == 'group-15-kirinuki-studio-rocm'" },
+    { name = "torch", version = "2.13.0", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm')" },
+    { name = "torchaudio", version = "2.8.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "extra == 'group-15-kirinuki-studio-cu128'" },
+    { name = "torchaudio", version = "2.8.0+rocm6.4", source = { registry = "https://download.pytorch.org/whl/rocm6.4" }, marker = "extra == 'group-15-kirinuki-studio-rocm'" },
+    { name = "torchaudio", version = "2.11.0", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/79/a6/722a832bca75d5079f6731e005b3d0c2eec7c6c6863d030620952d143d57/torch_pitch_shift-1.2.5.tar.gz", hash = "sha256:6e1c7531f08d0f407a4c55e5ff8385a41355c5c5d27ab7fa08632e51defbd0ed", size = 4725, upload-time = "2024-09-25T19:10:12.922Z" }
 wheels = [
@@ -3440,7 +3507,7 @@ resolution-markers = [
     "python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
 ]
 dependencies = [
-    { name = "torch", version = "2.8.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "extra == 'group-13-whisper-local-cu128'" },
+    { name = "torch", version = "2.8.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "extra == 'group-15-kirinuki-studio-cu128'" },
 ]
 wheels = [
     { url = "https://download-r2.pytorch.org/whl/cu128/torchaudio-2.8.0%2Bcu128-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:145b8a0c21cfcaa1705c67173c5d439087e0e120d5da9bc344746f937901d243", upload-time = "2025-08-05T20:12:07Z" },
@@ -3464,7 +3531,7 @@ resolution-markers = [
     "python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
 ]
 dependencies = [
-    { name = "torch", version = "2.8.0+rocm6.4", source = { registry = "https://download.pytorch.org/whl/rocm6.4" }, marker = "extra == 'group-13-whisper-local-rocm'" },
+    { name = "torch", version = "2.8.0+rocm6.4", source = { registry = "https://download.pytorch.org/whl/rocm6.4" }, marker = "extra == 'group-15-kirinuki-studio-rocm'" },
 ]
 wheels = [
     { url = "https://download-r2.pytorch.org/whl/rocm6.4/torchaudio-2.8.0%2Brocm6.4-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:c1ff4ec4f3db80fe7a7403e0171ce9712e61193ccf0128d4c1e160336c4a303f", upload-time = "2025-08-05T20:12:11Z" },
@@ -3515,9 +3582,9 @@ dependencies = [
     { name = "lightning-utilities" },
     { name = "numpy" },
     { name = "packaging" },
-    { name = "torch", version = "2.8.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "extra == 'group-13-whisper-local-cu128'" },
-    { name = "torch", version = "2.8.0+rocm6.4", source = { registry = "https://download.pytorch.org/whl/rocm6.4" }, marker = "extra == 'group-13-whisper-local-rocm'" },
-    { name = "torch", version = "2.13.0", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (extra != 'group-13-whisper-local-cu128' and extra != 'group-13-whisper-local-rocm')" },
+    { name = "torch", version = "2.8.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "extra == 'group-15-kirinuki-studio-cu128'" },
+    { name = "torch", version = "2.8.0+rocm6.4", source = { registry = "https://download.pytorch.org/whl/rocm6.4" }, marker = "extra == 'group-15-kirinuki-studio-rocm'" },
+    { name = "torch", version = "2.13.0", source = { registry = "https://pypi.org/simple" }, marker = "(extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (extra != 'group-15-kirinuki-studio-cu128' and extra != 'group-15-kirinuki-studio-rocm')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/81/34/39b8b749333db56c0585d7a11fa62a283c087bb1dfc897d69fb8cedbefb1/torchmetrics-1.9.0.tar.gz", hash = "sha256:a488609948600df52d3db4fcdab02e62aab2a85ef34da67037dc3e65b8512faa", size = 581765, upload-time = "2026-03-09T17:41:22.443Z" }
 wheels = [
@@ -3529,7 +3596,7 @@ name = "tqdm"
 version = "4.70.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
+    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/21/3b/6c24bec5be5e743ffd99576daa5cc077722fc7d5bbc00bd133fa0c698dc6/tqdm-4.70.0.tar.gz", hash = "sha256:55b0b0dbd97462d06ebee91e4dac24ed4d4702be82b24f07e6c1d27e08cea220", size = 795438, upload-time = "2026-07-27T11:33:15.271Z" }
 wheels = [
@@ -3578,7 +3645,7 @@ version = "0.27.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "annotated-doc" },
-    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
+    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
     { name = "rich" },
     { name = "shellingham" },
 ]
@@ -3644,7 +3711,7 @@ standard = [
     { name = "httptools" },
     { name = "python-dotenv" },
     { name = "pyyaml" },
-    { name = "uvloop", marker = "(platform_python_implementation != 'PyPy' and sys_platform != 'cygwin' and sys_platform != 'win32') or (platform_python_implementation == 'PyPy' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (sys_platform == 'cygwin' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm') or (sys_platform == 'win32' and extra == 'group-13-whisper-local-cu128' and extra == 'group-13-whisper-local-rocm')" },
+    { name = "uvloop", marker = "(platform_python_implementation != 'PyPy' and sys_platform != 'cygwin' and sys_platform != 'win32') or (platform_python_implementation == 'PyPy' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform == 'cygwin' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm') or (sys_platform == 'win32' and extra == 'group-15-kirinuki-studio-cu128' and extra == 'group-15-kirinuki-studio-rocm')" },
     { name = "watchfiles" },
     { name = "websockets" },
 ]
@@ -3854,73 +3921,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/f1/2c/9d9c1da5a7ea9af307b386d25f64d1dead4729644198d2b92e36db5dfd41/websockets-17.0.1-cp314-cp314t-win_amd64.whl", hash = "sha256:bb31f42ea095ea826463c770829aa188a86c9a5c976b1467cbbf583c811de833", size = 213094, upload-time = "2026-07-31T11:31:15.367Z" },
     { url = "https://files.pythonhosted.org/packages/5b/24/a585e7573e128070605d003b5544729bcd58d9756c7e99d550818ca4b916/websockets-17.0.1-cp314-cp314t-win_arm64.whl", hash = "sha256:dbfae8e75b342e31fc6fd1a8bbb393b7cbb91d6cfd581650300a94381e7b7e2b", size = 213009, upload-time = "2026-07-31T11:31:16.776Z" },
     { url = "https://files.pythonhosted.org/packages/09/ce/3929538b2b9918f5eee623fbf3346893973191f6df93f19bbda097bd7bb7/websockets-17.0.1-py3-none-any.whl", hash = "sha256:c6be9cba65c65cc76dfa3d4619e359ff02a4476c74e179b215236c11a0b32345", size = 206718, upload-time = "2026-07-31T11:31:26.037Z" },
-]
-
-[[package]]
-name = "whisper-local"
-version = "0.4.0"
-source = { virtual = "." }
-dependencies = [
-    { name = "fastapi" },
-    { name = "faster-whisper" },
-    { name = "huggingface-hub" },
-    { name = "openai-whisper" },
-    { name = "opencv-python-headless" },
-    { name = "pyannote-audio" },
-    { name = "pydantic-settings" },
-    { name = "python-multipart" },
-    { name = "requests" },
-    { name = "sherpa-onnx" },
-    { name = "sse-starlette" },
-    { name = "transformers" },
-    { name = "uvicorn", extra = ["standard"] },
-]
-
-[package.dev-dependencies]
-cu128 = [
-    { name = "torch", version = "2.8.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" } },
-    { name = "torchaudio", version = "2.8.0+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" } },
-]
-dev = [
-    { name = "httpx" },
-    { name = "pytest" },
-]
-rocm = [
-    { name = "pytorch-triton-rocm" },
-    { name = "torch", version = "2.8.0+rocm6.4", source = { registry = "https://download.pytorch.org/whl/rocm6.4" } },
-    { name = "torchaudio", version = "2.8.0+rocm6.4", source = { registry = "https://download.pytorch.org/whl/rocm6.4" } },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "fastapi", specifier = ">=0.115" },
-    { name = "faster-whisper", specifier = ">=1.1.0" },
-    { name = "huggingface-hub", specifier = "<1.0" },
-    { name = "openai-whisper", specifier = ">=20240930" },
-    { name = "opencv-python-headless", specifier = ">=4.10,<5" },
-    { name = "pyannote-audio", specifier = ">=3.3,<4" },
-    { name = "pydantic-settings", specifier = ">=2.6" },
-    { name = "python-multipart", specifier = ">=0.0.20" },
-    { name = "requests", specifier = ">=2.31" },
-    { name = "sherpa-onnx", specifier = ">=1.13" },
-    { name = "sse-starlette", specifier = ">=2.1" },
-    { name = "transformers", specifier = ">=4.44" },
-    { name = "uvicorn", extras = ["standard"], specifier = ">=0.32" },
-]
-
-[package.metadata.requires-dev]
-cu128 = [
-    { name = "torch", specifier = "==2.8.*", index = "https://download.pytorch.org/whl/cu128", conflict = { package = "whisper-local", group = "cu128" } },
-    { name = "torchaudio", specifier = "==2.8.*", index = "https://download.pytorch.org/whl/cu128", conflict = { package = "whisper-local", group = "cu128" } },
-]
-dev = [
-    { name = "httpx", specifier = ">=0.28" },
-    { name = "pytest", specifier = ">=8.3" },
-]
-rocm = [
-    { name = "pytorch-triton-rocm", index = "https://download.pytorch.org/whl/rocm6.4", conflict = { package = "whisper-local", group = "rocm" } },
-    { name = "torch", specifier = "==2.8.*", index = "https://download.pytorch.org/whl/rocm6.4", conflict = { package = "whisper-local", group = "rocm" } },
-    { name = "torchaudio", specifier = "==2.8.*", index = "https://download.pytorch.org/whl/rocm6.4", conflict = { package = "whisper-local", group = "rocm" } },
 ]
 
 [[package]]

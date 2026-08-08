@@ -196,7 +196,7 @@ export function Home() {
 
   return (
     <main className="mx-auto max-w-3xl space-y-4 p-6">
-      <h1 className="text-xl font-bold">Attention Subtitle Separate Application</h1>
+      <h1 className="text-xl font-bold">KirinukiStudio</h1>
 
       <CreateProjectForm />
 
