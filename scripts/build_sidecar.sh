@@ -18,6 +18,21 @@ BUILD_DIR="${KS_BUILD_DIR:-build}"
 VENV="$BUILD_DIR/sidecar-venv"
 OUT="frontend/src-tauri/kirinuki-studio-backend"
 
+# Windowsのvenvは bin/ ではなく Scripts/ で、実行ファイルに .exe が付く
+case "$(uname -s)" in
+  MINGW* | MSYS* | CYGWIN*)
+    VENV_BIN="$VENV/Scripts"
+    EXE=".exe"
+    ;;
+  *)
+    VENV_BIN="$VENV/bin"
+    EXE=""
+    ;;
+esac
+
+# PyInstallerはネイティブのパス表記を要求する(git bashの /d/... は解釈できない)
+REPO_ROOT="$(pwd -W 2>/dev/null || pwd)"
+
 echo "=== 配布用の仮想環境を作る(torchなし) ==="
 mkdir -p "$BUILD_DIR"
 rm -rf "$VENV"
@@ -34,11 +49,11 @@ VIRTUAL_ENV="$VENV" uv pip install -q -r "$BUILD_DIR/requirements.txt" pyinstall
 echo "=== 1ファイルに固める ==="
 # --collect-all: 動的importで拾えない同梱データ(ONNXの共有ライブラリ、
 # ctranslate2のバイナリ、opencvのカスケードxml)を取りこぼさないため
-"$VENV/bin/pyinstaller" \
+"$VENV_BIN/pyinstaller$EXE" \
   --noconfirm --clean --onefile \
   --name kirinuki-studio-backend \
   --distpath "$BUILD_DIR/dist" --workpath "$BUILD_DIR/work" --specpath "$BUILD_DIR" \
-  --paths "$PWD" \
+  --paths "$REPO_ROOT" \
   --collect-submodules backend \
   --collect-all sherpa_onnx \
   --collect-all ctranslate2 \
@@ -49,13 +64,13 @@ echo "=== 1ファイルに固める ==="
   --hidden-import uvicorn.protocols.websockets.websockets_impl \
   scripts/sidecar_main.py
 
-cp "$BUILD_DIR/dist/kirinuki-studio-backend" "$OUT"
+cp "$BUILD_DIR/dist/kirinuki-studio-backend$EXE" "$OUT$EXE"
 # Tauriのサイドカーはターゲットトリプル付きの名前を要求する。
 # インストール後は実行ファイルの隣にトリプル無しの名前で置かれるので、
 # backend.rs の sidecar_path() がそのまま拾える
 # rustupは ~/.cargo/bin に入る。呼び出し元のPATH設定に依存しない
 export PATH="$HOME/.cargo/bin:$PATH"
 TRIPLE="$(rustc -vV | sed -n 's/^host: //p')"
-cp "$OUT" "$OUT-$TRIPLE"
-echo "=== できました: $OUT ($(du -h "$OUT" | cut -f1)) ==="
-echo "    Tauri用: $OUT-$TRIPLE"
+cp "$OUT$EXE" "$OUT-$TRIPLE$EXE"
+echo "=== できました: $OUT$EXE ($(du -h "$OUT$EXE" | cut -f1)) ==="
+echo "    Tauri用: $OUT-$TRIPLE$EXE"

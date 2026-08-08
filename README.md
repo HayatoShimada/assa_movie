@@ -35,7 +35,7 @@ LLMはローカル(Ollama)とクラウド(Gemini API)を切り替え可能。ロ
 
 | 項目 | 要件 |
 |---|---|
-| OS | Ubuntu 22.04+ (Windowsは未対応・v1.0で対応予定) |
+| OS | Ubuntu 24.04+ / macOS 11+ (Apple Silicon) / Windows 10+ |
 | GPU | NVIDIA GPU(CUDA 12.x)または AMD GPU(ROCm 6.4+。RX 7900系で検証)。VRAM 8GB以上推奨 |
 | Python | 3.12(uvが自動で管理) |
 | Node.js | 20以上(フロントエンド用) |
@@ -54,7 +54,7 @@ LLMはローカル(Ollama)とクラウド(Gemini API)を切り替え可能。ロ
 
 | OS | ファイル | 備考 |
 |---|---|---|
-| Ubuntu / Debian | `.deb` | `sudo apt install ./KirinukiStudio_*.deb` |
+| Ubuntu / Debian | `.deb` | `sudo apt install ./KirinukiStudio_*.deb`(24.04以降) |
 | Linux(その他) | `.AppImage` | `chmod +x` して実行 |
 | macOS | `.dmg` | Apple Silicon 向け。初回は右クリック →「開く」 |
 | Windows | `.msi` または `.exe` | |
