@@ -133,8 +133,8 @@ uv run python resolve_pronouns.py 動画 --form annotate  # 指示語の注釈�
 cd frontend && npm run gen:api   # バックエンドAPIを変えたら型を再生成
 ```
 
-設計ドキュメント: [DESIGN.md](DESIGN.md)(概要)/ [BACKEND_DESIGN.md](BACKEND_DESIGN.md) /
-[FRONTEND_DESIGN.md](FRONTEND_DESIGN.md) / [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md)(進捗)。
+設計ドキュメント: [DESIGN.md](docs/DESIGN.md)(概要)/ [BACKEND_DESIGN.md](docs/BACKEND_DESIGN.md) /
+[FRONTEND_DESIGN.md](docs/FRONTEND_DESIGN.md) / [IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md)(進捗)。
 AIで開発を続ける場合の規約は [CLAUDE.md](CLAUDE.md)。
 
 ## 既知の制限(今後の予定)

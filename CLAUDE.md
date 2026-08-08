@@ -1,8 +1,8 @@
 # CLAUDE.md
 
-このリポジトリでAIがコードを書くときの規約。設計書は [DESIGN.md](DESIGN.md) /
-[BACKEND_DESIGN.md](BACKEND_DESIGN.md) / [FRONTEND_DESIGN.md](FRONTEND_DESIGN.md) /
-[IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md)。**迷ったら設計書が正**。
+このリポジトリでAIがコードを書くときの規約。設計書は [DESIGN.md](docs/DESIGN.md) /
+[BACKEND_DESIGN.md](docs/BACKEND_DESIGN.md) / [FRONTEND_DESIGN.md](docs/FRONTEND_DESIGN.md) /
+[IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md)。**迷ったら設計書が正**。
 
 ## これは何か
 
