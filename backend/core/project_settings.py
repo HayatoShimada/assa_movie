@@ -28,11 +28,12 @@ MUTABLE_FIELDS = {
     "convert_method",
     "llm_provider", "ollama_model", "gemini_model", "claude_model",
     "vram_budget_mb",
+    "setup_completed",
 }
 
 # プロジェクト単位で上書きできる項目。
-# VRAM割当はマシン全体の資源なのでプロジェクト単位化しない
-PROJECT_OVERRIDABLE = set(MUTABLE_FIELDS) - {"vram_budget_mb"}
+# VRAM割当と初回セットアップの完了はマシン全体の状態なのでプロジェクト単位化しない
+PROJECT_OVERRIDABLE = set(MUTABLE_FIELDS) - {"vram_budget_mb", "setup_completed"}
 
 
 def project_overrides(conn: sqlite3.Connection, project_id: int) -> dict:

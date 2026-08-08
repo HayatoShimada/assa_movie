@@ -8,6 +8,7 @@ import { execFileSync } from 'node:child_process'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import openapiTS, { astToString } from 'openapi-typescript'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(here, '../..')
@@ -35,7 +36,14 @@ async function fetchSchema() {
 }
 
 const schema = await fetchSchema()
-writeFileSync(schemaFile, schema)
+writeFileSync(schemaFile, schema) // 中身を確かめたいとき用に残す
 mkdirSync(dirname(outFile), { recursive: true })
-execFileSync('npx', ['openapi-typescript', schemaFile, '-o', outFile], { stdio: 'inherit' })
+
+// CLIではなくNode APIを使い、スキーマをオブジェクトのまま渡す。
+// CLIに渡すとファイルパスをURLに変換する過程で、非ASCIIを含むパス
+// (例: OneDrive\ドキュメント)が壊れてENOENTになる。またWindowsでは
+// npxの実体が npx.cmd で、Node 20以降はシェル無しに起動できない(EINVAL)。
+// オブジェクトを直接渡せば、パスもシェルも介さない
+const ast = await openapiTS(JSON.parse(schema))
+writeFileSync(outFile, astToString(ast))
 console.log(`生成しました: ${outFile}`)

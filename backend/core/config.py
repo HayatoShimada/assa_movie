@@ -80,6 +80,11 @@ class Settings(BaseSettings):
     # 入力と出力の向きが違うときの変換方式。クリップ単位でも上書き可能
     convert_method: str = "blur_pad"  # crop | blur_pad | face
 
+    # ---- 初回セットアップ ----
+    # 初回起動時のウィザードを済ませたか。専用のファイルやテーブルを増やさず
+    # 設定として持つ(設定タブから「やり直す」でfalseに戻せる)
+    setup_completed: bool = False
+
     # ---- LLM ----
     llm_provider: str = "ollama"  # ollama | gemini | claude
     ollama_url: str = "http://localhost:11434/api/chat"
