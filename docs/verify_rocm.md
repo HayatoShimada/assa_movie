@@ -59,6 +59,39 @@ speed は transformers がわずかに速いが、**句読点が出ないため�
 効かず**、単語確率も無いためフィラー自動判定のシグナルが1つ欠ける。
 機能が揃う openai-whisper を ROCm の既定にしている。
 
+### whisper.cpp(hipBLAS)の検証結果 ※採用は保留
+
+同じ音源・同じ large-v3 で比較した(2026-08-08)。**速度は明確に速いが、
+このアプリが必要とする情報をCLIから同時に取り出せない**ため採用を見送っている。
+
+| 条件 | 速度(実時間比) | 句読点 | 単語TS | 単語確率 |
+|---|---|---|---|---|
+| 既定(greedy) | 18.5倍 | **なし** | なし | なし |
+| `-bs 5 --prompt`(公式版と同条件) | **11.6倍** | **あり(41/41)** | なし | なし |
+| `-bs 5 -dtw large.v3 -ml 1` | 14.9倍 | **なし** | あり(1.5文字) | JSONに出ない |
+| (参考)openai-whisper | 4.4倍 | あり | あり | **あり** |
+
+- **速度は openai-whisper の約2.6倍**(75分の動画なら約17分→約6.5分)
+- しかし単語タイムスタンプを得る `-ml 1` を付けると**句読点が消える**。
+  字幕の文末分割に句読点が要るので、CLI経由では両立できない
+- `--print-confidence` は端末出力の着色のみで、JSONに確率は含まれない
+  (フィラー判定は単語確率をシグナルに使う)
+- 両立させるにはC API(pywhispercpp等)で組み込む必要があり、
+  外部バイナリとggml版モデル(2.9GB)の管理も増える
+
+ビルド手順(再現用):
+
+```bash
+sudo apt install cmake
+# ROCm 6.2時代の rocprofiler-register が残っているとリンクに失敗する
+#   undefined reference to `rocprofiler_register_error_string'
+sudo apt install rocprofiler-register   # 7.2系に更新する
+git clone --depth 1 https://github.com/ggml-org/whisper.cpp && cd whisper.cpp
+HIPCXX="$(hipconfig -l)/clang" HIP_PATH="$(hipconfig -R)" \
+  cmake -S . -B build -DGGML_HIP=ON -DAMDGPU_TARGETS=gfx1100 -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j 20
+```
+
 ### その他
 
 - 話者分離(pyannote): GPU実行でCPU比 約2.8倍(MIOpen迂回)
