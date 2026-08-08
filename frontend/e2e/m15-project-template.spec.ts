@@ -43,6 +43,7 @@ test('プロジェクト設定: 編集パネルで上書き→既定に戻す', 
   await page
     .getByTestId(`project-${seed.project_id}-convert-method`)
     .selectOption('face')
+  await page.getByTestId(`project-settings-save-${seed.project_id}`).click()
 
   await expect
     .poll(async () => {
@@ -53,6 +54,7 @@ test('プロジェクト設定: 編集パネルで上書き→既定に戻す', 
 
   // 既定に戻すと差分から消える
   await page.getByRole('button', { name: '既定に戻す' }).click()
+  await page.getByTestId(`project-settings-save-${seed.project_id}`).click()
   await expect
     .poll(async () => {
       const p = await (await request.get(`${API}/api/projects/${seed.project_id}`)).json()

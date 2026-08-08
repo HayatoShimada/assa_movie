@@ -13,17 +13,26 @@ import { ReviewTab } from '../components/edits/ReviewTab'
 import { ExportTab } from '../components/export/ExportTab'
 import { QuestionsTab } from '../components/questions/QuestionsTab'
 import { SettingsForm } from '../components/settings/SettingsForm'
+import {
+  ClipIcon,
+  ExportIcon,
+  QuestionIcon,
+  ReviewIcon,
+  SettingsIcon,
+  TranscriptIcon,
+} from '../components/icons'
 import { Button } from '../components/ui'
 import { navigate } from '../hooks/useHashRoute'
 import { usePlayback } from '../stores/playback'
 
 type Tab = 'transcript' | 'review' | 'questions' | 'clips' | 'export' | 'settings'
 
+/** 未処理件数。アイコンの右上に小さく重ねる */
 function Badge({ count }: { count: number }) {
   if (count === 0) return null
   return (
-    <span className="ml-1 rounded-full bg-blue-600 px-1.5 text-xs font-semibold text-white">
-      {count}
+    <span className="absolute -right-1.5 -top-1 min-w-4 rounded-full bg-blue-600 px-1 text-[10px] font-semibold leading-4 text-white">
+      {count > 99 ? '99+' : count}
     </span>
   )
 }
@@ -69,13 +78,18 @@ export function Editor({ mediaId }: { mediaId: number }) {
   const openQuestions = (questions.data ?? []).length
   const selectedSegment = (segments.data ?? []).find((s) => s.id === selectedSegmentId)
 
-  const tabs: { key: Tab; label: string; badge: number }[] = [
-    { key: 'transcript', label: 'トランスクリプト', badge: 0 },
-    { key: 'review', label: 'レビュー', badge: proposedCount },
-    { key: 'questions', label: '質問', badge: openQuestions },
-    { key: 'clips', label: 'クリップ', badge: 0 },
-    { key: 'export', label: '書き出し', badge: 0 },
-    { key: 'settings', label: '設定', badge: 0 },
+  const tabs: {
+    key: Tab
+    label: string
+    badge: number
+    Icon: (p: { className?: string }) => React.ReactElement
+  }[] = [
+    { key: 'transcript', label: '文字起こし', badge: 0, Icon: TranscriptIcon },
+    { key: 'review', label: 'レビュー', badge: proposedCount, Icon: ReviewIcon },
+    { key: 'questions', label: '質問', badge: openQuestions, Icon: QuestionIcon },
+    { key: 'clips', label: 'クリップ', badge: 0, Icon: ClipIcon },
+    { key: 'export', label: '書き出し', badge: 0, Icon: ExportIcon },
+    { key: 'settings', label: '設定', badge: 0, Icon: SettingsIcon },
   ]
 
   return (
@@ -110,28 +124,35 @@ export function Editor({ mediaId }: { mediaId: number }) {
                 key={t.key}
                 type="button"
                 data-testid={`tab-${t.key}`}
+                title={t.label}
+                aria-label={t.label}
+                aria-current={tab === t.key ? 'page' : undefined}
                 onClick={() => setTab(t.key)}
-                className={`px-3 py-2 text-sm ${
+                // アイコンの下にラベルを置いて折り返しを防ぐ(横並びだと日本語が2行になる)
+                className={`flex flex-1 flex-col items-center gap-0.5 whitespace-nowrap border-b-2 px-1 py-1.5 text-[11px] transition-colors ${
                   tab === t.key
-                    ? 'border-b-2 border-blue-600 font-semibold'
-                    : 'text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200'
+                    ? 'border-blue-600 font-semibold text-blue-700 dark:text-blue-300'
+                    : 'border-transparent text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 dark:hover:bg-neutral-900 dark:hover:text-neutral-200'
                 }`}
               >
+                <span className="relative">
+                  <t.Icon className="h-5 w-5" />
+                  <Badge count={t.badge} />
+                </span>
                 {t.label}
-                <Badge count={t.badge} />
               </button>
             ))}
-            {tab === 'transcript' && (
-              <label className="ml-auto flex items-center gap-1 px-3 text-xs text-neutral-500">
-                <input
-                  type="checkbox"
-                  checked={showAizuchi}
-                  onChange={(e) => setShowAizuchi(e.target.checked)}
-                />
-                相槌を表示
-              </label>
-            )}
           </nav>
+          {tab === 'transcript' && (
+            <label className="flex items-center justify-end gap-1 border-b border-neutral-200 px-3 py-1 text-xs text-neutral-500 dark:border-neutral-800">
+              <input
+                type="checkbox"
+                checked={showAizuchi}
+                onChange={(e) => setShowAizuchi(e.target.checked)}
+              />
+              相槌を表示
+            </label>
+          )}
 
           <div className="flex min-h-0 flex-1 flex-col">
             {tab === 'transcript' && (

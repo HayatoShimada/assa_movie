@@ -81,6 +81,11 @@ test('設定タブでASRモデルを切り替えると保存される', async ({
   // 標準語化の注意書きが表示される
   await expect(page.getByText(/標準語化/)).toBeVisible()
 
+  // 保存するまでは下書き。保存ボタンで確定する
+  await expect(page.getByTestId('settings-save-status')).toHaveText('未保存の変更があります')
+  await page.getByTestId('settings-save').click()
+  await expect(page.getByTestId('settings-save-status')).toHaveText('保存しました')
+
   // リロードしても保持されている(バックエンドに保存された)
   await page.reload()
   await page.getByRole('button', { name: '設定' }).click()
@@ -98,6 +103,7 @@ test('設定タブで字幕サイズを調整すると保存される', async ({
   const slider = page.getByTestId('setting-subtitle-font-size')
   await slider.fill('62')
   await slider.dispatchEvent('mouseup')
+  await page.getByTestId('settings-save').click()
 
   await expect
     .poll(async () => {

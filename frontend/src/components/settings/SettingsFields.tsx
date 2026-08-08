@@ -8,7 +8,11 @@
 import { useQuery } from '@tanstack/react-query'
 import { api, machineQueryOptions, type SettingsResponse } from '../../api/client'
 import { CONVERT_METHOD_LABELS } from '../../lib/catalogs'
+import { BASE_RES_X } from '../../lib/subtitleLayout'
 import { selectCls } from '../ui'
+
+/** これ未満は縦動画(1080px幅)で1桁pxになり読めない(1920px幅基準の値) */
+const MIN_READABLE_FONT_SIZE = 20
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -44,6 +48,8 @@ export function SettingsFields({
   const v = values
   const set = (key: string) => (value: unknown) => onSet(key, value)
   const asrNote = meta.asr_models.find((m) => m.id === v.asr_model)?.note
+  // 字幕サイズは1920px幅基準の値。実際の見え方は「画面幅の何%か」で決まる
+  const fontRatioPct = (Number(v.subtitle_font_size ?? 48) / BASE_RES_X) * 100
 
   // Ollamaモデル: インストール済み(VRAM目安付き)+レジストリの推奨候補
   const installed = env.data?.ollama_options ?? []
@@ -247,19 +253,27 @@ export function SettingsFields({
             {resetBtn('subtitle_font_family')}
           </span>
         </Row>
-        <Row label={`字幕サイズ: ${v.subtitle_font_size}px(1920px幅基準)`}>
+        <Row
+          label={`字幕サイズ: ${v.subtitle_font_size}px(画面幅の${fontRatioPct.toFixed(1)}%)`}
+        >
           <input
             data-testid={`${idPrefix}-subtitle-font-size`}
             type="range"
-            min={6}
-            max={72}
+            // 値は1920px幅基準。これ未満は縦動画(1080px幅)で数pxになり読めない
+            min={MIN_READABLE_FONT_SIZE}
+            max={96}
             step={1}
-            defaultValue={Number(v.subtitle_font_size ?? 48)}
-            onMouseUp={(e) =>
-              set('subtitle_font_size')(Number((e.target as HTMLInputElement).value))
-            }
+            value={Number(v.subtitle_font_size ?? 48)}
+            onChange={(e) => set('subtitle_font_size')(Number(e.target.value))}
           />
         </Row>
+        {Number(v.subtitle_font_size ?? 48) < MIN_READABLE_FONT_SIZE && (
+          <p data-testid={`${idPrefix}-subtitle-font-size-warning`} className="text-xs text-amber-600">
+            ⚠ 小さすぎます。書き出すと縦動画で約
+            {Math.round((Number(v.subtitle_font_size) * 1080) / 1920)}px になり、ほぼ見えません。
+            {MIN_READABLE_FONT_SIZE}以上にしてください。
+          </p>
+        )}
         <Row label="文字色">
           <span className="flex items-center gap-1">
             <input
