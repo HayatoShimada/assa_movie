@@ -59,9 +59,15 @@ sudo apt install ./KirinukiStudio_0.9.0_amd64.deb
 アプリメニューに **KirinukiStudio** が登録されます。AppImageもあります
 (`chmod +x` して実行)。データは `~/.local/share/kirinuki-studio/` に作られます。
 
-初回起動後、設定タブの「セットアップ」から話者分離モデル(76MB)を取得してください。
-AMD GPUをお使いなら、`./dev.sh whispercpp` でwhisper.cppを用意すると
-文字起こしが約3倍速くなります(ビルドが要るのでアプリからは入れられません)。
+初回起動後、設定タブの「セットアップ」から次を取得してください。
+
+| | 大きさ | 効果 |
+|---|---|---|
+| 話者分離モデル | 76MB | 話者を自動で見分けます |
+| 高速な文字起こし | 3.1GB | 文字起こしが数倍速くなります |
+
+本体(whisper.cpp)はアプリに同梱済みです。GPUドライバのVulkanで動くので、
+AMD・NVIDIA・Intelのどれでも追加の準備は要りません。
 
 **Windowsは未対応です**(v1.0.0で対応予定)。
 

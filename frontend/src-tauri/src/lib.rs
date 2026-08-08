@@ -45,22 +45,26 @@ pub fn injection_script(api_base: &str) -> String {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let mut server = match Backend::spawn(&exe_dir(), &dev_repo_root()) {
-        Ok(server) => server,
-        Err(e) => {
-            eprintln!("バックエンドを起動できませんでした: {e}");
-            std::process::exit(1);
-        }
-    };
-    if !server.wait_until_ready() {
-        eprintln!("バックエンドが応答しません(上のログを確認してください)");
-        std::process::exit(1);
-    }
-    let api_base = server.api_base();
-    println!("バックエンド起動: {api_base}");
-
     tauri::Builder::default()
         .setup(move |app| {
+            // 同梱物(whisper.cpp)の置き場所はパッケージ形式で変わる。
+            // .debなら /usr/lib/KirinukiStudio、AppImageなら展開先。
+            // 自分で組み立てず、Tauriに聞いてバックエンドへ渡す
+            let resource_dir = app.path().resource_dir().ok();
+            let mut server = match Backend::spawn(&exe_dir(), &dev_repo_root(), resource_dir) {
+                Ok(server) => server,
+                Err(e) => {
+                    eprintln!("バックエンドを起動できませんでした: {e}");
+                    std::process::exit(1);
+                }
+            };
+            if !server.wait_until_ready() {
+                eprintln!("バックエンドが応答しません(上のログを確認してください)");
+                std::process::exit(1);
+            }
+            let api_base = server.api_base();
+            println!("バックエンド起動: {api_base}");
+
             // Backendを保持させることで、アプリ終了時のDropでPythonも確実に止まる
             app.manage(server);
             WebviewWindowBuilder::new(app, "main", WebviewUrl::default())

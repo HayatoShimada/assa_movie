@@ -15,6 +15,7 @@
 ./dev.sh              # バックエンド(8000)+フロント(5173)を起動
 ./dev.sh app          # デスクトップアプリ(Tauri)として起動
 ./dev.sh package      # 配布用の .deb / AppImage を作る
+                      # (tauri build 単体ではPythonサイドカーが再ビルドされない)
 ./dev.sh check        # コミット前の全チェック(pytest + typecheck + lint + vitest + build)
 ./dev.sh e2e          # E2E(FakeLLM・一時DBなのでGPUもOllamaも不要)
 

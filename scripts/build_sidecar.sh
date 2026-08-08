@@ -7,6 +7,10 @@
 #
 #   ./scripts/build_sidecar.sh
 #   → frontend/src-tauri/kirinuki-studio-backend
+#
+# 注意: `tauri build` はこのバイナリを再ビルドしない。Pythonを変えたら
+# 必ずこれを回すこと(`./dev.sh package` は両方やる)。忘れると古いAPIが
+# 入ったまま配布され、新しい画面から404が返る。
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -49,6 +53,8 @@ cp "$BUILD_DIR/dist/kirinuki-studio-backend" "$OUT"
 # Tauriのサイドカーはターゲットトリプル付きの名前を要求する。
 # インストール後は実行ファイルの隣にトリプル無しの名前で置かれるので、
 # backend.rs の sidecar_path() がそのまま拾える
+# rustupは ~/.cargo/bin に入る。呼び出し元のPATH設定に依存しない
+export PATH="$HOME/.cargo/bin:$PATH"
 TRIPLE="$(rustc -vV | sed -n 's/^host: //p')"
 cp "$OUT" "$OUT-$TRIPLE"
 echo "=== できました: $OUT ($(du -h "$OUT" | cut -f1)) ==="

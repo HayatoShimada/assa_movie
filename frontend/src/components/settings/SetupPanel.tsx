@@ -9,6 +9,11 @@ import { useState } from 'react'
 import { api, subscribeJob, type SetupItem } from '../../api/client'
 import { Button } from '../ui'
 
+/** 3.1GBを「3100MB」と出すと大きさが伝わらない */
+function formatSize(mb: number): string {
+  return mb >= 1024 ? `${(mb / 1024).toFixed(1)}GB` : `${mb}MB`
+}
+
 function Item({ id, item }: { id: string; item: SetupItem }) {
   const queryClient = useQueryClient()
   const [progress, setProgress] = useState<number | null>(null)
@@ -47,7 +52,7 @@ function Item({ id, item }: { id: string; item: SetupItem }) {
           data-testid={`setup-state-${id}`}
           className={item.ready ? 'text-xs text-green-700 dark:text-green-400' : 'text-xs text-neutral-500'}
         >
-          {item.ready ? '準備できています' : `未取得(約${item.size_mb}MB)`}
+          {item.ready ? '準備できています' : `未取得(約${formatSize(item.size_mb)})`}
         </span>
       </div>
       <p className="mt-1 text-xs text-neutral-500">{item.note}</p>

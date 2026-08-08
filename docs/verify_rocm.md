@@ -129,8 +129,12 @@ Windows対応の下調べ。**Vulkanで実用速度が出るなら、ベンダ�
 
 | | 実時間比 | 300秒音源の所要 | ROCm依存 | 配布サイズ(共有ライブラリ) |
 |---|---|---|---|---|
-| HIP (`GGML_HIP=ON`) | **18.6倍** | 16.1秒 | **あり**(hipblas / rocblas / amdhip64 / rocsolver) | 215MB + ROCm本体 |
-| Vulkan (`GGML_VULKAN=ON`) | 16.2倍 | 18.5秒 | **なし**(`libvulkan.so.1` のみ) | **976KB** |
+| HIP (`GGML_HIP=ON`) | **18.6倍** | 16.1秒 | **あり**(hipblas / rocblas / amdhip64 / rocsolver) | 215MB + ROCm本体(rocblasだけで644MB) |
+| Vulkan (`GGML_VULKAN=ON`) | 16.2倍 | 18.5秒 | **なし**(`libvulkan.so.1` のみ) | **44MB**(静的リンクなら43MBの1ファイル) |
+
+> 当初この表に「976KB」と書いていたのは誤り。`du` がシンボリックリンク自体の
+> サイズを数えていた(`-L` を付けずに `libggml*.so.0` を指定していた)。
+> 実体は `libggml-vulkan.so` が40MBあり、Vulkanシェーダを埋め込むぶん大きい。
 
 **速度差は13%しかなく、配布のしやすさは桁違いに違う。**
 Vulkan版は `ldd` でROCmのライブラリを一切引かない。GPUドライバに付いてくる
@@ -163,9 +167,10 @@ cmake --build build-vulkan -j "$(nproc)"
 
 1. **Windows対応はVulkan 1本で足りる見込み。** AMD/NVIDIA/Intelを1ビルドで賄え、
    HIP SDK for Windows は不要になる
-2. **whisper.cppをアプリに同梱できる。** 976KBならM28で「ビルドが要るので
-   アプリからは入れられない」とした制限が消える(現状のggmlモデル3.1GBの
-   ダウンロードは別途必要)
+2. **whisper.cppをアプリに同梱できる。** 44MB(静的なら1ファイル43MB)なら、
+   M28で「ビルドが要るのでアプリからは入れられない」とした制限が消える。
+   Pythonサイドカーが207MBあるので、それに比べれば十分小さい
+   (ggmlモデル3.1GBのダウンロードは別途必要)
 3. Linuxで最速を求めるならHIP版が13%速い。既存の `./dev.sh whispercpp` は
    HIP版のままでよい
 

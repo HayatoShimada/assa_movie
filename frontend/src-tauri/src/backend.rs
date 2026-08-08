@@ -103,9 +103,17 @@ pub struct Backend {
 }
 
 impl Backend {
-    pub fn spawn(exe_dir: &Path, repo_root: &Path) -> std::io::Result<Self> {
+    pub fn spawn(
+        exe_dir: &Path,
+        repo_root: &Path,
+        resource_dir: Option<PathBuf>,
+    ) -> std::io::Result<Self> {
         let port = free_port()?;
         let mut cmd = build_command(exe_dir, repo_root, port);
+        // 同梱したwhisper.cppの探索先(backend/engines/asr/whispercpp.py が読む)
+        if let Some(dir) = resource_dir {
+            cmd.env("KS_RESOURCE_DIR", dir);
+        }
         // ログはシェルの標準出力にそのまま流す(起動失敗の原因が見えるように)
         cmd.stdout(Stdio::inherit()).stderr(Stdio::inherit());
         kill_with_parent(&mut cmd);

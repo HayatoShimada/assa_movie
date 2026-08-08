@@ -27,6 +27,10 @@ EMBEDDING_URL = (
     "3dspeaker_speech_eres2netv2_sv_zh-cn_16k-common.onnx"
 )
 DIARIZATION_SIZE_MB = 76
+WHISPERCPP_MODEL_URL = (
+    "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3.bin"
+)
+WHISPERCPP_SIZE_MB = 3100
 # 分離モデルの取得が全体の何割か(残りが埋め込みモデル。実サイズの比率に合わせる)
 SEGMENTATION_SHARE = 0.1
 
@@ -81,6 +85,27 @@ def fetch_diarization_models(progress) -> None:
         shutil.rmtree(staging, ignore_errors=True)
 
 
+def fetch_whispercpp_model(progress) -> None:
+    """whisper.cpp用のggmlモデル(3.1GB)を取得する。取得済みなら何もしない。
+
+    完了してから所定の場所に置く。中途半端なファイルが残ると
+    `is_available()` が「使える」と誤判定してしまう。
+    """
+    model = whispercpp.resolve_model()
+    if model.is_file():
+        progress(1.0)
+        return
+
+    model.parent.mkdir(parents=True, exist_ok=True)
+    staging = model.with_suffix(model.suffix + ".part")
+    try:
+        download(WHISPERCPP_MODEL_URL, staging, progress)
+        staging.replace(model)
+        progress(1.0)
+    finally:
+        staging.unlink(missing_ok=True)
+
+
 def status() -> dict:
     """セットアップの状態(設定タブのセットアップパネル用)"""
     return {
@@ -92,16 +117,30 @@ def status() -> dict:
             "note": "話者を自動で見分けます。無くても文字起こしはできます。",
         },
         "whispercpp": {
-            "label": "whisper.cpp(高速なASR)",
+            "label": "高速な文字起こし(whisper.cpp)",
             "ready": whispercpp.is_available(),
-            "size_mb": 3100,
-            # hipccでのビルドが要るのでアプリからは入れられない
-            "installable": False,
-            "note": "AMD GPUで最速のASRです。`./dev.sh whispercpp` でビルドしてください。",
+            "size_mb": WHISPERCPP_SIZE_MB,
+            # バイナリが無ければモデルだけ3.1GB落としても使えないので取得させない
+            "installable": whispercpp.resolve_binary() is not None,
+            "note": _whispercpp_note(),
         },
     }
+
+
+def _whispercpp_note() -> str:
+    if whispercpp.resolve_binary() is None:
+        return (
+            "本体が見つかりません。`./dev.sh whispercpp` でビルドすると、"
+            "文字起こしが数倍速くなります。"
+        )
+    return "文字起こしが数倍速くなります。モデルが大きいので時間がかかります。"
 
 
 @register("setup_diarization")
 def run_setup_diarization(conn, media_id, params, progress) -> None:
     fetch_diarization_models(progress)
+
+
+@register("setup_whispercpp")
+def run_setup_whispercpp(conn, media_id, params, progress) -> None:
+    fetch_whispercpp_model(progress)

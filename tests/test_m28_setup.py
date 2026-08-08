@@ -36,10 +36,9 @@ def test_取得済みなら準備済みと返る(client, models):
 
 
 def test_whispercppの状態も返す(client, models):
-    """ROCmで最速のASR。ビルドが要るのでアプリからは取得できない"""
     body = client.get("/api/setup").json()
     assert "whispercpp" in body
-    assert body["whispercpp"]["installable"] is False
+    assert body["whispercpp"]["size_mb"] > 0
 
 
 def test_話者分離モデルはアプリから取得できる(client, models):
@@ -118,6 +117,75 @@ def test_取得を開始するとジョブが積まれる(client, models):
     assert client.get(f"/api/jobs/{body['id']}").status_code == 200
 
 
-def test_アプリから取得できない項目は404(client, models):
-    assert client.post("/api/setup/whispercpp").status_code == 404
+def test_知らない項目は404(client, models):
     assert client.post("/api/setup/unknown").status_code == 404
+
+
+# ---- whisper.cpp モデルの取得(同梱バイナリがあるときだけ) ----
+@pytest.fixture
+def whispercpp(monkeypatch, tmp_path):
+    from backend.engines.asr import whispercpp as wc
+
+    monkeypatch.setattr(wc, "DEFAULT_HOME", tmp_path)
+    monkeypatch.setattr(wc, "bundled_dir", lambda: tmp_path / "app")
+    return wc
+
+
+def place_whispercpp_binary(wc):
+    path = wc.bundled_dir() / "bin" / "whisper-cli"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("#!/bin/sh\n")
+    path.chmod(0o755)
+    return path
+
+
+def test_バイナリが無ければモデルは取得させない(client, models, whispercpp):
+    """モデルだけ3.1GB落としても使えない。無駄なダウンロードをさせない"""
+    body = client.get("/api/setup").json()
+    assert body["whispercpp"]["installable"] is False
+
+
+def test_同梱バイナリがあればモデルを取得できる(client, models, whispercpp):
+    place_whispercpp_binary(whispercpp)
+    body = client.get("/api/setup").json()
+    assert body["whispercpp"]["installable"] is True
+    assert body["whispercpp"]["ready"] is False   # モデルがまだ無い
+
+
+def test_モデルが揃えば準備済みになる(client, models, whispercpp):
+    place_whispercpp_binary(whispercpp)
+    model = whispercpp.resolve_model()
+    model.parent.mkdir(parents=True, exist_ok=True)
+    model.write_bytes(b"x")
+    assert client.get("/api/setup").json()["whispercpp"]["ready"] is True
+
+
+def test_モデル取得ジョブが登録されている():
+    from backend.jobs.queue import _HANDLERS
+
+    assert "setup_whispercpp" in _HANDLERS
+
+
+def test_モデル取得は途中で失敗しても壊れたファイルを残さない(whispercpp, monkeypatch):
+    place_whispercpp_binary(whispercpp)
+
+    def broken(url, dest, progress):
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(b"partial")
+        raise RuntimeError("回線が切れた")
+
+    monkeypatch.setattr(setup_job, "download", broken)
+    with pytest.raises(RuntimeError):
+        setup_job.fetch_whispercpp_model(lambda p: None)
+    assert not whispercpp.resolve_model().exists()
+
+
+def test_モデル取得済みなら何もしない(whispercpp, monkeypatch):
+    place_whispercpp_binary(whispercpp)
+    model = whispercpp.resolve_model()
+    model.parent.mkdir(parents=True, exist_ok=True)
+    model.write_bytes(b"x")
+    called = []
+    monkeypatch.setattr(setup_job, "download", lambda *a: called.append(1))
+    setup_job.fetch_whispercpp_model(lambda p: None)
+    assert called == []

@@ -199,8 +199,8 @@ def build_app():
     model_dir = Path(tempfile.mkdtemp(prefix="ks-e2e-models-"))
     onnx.DEFAULT_SEGMENTATION = model_dir / "seg" / "model.onnx"
     onnx.DEFAULT_EMBEDDING = model_dir / "embedding.onnx"
-    whispercpp.DEFAULT_BINARY = model_dir / "bin" / "whisper-cli"
-    whispercpp.DEFAULT_MODEL = model_dir / "models" / "ggml-large-v3.bin"
+    whispercpp.DEFAULT_HOME = model_dir
+    whispercpp.bundled_dir = lambda: model_dir
 
     app.include_router(router)
     resolve_job.set_client_factory(lambda: FakeLLMClient(responses=_fake_llm))

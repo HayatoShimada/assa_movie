@@ -14,6 +14,7 @@ RX 7900 XTX実測で実時間比11.6倍(公式Whisperの約2.6倍)。
 import json
 import logging
 import os
+import sys
 import subprocess
 import tempfile
 import wave
@@ -30,14 +31,54 @@ logger = logging.getLogger(__name__)
 SAMPLE_RATE = 16000
 # 置き場所は backend/core/paths.py が決める(旧名のキャッシュがあればそれを使う)
 DEFAULT_HOME = Path(os.environ.get("KS_WHISPERCPP_HOME") or cache_dir())
-DEFAULT_BINARY = DEFAULT_HOME / "bin/whisper-cli"
-DEFAULT_MODEL = DEFAULT_HOME / "models/ggml-large-v3.bin"
+MODEL_NAME = "ggml-large-v3.bin"
 # 長さ0のトークン(句読点など)に与える最小表示時間(秒)
 MIN_TOKEN_DURATION = 0.02
 
 
-def is_available(binary: Path = DEFAULT_BINARY, model: Path = DEFAULT_MODEL) -> bool:
-    """実行可能なバイナリとモデルが揃っているか"""
+def bundled_dir() -> Path:
+    """配布版に同梱したバイナリの置き場所。
+
+    同梱物の実際の場所はパッケージ形式で変わる(.debなら
+    /usr/lib/KirinukiStudio、AppImageなら展開先)。自分で組み立てず、
+    Tauriシェルが KS_RESOURCE_DIR で教えてくれた場所を使う
+    (frontend/src-tauri/src/lib.rs)。開発中は実行ファイルの隣を見る。
+    """
+    resource_dir = os.environ.get("KS_RESOURCE_DIR", "").strip()
+    return Path(resource_dir) if resource_dir else Path(sys.executable).parent
+
+
+def resolve_model() -> Path:
+    """ggml版モデルの置き場所。
+
+    DEFAULT_HOME から都度導く。import時に固定すると、テストやE2Eで
+    DEFAULT_HOME を差し替えてもモデルだけ本物を指したままになる。
+    """
+    return DEFAULT_HOME / "models" / MODEL_NAME
+
+
+def resolve_binary() -> Path | None:
+    """使うwhisper-cliを決める。見つからなければNone。
+
+    自分でビルドしたもの(`./dev.sh whispercpp`)を優先する。配布版が同梱するのは
+    Vulkanビルドで、HIPビルドの方が13%速い(docs/verify_rocm.md)。
+    わざわざビルドした人の意図を尊重する。
+    """
+    for candidate in (DEFAULT_HOME / "bin/whisper-cli", bundled_dir() / "bin/whisper-cli"):
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return candidate
+    return None
+
+
+def is_available(binary: Path | None = None, model: Path | None = None) -> bool:
+    """実行可能なバイナリとモデルが揃っているか。
+
+    引数を省くと解決結果を使う(同梱・自前ビルドのどちらでも動くように)。
+    """
+    binary = binary or resolve_binary()
+    model = model or resolve_model()
+    if binary is None:
+        return False
     return binary.is_file() and os.access(binary, os.X_OK) and model.is_file()
 
 
@@ -99,13 +140,15 @@ class WhisperCppEngine:
 
     def __init__(
         self,
-        binary: Path = DEFAULT_BINARY,
-        model: Path = DEFAULT_MODEL,
+        binary: Path | None = None,
+        model: Path | None = None,
         beam_size: int = 5,
         runner=None,  # テスト用の差し替え口
     ):
-        self.binary = Path(binary)
-        self.model = Path(model)
+        # import時ではなく生成時に解決する(同梱バイナリは後から置かれうる)
+        resolved = binary or resolve_binary()
+        self.binary = Path(resolved) if resolved else None
+        self.model = Path(model or resolve_model())
         self.beam_size = beam_size
         self._runner = runner
 

@@ -170,7 +170,7 @@ def get_setup_status() -> dict:
 
 
 # アプリから取得できるもの(画面のIDとジョブ種別の対応)
-SETUP_JOBS = {"diarization": "setup_diarization"}
+SETUP_JOBS = {"diarization": "setup_diarization", "whispercpp": "setup_whispercpp"}
 
 
 @router.post("/setup/{item}")

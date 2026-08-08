@@ -30,7 +30,10 @@ case "${1:-all}" in
   package)
     # Pythonを1ファイルに固めてからTauriでパッケージする。
     # 配布物にtorchは入れない(scripts/build_sidecar.sh 参照)
+    # cargo/rustcはrustupの既定の場所に入る
+    export PATH="$HOME/.cargo/bin:$PATH"
     ./scripts/build_sidecar.sh
+    ./scripts/build_whispercpp_vulkan.sh
     cd frontend && exec npm run app:build
     ;;
   app)
