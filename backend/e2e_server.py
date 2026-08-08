@@ -124,6 +124,10 @@ def reset(request: Request) -> dict:
     from backend.api import license_api
 
     license_api.key_path().unlink(missing_ok=True)
+    from backend.api import keys_api
+
+    for provider in keys_api.PROVIDERS:
+        keys_api.key_path(provider).unlink(missing_ok=True)
     return {"status": "reset"}
 
 
@@ -180,6 +184,12 @@ def build_app():
     license_api.PUBLIC_KEY = lic.public_key_to_text(_E2E_ISSUER.public_key())
     license_dir = Path(tempfile.mkdtemp(prefix="ks-e2e-license-"))
     license_api.key_path = lambda: license_dir / "license.key"
+
+    # APIキーも一時ディレクトリへ(開発機の本物のキーを読まない・書き換えない)
+    from backend.api import keys_api
+
+    key_dir = Path(tempfile.mkdtemp(prefix="ks-e2e-keys-"))
+    keys_api.key_path = lambda provider: key_dir / f"{provider}.txt"
 
     app.include_router(router)
     resolve_job.set_client_factory(lambda: FakeLLMClient(responses=_fake_llm))

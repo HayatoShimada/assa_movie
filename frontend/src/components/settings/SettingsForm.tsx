@@ -7,6 +7,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api } from '../../api/client'
 import type { SettingsValues } from '../../lib/settings'
+import { ApiKeysPanel } from './ApiKeysPanel'
 import { EnvironmentPanel } from './EnvironmentPanel'
 import { LicensePanel } from './LicensePanel'
 import { SaveBar } from './SaveBar'
@@ -34,6 +35,7 @@ export function SettingsForm() {
     <div className="p-4">
       <LicensePanel />
       <EnvironmentPanel />
+      <ApiKeysPanel />
       <p className="mb-2 text-xs text-neutral-500">
         全体設定。新規プロジェクトの既定値になります(プロジェクト単位で上書き可能)。
       </p>

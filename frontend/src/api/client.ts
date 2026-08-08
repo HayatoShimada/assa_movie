@@ -133,6 +133,14 @@ export const api = {
   updateSettings: (patch: Record<string, unknown>) =>
     request<SettingsResponse>('/api/settings', { method: 'PATCH', body: JSON.stringify(patch) }),
   getFonts: () => request<{ fonts: string[] }>('/api/fonts'),
+  getApiKeys: () => request<Record<string, ApiKeyStatus>>('/api/keys'),
+  registerApiKey: (provider: string, key: string) =>
+    request<Record<string, ApiKeyStatus>>(`/api/keys/${provider}`, {
+      method: 'PUT',
+      body: JSON.stringify({ key }),
+    }),
+  deleteApiKey: (provider: string) =>
+    request<Record<string, ApiKeyStatus>>(`/api/keys/${provider}`, { method: 'DELETE' }),
   getLicense: () => request<LicenseStatus>('/api/license'),
   registerLicense: (key: string) =>
     request<LicenseStatus>('/api/license', { method: 'POST', body: JSON.stringify({ key }) }),
@@ -147,6 +155,15 @@ export const api = {
  * パネルを開くたびに再スキャンしない(変わる操作の後は明示的にinvalidateする)。
  */
 export const machineQueryOptions = { staleTime: Infinity } as const
+
+export interface ApiKeyStatus {
+  label: string
+  configured: boolean
+  /** キーの出所。「環境変数」なら画面からは消せない */
+  source: string | null
+  /** 末尾4文字だけ(全文は返さない) */
+  hint: string | null
+}
 
 export interface LicenseStatus {
   status: 'valid' | 'grace' | 'expired' | 'invalid' | 'missing'

@@ -81,12 +81,16 @@ class Settings(BaseSettings):
     convert_method: str = "blur_pad"  # crop | blur_pad | face
 
     # ---- LLM ----
-    llm_provider: str = "ollama"  # ollama | gemini
+    llm_provider: str = "ollama"  # ollama | gemini | claude
     ollama_url: str = "http://localhost:11434/api/chat"
     ollama_model: str = "qwen3:32b"
     gemini_model: str = "gemini-3.5-flash"
     gemini_key_file: Path = Field(
         default_factory=lambda: paths.config_file("gemini_api_key.txt")
+    )
+    claude_model: str = "claude-opus-5"
+    claude_key_file: Path = Field(
+        default_factory=lambda: paths.config_file("claude_api_key.txt")
     )
     llm_chunk_size: int = 30
     llm_context_size: int = 15

@@ -26,7 +26,7 @@ MUTABLE_FIELDS = {
     "subtitle_font_family", "subtitle_text_color", "subtitle_speaker_colors",
     "subtitle_bg", "subtitle_bg_color", "subtitle_bg_opacity",
     "convert_method",
-    "llm_provider", "ollama_model", "gemini_model",
+    "llm_provider", "ollama_model", "gemini_model", "claude_model",
     "vram_budget_mb",
 }
 

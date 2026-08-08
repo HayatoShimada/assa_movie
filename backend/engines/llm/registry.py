@@ -1,8 +1,11 @@
-"""LLMプロバイダの選択。ローカル(Ollama)とクラウド(Gemini)を切り替える。"""
+"""LLMプロバイダの選択。ローカル(Ollama)とクラウド(Gemini / Claude)を切り替える。"""
 
 from dataclasses import dataclass
 
 from backend.engines.llm.base import LLMClient
+from backend.engines.llm.claude import DEFAULT_MODEL as CLAUDE_DEFAULT
+from backend.engines.llm.claude import ClaudeClient
+from backend.engines.llm.claude import load_api_key as load_claude_key
 from backend.engines.llm.gemini import DEFAULT_MODEL as GEMINI_DEFAULT
 from backend.engines.llm.gemini import GeminiClient, load_api_key
 from backend.engines.llm.ollama import OllamaClient
@@ -32,6 +35,13 @@ PROVIDERS: dict[str, ProviderInfo] = {
         models=("gemini-3.5-flash", "gemini-3.5-pro", "gemini-3.6-flash"),
         note="高精度・高速ですが、文字起こしがGoogleに送信されます。APIキーが必要です。",
     ),
+    "claude": ProviderInfo(
+        id="claude",
+        label="Claude API(クラウド)",
+        local=False,
+        models=("claude-opus-5", "claude-sonnet-5", "claude-haiku-4-5"),
+        note="日本語の文脈判断が得意ですが、文字起こしがAnthropicに送信されます。APIキーが必要です。",
+    ),
 }
 
 
@@ -47,6 +57,19 @@ def build_client(settings) -> LLMClient:
         return OllamaClient(
             url=settings.ollama_url,
             model=settings.ollama_model,
+            retries=settings.llm_retries,
+        )
+
+    if provider == "claude":
+        api_key = load_claude_key(settings.claude_key_file)
+        if not api_key:
+            raise ValueError(
+                "Claude APIキーが設定されていません。設定タブで登録するか、"
+                "環境変数 ANTHROPIC_API_KEY を設定してください。"
+            )
+        return ClaudeClient(
+            api_key=api_key,
+            model=settings.claude_model or CLAUDE_DEFAULT,
             retries=settings.llm_retries,
         )
 

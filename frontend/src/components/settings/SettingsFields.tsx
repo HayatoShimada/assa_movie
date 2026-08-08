@@ -455,6 +455,22 @@ export function SettingsFields({
             </select>
           </Row>
         )}
+        {v.llm_provider === 'claude' && (
+          <Row label="Claudeモデル">
+            <select
+              data-testid={`${idPrefix}-claude-model`}
+              className={selectCls}
+              value={String(v.claude_model ?? '')}
+              onChange={(e) => set('claude_model')(e.target.value)}
+            >
+              {(meta.llm_providers.find((p) => p.id === 'claude')?.models ?? []).map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </Row>
+        )}
         <p className="text-xs text-neutral-500">
           {meta.llm_providers.find((p) => p.id === v.llm_provider)?.note}
         </p>

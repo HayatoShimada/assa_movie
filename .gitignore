@@ -43,3 +43,4 @@ exports/
 # Tauri(Rustのビルド成果物。デバッグビルドで約4GB)
 frontend/src-tauri/target/
 frontend/src-tauri/gen/
+claude_api_key.txt

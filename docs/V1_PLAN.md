@@ -182,12 +182,32 @@ base64url文字列そのものにした。JSONを正規化する必要がなく�
 **機能制限(未登録なら閲覧のみ)は未実装。** 開発中のこの環境まで止めてしまうため、
 どこで線を引くかは配布形態が決まるM28で入れる。現状は状態を出すところまで。
 
-### M27: APIキー設定(Gemini / Claude)
+### M27: APIキー設定 + Claudeプロバイダ ✅ 完了(疎通確認ボタンのみ未実装)
 
-- 設定画面から入力し、資格情報ストアに保存(現行の `gemini_api_key.txt` は移行して廃止)
-- **Claude(Anthropic)をLLMプロバイダとして追加**。既存の `PROVIDERS` に足す
-  (`backend/engines/llm/registry.py`。実装前に `claude-api` スキルを読むこと)
-- キーの疎通確認ボタン(1回だけ最小のリクエストを投げて成否を出す)
+- `backend/engines/llm/claude.py` — Anthropic公式SDK経由。構造化出力
+  (`output_config.format`)でJSON Schemaをそのまま渡せるので、Ollama・Geminiと
+  同じ `complete_json` の形に収まる
+- `backend/api/keys_api.py` + `ApiKeysPanel.tsx` — 設定画面からキーを登録・削除
+
+**Claude実装で押さえた点**(`claude-api` スキルより):
+
+- 既定モデルは `claude-opus-5`
+- **`max_tokens` は「思考+本文」の合計にかかる。** Claudeは既定で思考するので、
+  本文だけを見て詰めると途中で切れる(16000確保)
+- **拒否(`stop_reason: "refusal"`)は成功応答で返る。** 本文を読む前に確認しないと
+  空配列を正常な結果として扱ってしまう。再試行しても同じなのでその場で伝える
+- 構造化出力は全objectに `additionalProperties: false` が要る(`to_strict_schema`)
+- チャンクごとに何十回も呼ぶため、effortは既定のhighではなくmedium
+
+**キーの扱い**: この端末の設定ディレクトリに 0600 で置くだけ。画面には
+「登録済みかどうか」と末尾4文字しか返さない。環境変数のキーはファイルより優先される
+ため、どちらが効いているかを画面に出す(消せるのはファイル側だけ)。
+
+**あわせて直したもの**: 設定APIの `llm_providers[].ready` が、どのクラウド
+プロバイダでもGeminiのキーだけを見ていた。プロバイダごとに判定するようにした。
+
+**疎通確認ボタンは未実装。** 実際に課金の発生するリクエストを投げるので、
+どのモデル・どの内容で投げるかを決めてから入れる。
 
 ### M28: インストーラーとOS登録
 

@@ -16,7 +16,7 @@ from backend.core.project_settings import MUTABLE_FIELDS, save_global_overrides
 from backend.engines.asr.registry import ENGINES, MODELS
 from backend.engines.diarize.registry import ENGINES as DIARIZE_ENGINES
 from backend.engines.diarize.registry import resolve_engine as resolve_diarize_engine
-from backend.engines.llm.gemini import load_api_key
+from backend.api.keys_api import provider_ready
 from backend.engines.llm.registry import PROVIDERS
 
 router = APIRouter(prefix="/api", tags=["settings"])
@@ -134,7 +134,8 @@ def get_settings_api() -> dict:
                 "id": p.id, "label": p.label, "local": p.local,
                 "models": list(p.models), "note": p.note,
                 # クラウドは鍵が無いと使えないのでUIで事前に案内できるようにする
-                "ready": p.local or bool(load_api_key(settings.gemini_key_file)),
+                # (プロバイダごとに別のキーを見る)
+                "ready": p.local or provider_ready(p.id),
             }
             for p in PROVIDERS.values()
         ],
