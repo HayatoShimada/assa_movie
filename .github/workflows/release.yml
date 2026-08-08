@@ -54,7 +54,14 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
+      # Tauriの依存クレートは毎回同じ。キャッシュしないと毎回ゼロからコンパイルする
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: frontend/src-tauri
+
       - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
 
       - name: フロントエンドの依存
         working-directory: frontend
@@ -68,6 +75,14 @@ jobs:
       # macOSはMetal(Apple純正・追加の依存なし)、LinuxはVulkan。
       # WindowsはVulkan SDKの導入が要るので、まずは同梱せずに出す
       # (faster-whisperで動く。docs/verify_rocm.md の比較を参照)
+      # Vulkanのシェーダ生成が重い(Linuxで実測2分半)。commitが変わるまで使い回す
+      - name: whisper.cppのビルドキャッシュ
+        if: matrix.os != 'windows-latest'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/kirinuki-studio/src/whisper.cpp
+          key: whispercpp-${{ matrix.os }}-${{ hashFiles('scripts/build_whispercpp.sh') }}
+
       - name: whisper.cppを同梱(Linux/macOS)
         if: matrix.os != 'windows-latest'
         shell: bash

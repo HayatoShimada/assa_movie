@@ -23,7 +23,10 @@ tauri = { version = "2", features = [] }
 libc = "0.2"
 
 [profile.release]
-# 配布サイズを削る(Pythonの同梱分が大きいので、シェル側は絞れるだけ絞る)
+# 配布サイズを削る。実測(依存クレートがコンパイル済みの状態):
+#   lto有り 36.6秒 / 3.2MB、lto無し 34.7秒 / 4.5MB
+# 差は2秒なので残す。ビルドが遅いのはltoではなくキャッシュ不在が原因だった
+# (CIは Swatinem/rust-cache で依存を使い回す)
 opt-level = "s"
 lto = true
 codegen-units = 1

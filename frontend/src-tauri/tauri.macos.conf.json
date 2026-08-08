@@ -1,0 +1,7 @@
+{
+  "bundle": {
+    "resources": {
+      "resources/bin/whisper-cli": "bin/whisper-cli"
+    }
+  }
+}

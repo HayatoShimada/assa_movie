@@ -18,7 +18,14 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": [
+      "deb",
+      "appimage",
+      "app",
+      "dmg",
+      "msi",
+      "nsis"
+    ],
     "externalBin": [
       "kirinuki-studio-backend"
     ],
@@ -38,9 +45,6 @@
           "ffmpeg"
         ]
       }
-    },
-    "resources": {
-      "resources/bin/whisper-cli": "bin/whisper-cli"
     },
     "macOS": {
       "minimumSystemVersion": "11.0"
