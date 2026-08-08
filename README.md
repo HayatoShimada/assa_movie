@@ -1,7 +1,7 @@
 # KirinukiStudio
 
 対談・イベント動画から **文字起こし → 話者分離 → 指示語の解決 → 字幕生成 → 切り抜き動画作成** までを、
-すべてローカルGPUで行うアプリケーションです。バージョン **0.9.5**。
+すべてローカルGPUで行うアプリケーションです。バージョン **0.9.6**。
 
 <https://github.com/HayatoShimada/assa_movie>
 
@@ -81,7 +81,8 @@ LLMはローカル(Ollama)とクラウド(Gemini API)を切り替え可能。ロ
 | 高速な文字起こし | 3.1GB | 文字起こしが数倍速くなります |
 
 高速な文字起こしの本体(whisper.cpp)はアプリに同梱済みです。
-LinuxはVulkan、macOSはMetalで動くので、GPUの追加設定は要りません。
+Linux・WindowsはVulkan、macOSはMetalで動くので、GPUの追加設定は要りません
+(Vulkanのローダーは各GPUドライバが入れます)。
 
 **書き出しにはffmpegが必要です。** Windows版はアプリに同梱済み(LGPL v2.1。
 使う機能だけに絞ってビルドしたもの)なので追加の作業は要りません。
@@ -191,8 +192,6 @@ AIで開発を続ける場合の規約は [CLAUDE.md](CLAUDE.md)。
 - 顔検出レイアウトは静的クロップ(クリップ内でカメラが大きく動くと追従しない)。
   検出失敗時はぼかし背景に自動フォールバック
 - 複数クリップの一括書き出しUIは未実装
-- Windows版はwhisper.cppを同梱していない(Vulkan SDKの導入が要るため)。
-  faster-whisperで動きます
 - 話者分離は2人の対談に最適化(3人以上は「話者N」表示)
 - ROCm環境ではfaster-whisper(CUDA専用ビルド)が使えないため、
   whisper.cpp(`./dev.sh whispercpp` でビルド。実時間比約11.6倍)か、

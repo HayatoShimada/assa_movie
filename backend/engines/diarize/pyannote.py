@@ -16,6 +16,21 @@ DEFAULT_MODEL = "pyannote/speaker-diarization-3.1"
 Turn = tuple[float, float, str]
 
 
+def is_available() -> bool:
+    """torch と pyannote.audio が入っているか。
+
+    配布物にはtorchを入れていない(11.5GBあるため)ので、インストール版では常にFalse。
+    HFトークンだけを見て「使える」と表示すると、選んだ瞬間に ImportError で落ちる。
+    importはしない(torchのimportは実測5秒かかる)。入っているかだけを見る。
+    """
+    from importlib.util import find_spec
+
+    try:
+        return find_spec("torch") is not None and find_spec("pyannote.audio") is not None
+    except (ImportError, ValueError):
+        return False
+
+
 def load_hf_token(token_file: Path | None = None) -> str | None:
     token = os.environ.get("HF_TOKEN", "").strip()
     if token.startswith("hf_"):

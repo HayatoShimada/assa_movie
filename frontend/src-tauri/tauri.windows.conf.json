@@ -3,11 +3,18 @@
     "resources": {
       "resources/bin/ffmpeg.exe": "bin/ffmpeg.exe",
       "resources/bin/ffprobe.exe": "bin/ffprobe.exe",
+      "resources/bin/whisper-cli.exe": "bin/whisper-cli.exe",
+      "resources/licenses/whispercpp/LICENSE.txt": "licenses/whispercpp/LICENSE.txt",
+      "resources/licenses/whispercpp/VERSION.txt": "licenses/whispercpp/VERSION.txt",
       "resources/licenses/ffmpeg/LICENSE.txt": "licenses/ffmpeg/LICENSE.txt",
       "resources/licenses/ffmpeg/THIRD-PARTY-NOTICES.txt": "licenses/ffmpeg/THIRD-PARTY-NOTICES.txt",
       "resources/licenses/ffmpeg/NOTICE.md": "licenses/ffmpeg/NOTICE.md",
       "resources/licenses/ffmpeg/VERSION.txt": "licenses/ffmpeg/VERSION.txt",
-      "resources/licenses/python/THIRD-PARTY-NOTICES.txt": "licenses/python/THIRD-PARTY-NOTICES.txt"
+      "resources/licenses/python/THIRD-PARTY-NOTICES.txt": "licenses/python/THIRD-PARTY-NOTICES.txt",
+      "resources/models/sherpa-onnx-pyannote-segmentation-3-0/model.onnx": "models/sherpa-onnx-pyannote-segmentation-3-0/model.onnx",
+      "resources/models/speaker-embedding.onnx": "models/speaker-embedding.onnx",
+      "resources/licenses/diarization/LICENSE-segmentation.txt": "licenses/diarization/LICENSE-segmentation.txt",
+      "resources/licenses/diarization/NOTICE.md": "licenses/diarization/NOTICE.md"
     }
   }
 }

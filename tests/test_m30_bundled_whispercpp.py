@@ -22,7 +22,7 @@ def dirs(tmp_path, monkeypatch):
 
 
 def place_binary(directory):
-    path = directory / "bin" / "whisper-cli"
+    path = directory / "bin" / whispercpp.BINARY_NAME
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("#!/bin/sh\n")
     path.chmod(0o755)

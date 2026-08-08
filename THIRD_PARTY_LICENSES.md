@@ -9,7 +9,8 @@ KirinukiStudio 本体は MIT ライセンスです([LICENSE](LICENSE))。
 | コンポーネント | 対象OS | ライセンス | 用途 |
 |---|---|---|---|
 | [FFmpeg](https://ffmpeg.org/) | Windows | LGPL v2.1 | 動画の書き出し・メディア情報の取得 |
-| [whisper.cpp](https://github.com/ggml-org/whisper.cpp) | Linux / macOS | MIT | 高速な文字起こし |
+| [whisper.cpp](https://github.com/ggml-org/whisper.cpp) | Linux / macOS / Windows | MIT | 高速な文字起こし |
+| 話者分離モデル(ONNX) | 全OS | MIT / Apache-2.0 | だれが話しているかの判定 |
 | Python の依存パッケージ | 全OS | MIT / BSD / Apache-2.0 ほか | バックエンド(PyInstallerが取り込む) |
 
 ### FFmpeg (LGPL v2.1)
@@ -30,6 +31,19 @@ KirinukiStudio 本体は MIT ライセンスです([LICENSE](LICENSE))。
 FFmpeg は本体とリンクしておらず、独立した実行ファイルを子プロセスとして
 呼び出しているだけです。差し替えも可能です。
 
+### 話者分離モデル (MIT / Apache-2.0)
+
+発話区間の検出(pyannote segmentation-3.0 を ONNX 化。MIT / CNRS)と、話者の
+特徴量(3D-Speaker eres2netv2 を ONNX 化。Apache-2.0)の2つを同梱しています。
+詳細は [licenses/diarization-NOTICE.md](licenses/diarization-NOTICE.md)。
+
+配布物には PyTorch を入れていないため、torch を使う pyannote エンジンは
+インストール版では動きません。ONNX が唯一使えるエンジンなので、モデルを
+同梱しないと話者分離がまったく使えなくなります。
+
+取得は [scripts/fetch_diarization_models.sh](scripts/fetch_diarization_models.sh)
+(Windows は `.ps1`)。インストール後は `licenses/diarization/` に入ります。
+
 ### Python の依存パッケージ
 
 バックエンドは PyInstaller で1つの実行ファイルに固めるため、依存パッケージが
@@ -42,8 +56,15 @@ FFmpeg は本体とリンクしておらず、独立した実行ファイルを�
 
 ### whisper.cpp (MIT)
 
-Linux版・macOS版に `whisper-cli` を同梱しています(`scripts/build_whispercpp.sh` が
-ソースから作ります)。MIT ライセンスなので、著作権表示とライセンス文の同梱で足ります。
+3OSすべてに `whisper-cli` を同梱しています。ソースからビルドします
+(Linux・macOS は [scripts/build_whispercpp.sh](scripts/build_whispercpp.sh)、
+Windows は [scripts/build_whispercpp.ps1](scripts/build_whispercpp.ps1))。
+
+バックエンドはOSで変えています。Linux・Windows は **Vulkan**、macOS は **Metal**。
+Vulkanのローダー(`vulkan-1.dll` 等)はGPUドライバが提供するため、同梱物には含みません。
+
+MIT ライセンスなので著作権表示とライセンス文の同梱で足ります。インストール後は
+`licenses/whispercpp/` に入ります(ビルドしたコミットも `VERSION.txt` に記録)。
 
 ## 同梱していないもの
 

@@ -14,6 +14,7 @@ RX 7900 XTX実測で実時間比11.6倍(公式Whisperの約2.6倍)。
 import json
 import logging
 import os
+import platform
 import sys
 import subprocess
 import tempfile
@@ -32,6 +33,9 @@ SAMPLE_RATE = 16000
 # 置き場所は backend/core/paths.py が決める(旧名のキャッシュがあればそれを使う)
 DEFAULT_HOME = Path(os.environ.get("KS_WHISPERCPP_HOME") or cache_dir())
 MODEL_NAME = "ggml-large-v3.bin"
+# Windowsの実行ファイルには .exe が付く。付けずに探すと同梱してあっても
+# 見つからず、黙って遅いエンジンに落ちる(サイドカーで同じ間違いをしている)
+BINARY_NAME = "whisper-cli.exe" if platform.system() == "Windows" else "whisper-cli"
 # 長さ0のトークン(句読点など)に与える最小表示時間(秒)
 MIN_TOKEN_DURATION = 0.02
 
@@ -64,7 +68,7 @@ def resolve_binary() -> Path | None:
     Vulkanビルドで、HIPビルドの方が13%速い(docs/verify_rocm.md)。
     わざわざビルドした人の意図を尊重する。
     """
-    for candidate in (DEFAULT_HOME / "bin/whisper-cli", bundled_dir() / "bin/whisper-cli"):
+    for candidate in (DEFAULT_HOME / "bin" / BINARY_NAME, bundled_dir() / "bin" / BINARY_NAME):
         if candidate.is_file() and os.access(candidate, os.X_OK):
             return candidate
     return None

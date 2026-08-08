@@ -52,8 +52,16 @@ JOBS="$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)"
 cmake --build "$BUILD_DIR" -j "$JOBS" --config Release --target whisper-cli
 
 mkdir -p "$(dirname "$OUT")"
-# Windowsは Release/whisper-cli.exe に出る
-cp "$BUILD_DIR/bin/whisper-cli" "$OUT" 2>/dev/null \
-  || cp "$BUILD_DIR/bin/Release/whisper-cli.exe" "$OUT.exe"
-chmod +x "$OUT"
+# Windowsは Release/whisper-cli.exe に出る。出力名も .exe 付きにする
+# (backend/engines/asr/whispercpp.py の BINARY_NAME と一致させる)
+if [ -f "$BUILD_DIR/bin/whisper-cli" ]; then
+  cp "$BUILD_DIR/bin/whisper-cli" "$OUT"
+  chmod +x "$OUT"
+elif [ -f "$BUILD_DIR/bin/Release/whisper-cli.exe" ]; then
+  OUT="$OUT.exe"
+  cp "$BUILD_DIR/bin/Release/whisper-cli.exe" "$OUT"
+else
+  echo "whisper-cli が見つかりません: $BUILD_DIR/bin" >&2
+  exit 1
+fi
 echo "=== できました: $OUT ($(du -h "$OUT" | cut -f1)) ==="

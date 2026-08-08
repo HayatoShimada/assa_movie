@@ -111,7 +111,8 @@ def status() -> dict:
     return {
         "diarization": {
             "label": "話者分離モデル",
-            "ready": onnx.is_available(onnx.DEFAULT_SEGMENTATION, onnx.DEFAULT_EMBEDDING),
+            # 同梱物も探す。配布版はモデルを積んでいるので取得は不要になる
+            "ready": onnx.is_available(),
             "size_mb": DIARIZATION_SIZE_MB,
             "installable": True,
             "note": "話者を自動で見分けます。無くても文字起こしはできます。",

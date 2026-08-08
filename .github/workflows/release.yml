@@ -88,6 +88,44 @@ jobs:
         shell: bash
         run: ./scripts/build_whispercpp.sh
 
+      # WindowsもVulkanで同梱する。AMDのWindows機はROCmが無くCTranslate2も
+      # CUDA専用なので、GPUに載せる方法が実質これだけになる
+      # (実行時に配るDLLは無い。vulkan-1.dllはGPUドライバが入れる)
+      - name: 同梱whisper.cppのキャッシュ(Windows)
+        if: matrix.os == 'windows-latest'
+        id: whispercpp-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            frontend/src-tauri/resources/bin/whisper-cli.exe
+            frontend/src-tauri/resources/licenses/whispercpp
+          key: whispercpp-win-vulkan-${{ hashFiles('scripts/build_whispercpp.ps1') }}
+
+      # ランナー同梱のcmakeとVS付属のcmake(3.31系)は whisper.cpp の configure 中に
+      # 0xC0000409 でクラッシュする(実測)。新しいものを明示的に入れる
+      - name: CMake(Windows)
+        if: matrix.os == 'windows-latest' && steps.whispercpp-cache.outputs.cache-hit != 'true'
+        uses: lukka/get-cmake@latest
+
+      - name: Vulkan SDK(Windows)
+        if: matrix.os == 'windows-latest' && steps.whispercpp-cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          $installer = "$env:RUNNER_TEMP\vulkan_sdk.exe"
+          Invoke-WebRequest "https://sdk.lunarg.com/sdk/download/latest/windows/vulkan_sdk.exe" `
+            -OutFile $installer -UseBasicParsing
+          $root = "$env:RUNNER_TEMP\VulkanSDK"
+          & $installer --root $root --accept-licenses --default-answer --confirm-command install
+          if (-not (Test-Path "$root\Bin\glslc.exe")) { throw "Vulkan SDKの導入に失敗しました" }
+          "VULKAN_SDK=$root" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: whisper.cppをビルドして同梱(Windows)
+        if: matrix.os == 'windows-latest' && steps.whispercpp-cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        # WorkDirを短くするのが要点。vulkan-shaders-genが入れ子の
+        # ExternalProjectを作り、MSBuildの中間ファイルのパスが260文字を超える
+        run: ./scripts/build_whispercpp.ps1 -WorkDir C:\kw
+
       # WindowsにffmpegはOSに入っていない。同梱しないと書き出しができないうえ、
       # tauri.windows.conf.json がresourcesとして要求するのでビルド自体も通らない。
       # 配布ビルドは110MB・GPLなので、使う機能だけに絞って自前でビルドする
@@ -114,6 +152,27 @@ jobs:
         if: matrix.os == 'windows-latest' && steps.ffmpeg-cache.outputs.cache-hit != 'true'
         shell: msys2 {0}
         run: ./scripts/build_ffmpeg.sh
+
+      # 話者分離モデル(77MB)。配布物にtorchを入れていないためpyannoteは動かず、
+      # ONNXが唯一使えるエンジンになる。同梱しないと話者分離が全く使えない
+      - name: 話者分離モデルのキャッシュ
+        id: diarize-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            frontend/src-tauri/resources/models
+            frontend/src-tauri/resources/licenses/diarization
+          key: diarize-models-${{ hashFiles('scripts/fetch_diarization_models.sh', 'licenses/diarization-NOTICE.md') }}
+
+      - name: 話者分離モデルを同梱(Linux/macOS)
+        if: matrix.os != 'windows-latest' && steps.diarize-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: ./scripts/fetch_diarization_models.sh
+
+      - name: 話者分離モデルを同梱(Windows)
+        if: matrix.os == 'windows-latest' && steps.diarize-cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: ./scripts/fetch_diarization_models.ps1
 
       - name: パッケージを作る
         working-directory: frontend

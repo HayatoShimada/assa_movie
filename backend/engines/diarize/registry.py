@@ -27,13 +27,16 @@ def resolve_engine(engine_id: str, has_token: bool = False) -> str | None:
 
     ONNXモデルが未取得なら、HFトークンがある環境に限りpyannoteへ落とす。
     """
+    # pyannoteはトークンだけでなくtorchも要る。配布版はtorchを同梱していないので、
+    # トークンがあっても動かない。見た目だけ選べる状態にしない
+    pyannote_ready = has_token and pyannote.is_available()
     if engine_id == "onnx":
         return "onnx" if onnx.is_available() else None
     if engine_id == "pyannote":
-        return "pyannote" if has_token else None
+        return "pyannote" if pyannote_ready else None
     if onnx.is_available():
         return "onnx"
-    return "pyannote" if has_token else None
+    return "pyannote" if pyannote_ready else None
 
 
 def run_diarization(audio, settings, token: str | None = None) -> tuple[list[Turn], str | None]:

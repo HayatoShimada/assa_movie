@@ -10,6 +10,7 @@
 """
 
 import os
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -19,8 +20,38 @@ from backend.core.paths import cache_dir
 SAMPLE_RATE = 16000
 # 置き場所は backend/core/paths.py が決める(whisper.cppと同じディレクトリ)
 DEFAULT_HOME = Path(os.environ.get("KS_MODELS_HOME") or cache_dir())
-DEFAULT_SEGMENTATION = DEFAULT_HOME / "models/sherpa-onnx-pyannote-segmentation-3-0/model.onnx"
-DEFAULT_EMBEDDING = DEFAULT_HOME / "models/speaker-embedding.onnx"
+SEGMENTATION_REL = "models/sherpa-onnx-pyannote-segmentation-3-0/model.onnx"
+EMBEDDING_REL = "models/speaker-embedding.onnx"
+DEFAULT_SEGMENTATION = DEFAULT_HOME / SEGMENTATION_REL
+DEFAULT_EMBEDDING = DEFAULT_HOME / EMBEDDING_REL
+
+
+def bundled_dir() -> Path:
+    """配布版に同梱したモデルの置き場所。
+
+    場所はパッケージ形式で変わるので自分で組み立てず、Tauriシェルが
+    KS_RESOURCE_DIR で教えてくれた場所を使う(whispercpp.pyと同じ)。
+    """
+    resource_dir = os.environ.get("KS_RESOURCE_DIR", "").strip()
+    return Path(resource_dir) if resource_dir else Path(sys.executable).parent
+
+
+def _resolve(relative: str, downloaded: Path) -> Path:
+    """使うモデルを決める。自分で取得したものを優先し、無ければ同梱物。
+
+    都度解決する。import時に固定すると、テストやE2Eで置き場所を差し替えても
+    本物を指したままになる(whispercpp.resolve_model と同じ理由)。
+    """
+    bundled = bundled_dir() / relative
+    return downloaded if downloaded.is_file() or not bundled.is_file() else bundled
+
+
+def resolve_segmentation() -> Path:
+    return _resolve(SEGMENTATION_REL, DEFAULT_SEGMENTATION)
+
+
+def resolve_embedding() -> Path:
+    return _resolve(EMBEDDING_REL, DEFAULT_EMBEDDING)
 
 # 短すぎる発話・間は区切らない(相槌で細切れになるのを防ぐ)
 MIN_DURATION_ON = 0.3
@@ -30,9 +61,11 @@ Turn = tuple[float, float, str]
 
 
 def is_available(
-    segmentation: Path = DEFAULT_SEGMENTATION, embedding: Path = DEFAULT_EMBEDDING
+    segmentation: Path | None = None, embedding: Path | None = None
 ) -> bool:
-    """必要なモデルが揃っているか"""
+    """必要なモデルが揃っているか(同梱物も含めて探す)"""
+    segmentation = segmentation or resolve_segmentation()
+    embedding = embedding or resolve_embedding()
     return segmentation.is_file() and embedding.is_file()
 
 
@@ -86,8 +119,8 @@ def run_diarization(
     embedding: Path | None = None,
 ) -> list[Turn]:
     """(開始秒, 終了秒, 話者ラベル) のリストを返す(pyannote版と同じ形)"""
-    seg = segmentation or DEFAULT_SEGMENTATION
-    emb = embedding or DEFAULT_EMBEDDING
+    seg = segmentation or resolve_segmentation()
+    emb = embedding or resolve_embedding()
     if not is_available(seg, emb):
         raise RuntimeError(
             f"話者分離モデルが見つかりません({seg} / {emb})。"

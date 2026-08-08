@@ -21,6 +21,8 @@
 
 # Windows
 ./scripts/build_ffmpeg.sh                         # 同梱ffmpegをビルド(MSYS2のmingw64シェル)
+./scripts/build_whispercpp.ps1                    # 同梱whisper.cpp(Vulkan)をビルド
+./scripts/fetch_diarization_models.ps1            # 同梱する話者分離モデルを取得
 ./scripts/verify_windows.ps1 -Installer <path>    # 入れて・起動して・閉じるまで検証
 
 uv run pytest -q                  # バックエンドのテスト

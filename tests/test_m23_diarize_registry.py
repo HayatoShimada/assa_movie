@@ -7,6 +7,16 @@ from backend.core.config import Settings
 from backend.engines.diarize import registry
 
 
+@pytest.fixture(autouse=True)
+def torch_installed(monkeypatch):
+    """pyannoteが動く環境(=torchが入っている)を前提にする。
+
+    ここで固定しないと、torchの有無というテスト環境の都合で結果が変わる。
+    配布版のようにtorchが無い場合の挙動は test_m35_bundled_models.py で見る。
+    """
+    monkeypatch.setattr(registry.pyannote, "is_available", lambda: True)
+
+
 @pytest.fixture
 def no_models(monkeypatch):
     """ONNXモデルが未取得の状態にする"""
