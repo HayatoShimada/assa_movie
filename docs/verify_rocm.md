@@ -118,3 +118,56 @@ cmake --build build -j 20
   (`/etc/default/grub` の GRUB_CMDLINE_LINUX_DEFAULT → `sudo update-grub`)
 - ROCm 6.2 SDK等の追加インストールは不要(torch wheelがランタイム同梱。
   システムROCm 7.2と混ぜるとaptの依存が壊れるため入れないこと)
+
+## whisper.cpp: Vulkan と HIP の比較(2026-08-08 実測)
+
+Windows対応の下調べ。**Vulkanで実用速度が出るなら、ベンダーを問わない
+1つのビルドで済む**ので、まずそれを確かめた(V1_PLAN M28 の `[要検証]`)。
+
+同一機(RX 7900 XTX / RADV)・同一モデル(ggml-large-v3)・同一音源で計測。
+300秒音源を3回ずつ回し、ばらつきは0.1秒以内だった。
+
+| | 実時間比 | 300秒音源の所要 | ROCm依存 | 配布サイズ(共有ライブラリ) |
+|---|---|---|---|---|
+| HIP (`GGML_HIP=ON`) | **18.6倍** | 16.1秒 | **あり**(hipblas / rocblas / amdhip64 / rocsolver) | 215MB + ROCm本体 |
+| Vulkan (`GGML_VULKAN=ON`) | 16.2倍 | 18.5秒 | **なし**(`libvulkan.so.1` のみ) | **976KB** |
+
+**速度差は13%しかなく、配布のしやすさは桁違いに違う。**
+Vulkan版は `ldd` でROCmのライブラリを一切引かない。GPUドライバに付いてくる
+Vulkanローダーだけで動くので、ユーザーにROCm/HIP SDKの導入を求めずに済む。
+
+### 書き起こしの中身
+
+全文の文字単位一致率は**74.1%**(Vulkan 1615文字 / HIP 1409文字)。
+バックエンドが変わると浮動小数点の結果が僅かに変わり、デコードの経路が
+分岐するため完全一致はしない。差分の多くは相槌・フィラー
+(「そうそうそう」「まあ」)で、**Vulkan版の方が多く拾っている**。
+このアプリはフィラーを検出して扱う設計なので不利ではない。
+
+語の取り違え(「余ってる」↔「待ってる」など)も双方にあり、
+正解データが無いためどちらが優れているかは判定していない。
+
+### ビルド手順(Vulkan)
+
+ROCmは不要。HIP版と別ディレクトリに作れば共存できる。
+
+```bash
+sudo apt install libvulkan-dev glslc glslang-tools spirv-headers vulkan-tools
+vulkaninfo --summary | grep deviceName   # GPUが見えるか確認
+cd whisper.cpp
+cmake -S . -B build-vulkan -DGGML_VULKAN=ON -DCMAKE_BUILD_TYPE=Release
+cmake --build build-vulkan -j "$(nproc)"
+```
+
+### この結果の意味
+
+1. **Windows対応はVulkan 1本で足りる見込み。** AMD/NVIDIA/Intelを1ビルドで賄え、
+   HIP SDK for Windows は不要になる
+2. **whisper.cppをアプリに同梱できる。** 976KBならM28で「ビルドが要るので
+   アプリからは入れられない」とした制限が消える(現状のggmlモデル3.1GBの
+   ダウンロードは別途必要)
+3. Linuxで最速を求めるならHIP版が13%速い。既存の `./dev.sh whispercpp` は
+   HIP版のままでよい
+
+**未検証**: NVIDIA/Intel GPUでのVulkan動作(この機にはAMDしかない)、
+Windows上での速度。

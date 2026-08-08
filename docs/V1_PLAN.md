@@ -250,9 +250,14 @@ ffmpeg/VAAPIを検出、新規インストール時のDBが
 `~/.local/share/kirinuki-studio/kirinuki-studio.db` に作られること。
 
 **残り**:
-- Windows: MSI/NSIS。**ROCm は Windows で使えない**ため、
-  NVIDIA(CUDA)/ CPU / whisper.cpp の Vulkan バックエンドから自動選択する
-  (要検証: Vulkan版whisper.cppの速度)。この開発機では検証できない
+- Windows: MSI/NSIS。**whisper.cpp の Vulkan バックエンドで統一する**方針
+  (2026-08-08 実測。docs/verify_rocm.md「Vulkan と HIP の比較」)。
+  HIP比13%遅いだけで、ROCmを一切リンクせず共有ライブラリは976KB。
+  AMD/NVIDIA/Intel を1ビルドで賄えるため、GPUごとにビルドを分けずに済む。
+  976KBならアプリに同梱でき、M28の「ビルドが要るので入れられない」制限も消える。
+  ※以前ここに「ROCm は Windows で使えない」と書いていたのは誤り。
+  AMDは Windows 向け HIP SDK を出しており gfx1100 も対象(Ollama等が利用)。
+  ただし上記の通り Vulkan の方が配布に向くため、HIP SDK は使わない見込み
 - ~~初回起動時のモデル取得の進捗UI~~ ✅ 設定タブに「セットアップ」パネルを追加。
   何が足りていないかを示し、話者分離モデル(76MB)はその場でダウンロードできる
   (既存のジョブキュー+SSEに乗せたので進捗バーが出る)。
