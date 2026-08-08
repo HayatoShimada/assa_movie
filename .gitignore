@@ -44,3 +44,7 @@ exports/
 frontend/src-tauri/target/
 frontend/src-tauri/gen/
 claude_api_key.txt
+
+# サイドカー(PyInstallerの生成物。約200MB)
+build/
+frontend/src-tauri/kirinuki-studio-backend*

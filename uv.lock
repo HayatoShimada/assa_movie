@@ -1236,17 +1236,13 @@ dependencies = [
     { name = "cryptography" },
     { name = "fastapi" },
     { name = "faster-whisper" },
-    { name = "huggingface-hub" },
-    { name = "openai-whisper" },
     { name = "opencv-python-headless" },
-    { name = "pyannote-audio" },
     { name = "pydantic-settings" },
     { name = "python-multipart" },
     { name = "requests" },
     { name = "sherpa-onnx" },
     { name = "sherpa-onnx-core" },
     { name = "sse-starlette" },
-    { name = "transformers" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -1264,6 +1260,12 @@ rocm = [
     { name = "torch", version = "2.8.0+rocm6.4", source = { registry = "https://download.pytorch.org/whl/rocm6.4" } },
     { name = "torchaudio", version = "2.8.0+rocm6.4", source = { registry = "https://download.pytorch.org/whl/rocm6.4" } },
 ]
+torch-engines = [
+    { name = "huggingface-hub" },
+    { name = "openai-whisper" },
+    { name = "pyannote-audio" },
+    { name = "transformers" },
+]
 
 [package.metadata]
 requires-dist = [
@@ -1271,17 +1273,13 @@ requires-dist = [
     { name = "cryptography", specifier = ">=43" },
     { name = "fastapi", specifier = ">=0.115" },
     { name = "faster-whisper", specifier = ">=1.1.0" },
-    { name = "huggingface-hub", specifier = "<1.0" },
-    { name = "openai-whisper", specifier = ">=20240930" },
     { name = "opencv-python-headless", specifier = ">=4.10,<5" },
-    { name = "pyannote-audio", specifier = ">=3.3,<4" },
     { name = "pydantic-settings", specifier = ">=2.6" },
     { name = "python-multipart", specifier = ">=0.0.20" },
     { name = "requests", specifier = ">=2.31" },
     { name = "sherpa-onnx", specifier = "==1.13.4" },
     { name = "sherpa-onnx-core", specifier = "==1.13.4" },
     { name = "sse-starlette", specifier = ">=2.1" },
-    { name = "transformers", specifier = ">=4.44" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32" },
 ]
 
@@ -1298,6 +1296,12 @@ rocm = [
     { name = "pytorch-triton-rocm", index = "https://download.pytorch.org/whl/rocm6.4", conflict = { package = "kirinuki-studio", group = "rocm" } },
     { name = "torch", specifier = "==2.8.*", index = "https://download.pytorch.org/whl/rocm6.4", conflict = { package = "kirinuki-studio", group = "rocm" } },
     { name = "torchaudio", specifier = "==2.8.*", index = "https://download.pytorch.org/whl/rocm6.4", conflict = { package = "kirinuki-studio", group = "rocm" } },
+]
+torch-engines = [
+    { name = "huggingface-hub", specifier = "<1.0" },
+    { name = "openai-whisper", specifier = ">=20240930" },
+    { name = "pyannote-audio", specifier = ">=3.3,<4" },
+    { name = "transformers", specifier = ">=4.44" },
 ]
 
 [[package]]

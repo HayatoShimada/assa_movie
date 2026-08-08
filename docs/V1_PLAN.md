@@ -209,14 +209,52 @@ base64url文字列そのものにした。JSONを正規化する必要がなく�
 **疎通確認ボタンは未実装。** 実際に課金の発生するリクエストを投げるので、
 どのモデル・どの内容で投げるかを決めてから入れる。
 
-### M28: インストーラーとOS登録
+### M28: インストーラーとOS登録(Linux 🚧 / Windows 未着手)
 
-- Linux: `.deb` と AppImage(Tauri が生成)。`.desktop` とアイコンで
-  アプリメニューに登録。`ffmpeg` は依存として宣言
+**配布サイズが 14GB → 644MB になった。** これが一番効いた変更。
+
+| | 開発環境 | 配布物 |
+|---|---|---|
+| .venv | 14GB(torch 11.5GB + triton 0.8GB) | **644MB** |
+| 実行ファイル(PyInstaller) | ― | **207MB**(1ファイル) |
+
+torchを外せた理由は、torchを必要とする実装をどれも使わなくて済むようになったから:
+
+- 話者分離 → ONNX(M23)
+- ASR → ROCmはwhisper.cpp、CUDA/CPUはfaster-whisper(CTranslate2)。どちらもtorch不要
+
+`pyproject.toml` の `[project.dependencies]` からtorch系を外し、
+`[dependency-groups] torch-engines` に移した(dependency-groupは配布物に入らない)。
+開発環境では `default-groups` に入れているので今までどおり比較検証できる。
+
+**GPU検出をtorchから外した。** これが最後の関門だった。torchが無いと
+`detect_accel()` がROCm機でも "cpu" を返し、whisper.cppがあるのに遅いエンジンが
+黙って選ばれる。ベンダーCLIから読むようにした(`backend/core/device.py`):
+
+| | 所要時間 |
+|---|---|
+| torch(子プロセス経由) | 約5秒 |
+| `rocm-smi` / `nvidia-smi` | **約120ms** |
+
+副産物として、torch初期化がGILを握る問題への子プロセス回避策が不要になり、
+pytestの実行時間も42秒→19秒になった。
+
+**やったこと**:
+- `scripts/build_sidecar.sh` — 配布用の仮想環境を作ってPyInstallerで1ファイルに固める
+- `scripts/sidecar_main.py` — 配布版の入口(`--port` だけ受け取る)
+- `tauri.conf.json` の `externalBin` でサイドカーを同梱
+- `./dev.sh package` で .deb / AppImage まで一気に作る
+
+**実機で確認済み**: 固めたバイナリ単体で起動し、ROCm GPU(Navi 31)を検出、
+ffmpeg/VAAPIを検出、新規インストール時のDBが
+`~/.local/share/kirinuki-studio/kirinuki-studio.db` に作られること。
+
+**残り**:
 - Windows: MSI/NSIS。**ROCm は Windows で使えない**ため、
   NVIDIA(CUDA)/ CPU / whisper.cpp の Vulkan バックエンドから自動選択する
-  (要検証: Vulkan版whisper.cppの速度)
-- 初回起動時のモデル取得(whisper.cpp の ggml、話者分離モデル)に進捗UIを付ける
+  (要検証: Vulkan版whisper.cppの速度)。この開発機では検証できない
+- 初回起動時のモデル取得(whisper.cpp の ggml 3.1GB、話者分離モデル 76MB)の進捗UI。
+  現状は `./dev.sh whispercpp` / `./dev.sh diarize-models` を手で叩く前提
 
 ### M29: 通し検証とリリース
 

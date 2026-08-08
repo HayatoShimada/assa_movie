@@ -10,6 +10,7 @@
 #   ./dev.sh check    型・lint・テスト・ビルドを全部走らせる(コミット前用)
 #   ./dev.sh e2e      E2Eテスト(FakeLLM・一時DBなのでGPU/LLM不要)
 #   ./dev.sh app      デスクトップアプリ(Tauri)として起動
+#   ./dev.sh package  配布用パッケージ(.deb / AppImage)を作る
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -25,6 +26,12 @@ case "${1:-all}" in
     ;;
   e2e)
     cd frontend && exec npm run e2e "${@:2}"
+    ;;
+  package)
+    # Pythonを1ファイルに固めてからTauriでパッケージする。
+    # 配布物にtorchは入れない(scripts/build_sidecar.sh 参照)
+    ./scripts/build_sidecar.sh
+    cd frontend && exec npm run app:build
     ;;
   app)
     # Tauriシェルがバックエンドを空きポートで起動するので、./dev.sh は要らない
@@ -101,7 +108,7 @@ case "${1:-all}" in
     cd frontend && npm run dev
     ;;
   *)
-    echo "使い方: ./dev.sh [all|app|api|web|sync|whispercpp|diarize-models|e2e|check]" >&2
+    echo "使い方: ./dev.sh [all|app|package|api|web|sync|whispercpp|diarize-models|e2e|check]" >&2
     exit 1
     ;;
 esac

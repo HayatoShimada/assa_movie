@@ -1,13 +1,22 @@
 """GPUアクセラレータの検出と、ROCm固有の設定。
 
-ROCm版torchはHIPがCUDA APIを名乗る(torch.cuda.is_available()がTrueになる)ため、
-torch.version.hip の有無で cuda / rocm を見分ける。
+検出はベンダーのCLI(nvidia-smi / rocm-smi)を第一手にする。torchに聞くと
+初期化に実測5秒かかるうえ、配布物からtorchを外すとROCm機でも "cpu" と判定され、
+whisper.cppがあるのに遅いエンジンが黙って選ばれてしまう(rocm-smiは実測55ms)。
+
+torchが要るのはASRエンジン側だけなので、そこでは従来どおり
+torch.version.hip の有無で cuda / rocm を見分ける
+(ROCm版torchはHIPがCUDA APIを名乗るため)。
 """
 
 import json
+import shutil
 import subprocess
 import sys
 from functools import lru_cache
+
+EMPTY_GPU = {"accel": "cpu", "name": "", "vram_total_mb": 0, "vram_free_mb": 0}
+CLI_TIMEOUT = 5
 
 
 def _torch(torch_module=None):
@@ -22,8 +31,84 @@ def _torch(torch_module=None):
         return None
 
 
+def _run(cmd: list[str]) -> str:
+    """外部コマンドの標準出力。失敗したら空文字(テスト差し替え口)"""
+    if not shutil.which(cmd[0]):
+        return ""
+    try:
+        out = subprocess.run(cmd, capture_output=True, text=True, timeout=CLI_TIMEOUT)
+        return out.stdout if out.returncode == 0 else ""
+    except (subprocess.SubprocessError, OSError):
+        return ""
+
+
+def parse_nvidia_smi(output: str) -> dict:
+    """`nvidia-smi --query-gpu=name,memory.total,memory.free` の出力を読む(純関数)"""
+    line = next((l for l in output.splitlines() if l.strip()), "")
+    parts = [p.strip() for p in line.split(",")]
+    if len(parts) != 3:
+        return {}
+    try:
+        total, free = int(parts[1]), int(parts[2])
+    except ValueError:
+        return {}
+    return {
+        "accel": "cuda",
+        "name": parts[0],
+        "vram_total_mb": total,
+        "vram_free_mb": free,
+    }
+
+
+def parse_rocm_smi(memory_json: str, name_json: str) -> dict:
+    """`rocm-smi --showmeminfo vram --json` と `--showproductname --json` を読む(純関数)。
+
+    rocm-smiは合計と使用中しか出さないので、空きは引き算で求める。
+    """
+    try:
+        cards = json.loads(memory_json)
+        card = next(iter(cards.values()))
+        total = int(card["VRAM Total Memory (B)"])
+        used = int(card.get("VRAM Total Used Memory (B)", 0))
+    except (json.JSONDecodeError, StopIteration, KeyError, ValueError, TypeError, AttributeError):
+        return {}
+    if total <= 0:
+        return {}
+
+    name = "AMD GPU"
+    try:
+        card = next(iter(json.loads(name_json).values()))
+        name = card.get("Card series") or card.get("Card model") or name
+    except (json.JSONDecodeError, StopIteration, ValueError, TypeError, AttributeError):
+        pass  # 名前が取れなくても検出そのものは成立させる
+
+    return {
+        "accel": "rocm",
+        "name": name,
+        "vram_total_mb": int(total / 1024**2),
+        "vram_free_mb": int((total - used) / 1024**2),
+    }
+
+
+def probe_gpu_cli() -> dict:
+    """ベンダーCLIからGPUを調べる。見つからなければ空dict"""
+    nvidia = parse_nvidia_smi(
+        _run(["nvidia-smi", "--query-gpu=name,memory.total,memory.free",
+              "--format=csv,noheader,nounits"])
+    )
+    if nvidia:
+        return nvidia
+    return parse_rocm_smi(
+        _run(["rocm-smi", "--showmeminfo", "vram", "--json"]),
+        _run(["rocm-smi", "--showproductname", "--json"]),
+    )
+
+
 def detect_accel(torch_module=None) -> str:
     """利用可能なアクセラレータを返す: 'cuda' | 'rocm' | 'cpu'"""
+    if torch_module is None:
+        # 通常経路。torchが無くても正しく判定できる
+        return probe_gpu()["accel"]
     t = _torch(torch_module)
     if t is None:
         return "cpu"
@@ -75,11 +160,18 @@ def apply_vram_budget(budget_mb: int, torch_module=None) -> None:
 
 @lru_cache(maxsize=1)
 def probe_gpu() -> dict:
-    """別プロセスでGPUを調べる: {accel, name, vram_total_mb, vram_free_mb}。
+    """GPUを調べる: {accel, name, vram_total_mb, vram_free_mb}。
+
+    まずベンダーCLI(実測55ms)。無い環境だけtorchに聞く。
+    """
+    return probe_gpu_cli() or _probe_gpu_torch() or dict(EMPTY_GPU)
+
+
+def _probe_gpu_torch() -> dict:
+    """torchに聞く(CLIが無い環境向けの保険)。
 
     torchの初期化は実測5秒かかり、その間GILを握るのでAPIプロセス内で行うと
-    サーバー全体が固まる。表示用の情報なので子プロセスに逃がして本体を止めない
-    (ASR・話者分離のジョブ内では既にtorchを読むので直接 detect_accel を使う)。
+    サーバー全体が固まる。子プロセスに逃がして本体を止めない。
     """
     code = (
         "import json,torch\n"
@@ -95,10 +187,10 @@ def probe_gpu() -> dict:
         out = subprocess.run(
             [sys.executable, "-c", code], capture_output=True, text=True, timeout=120
         )
-        return json.loads(out.stdout.strip().splitlines()[-1])
+        info = json.loads(out.stdout.strip().splitlines()[-1])
+        return info if info.get("accel") != "cpu" else {}
     except Exception:
-        # 子プロセスが使えない環境ではプロセス内で調べる(初回のみ遅い)
-        return {"accel": detect_accel(), **gpu_info()}
+        return {}
 
 
 def apply_rocm_workarounds(torch_module=None) -> None:
@@ -109,7 +201,7 @@ def apply_rocm_workarounds(torch_module=None) -> None:
     カーネルで動く(RX 7900 XTX実測: CPU比 約2.8倍高速で結果は同一)。
     """
     t = _torch(torch_module)
-    if t is None or detect_accel(t) != "rocm":
+    if t is None or detect_accel(torch_module=t) != "rocm":
         return
     try:
         t.backends.cudnn.enabled = False

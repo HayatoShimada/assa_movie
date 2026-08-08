@@ -14,6 +14,7 @@
 ```bash
 ./dev.sh              # バックエンド(8000)+フロント(5173)を起動
 ./dev.sh app          # デスクトップアプリ(Tauri)として起動
+./dev.sh package      # 配布用の .deb / AppImage を作る
 ./dev.sh check        # コミット前の全チェック(pytest + typecheck + lint + vitest + build)
 ./dev.sh e2e          # E2E(FakeLLM・一時DBなのでGPUもOllamaも不要)
 
@@ -54,6 +55,11 @@ cd frontend && npm run gen:api    # バックエンドのAPIを変えたら必�
   フロントのプレビューも同じ規則(cqw/cqh)で描く。
 - **LLMは提案するだけ、適用は機械ガードを通ったものだけ。**
   `pronoun.validate_edit()` が削除のみ・既出重複・慣用表現などを弾く。この構造を壊さない。
+- **配布物にtorchを入れない。** torchだけで11.5GB、入れないと644MB。
+  `[project.dependencies]` はtorch非依存のものだけにし、torch系は
+  `[dependency-groups] torch-engines`(開発専用)に置く。
+  GPU検出もtorchではなく `rocm-smi`/`nvidia-smi` から読む
+  (torchに聞くと5秒、CLIなら120ms。`backend/core/device.py`)。
 - **`original_text` は常に原文を保持。** 置換もユーザー編集も非破壊で、いつでも戻せる。
 - **指示語置換の既定は `annotate`(カッコ注釈)。** 発言を改変しないため最も安全。
 
