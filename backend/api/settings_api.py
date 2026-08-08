@@ -66,7 +66,11 @@ def get_environment() -> dict:
         **env,
         "vram_budget_mb": budget,
         "effective_vram_mb": effective,
-        "recommendations": recommend(effective, env["accel"], env["ollama"]["models"]),
+        # GPUが載っていればCUDA/ROCmが無くてもVulkanのwhisper.cppを勧められる
+        "recommendations": recommend(
+            effective, env["accel"], env["ollama"]["models"],
+            has_gpu=bool(env["gpu"].get("name")),
+        ),
         "asr_options": asr_options,
         "ollama_options": ollama_options,
     }

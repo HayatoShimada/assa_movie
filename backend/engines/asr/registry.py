@@ -73,18 +73,28 @@ ENGINES: dict[str, str] = {
 }
 
 
-def resolve_engine(engine_id: str, accel: str) -> str:
+def resolve_engine(engine_id: str, accel: str, has_gpu: bool = False) -> str:
     """`auto` を実際のエンジンに解決する(実行と推奨表示で同じ規則を使う)。
 
     ROCmでは whisper.cpp が最速(公式版の約2.6倍)だが外部ビルドが要るので、
     用意されているときだけ使い、無ければ公式Whisperに落とす。
     CTranslate2(faster-whisper)はCUDA専用ビルドなのでROCmでは使えない。
+
+    `has_gpu` は「CUDA/ROCmは無いがGPUは積んでいる」機体のためにある。
+    典型はAMDのWindows機で、accelは"cpu"になるがVulkanは動く。同梱の
+    whisper.cpp(Vulkanビルド)ならGPUに載せられる
+    (RX 7900 XTX実測: 60秒の音声が faster-whisper CPU 52秒 → 4.8秒)。
     """
     if engine_id != "auto":
         return engine_id
-    if accel != "rocm":
-        return "faster_whisper"
-    return "whispercpp" if whispercpp_available() else "openai_whisper"
+    if accel == "rocm":
+        return "whispercpp" if whispercpp_available() else "openai_whisper"
+    if accel == "cuda":
+        return "faster_whisper"  # CUDA版CTranslate2が最速
+    # GPUはあるがCUDA/ROCmとして使えない。Vulkanなら賄える
+    if has_gpu and whispercpp_available():
+        return "whispercpp"
+    return "faster_whisper"
 
 
 def build_engine(settings) -> ASREngine:
@@ -98,8 +108,13 @@ def build_engine(settings) -> ASREngine:
             f"未知のASRエンジン: {settings.asr_engine}(選択肢: {', '.join(ENGINES)})"
         )
 
+    from backend.core.device import probe_gpu
+
     accel = detect_accel()
-    engine_id = resolve_engine(settings.asr_engine, accel)
+    # CUDA/ROCmが無くてもGPUが載っていればVulkanのwhisper.cppが使える
+    engine_id = resolve_engine(
+        settings.asr_engine, accel, has_gpu=bool(probe_gpu().get("name"))
+    )
 
     if engine_id == "whispercpp":
         return WhisperCppEngine(beam_size=settings.asr_beam_size)

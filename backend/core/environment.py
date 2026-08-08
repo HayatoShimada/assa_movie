@@ -58,14 +58,16 @@ def scan_environment(settings) -> dict:
     }
 
 
-def recommend(vram_mb: int, accel: str, ollama_models: list[dict]) -> dict:
+def recommend(
+    vram_mb: int, accel: str, ollama_models: list[dict], has_gpu: bool = False
+) -> dict:
     """割当VRAMに収まる範囲で最も性能の良いASRエンジン・モデル・LLMを選ぶ(純関数)。
 
     ASRとLLMは直列実行(ASRはunloadしてからLLM)なので、それぞれ個別に判定する。
     """
     from backend.engines.asr.registry import MODELS, resolve_engine
 
-    engine = resolve_engine("auto", accel)  # 実行時と同じ選択規則
+    engine = resolve_engine("auto", accel, has_gpu=has_gpu)  # 実行時と同じ選択規則
 
     if accel == "cpu":
         # CPUはVRAM制約なし。実用速度を優先して速い方(rtfが大きい)を推奨
