@@ -4,6 +4,7 @@ import threading
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from backend.api import assist as assist_api
 from backend.api import clips as clips_api
@@ -27,6 +28,17 @@ from backend.models import schema
 
 # 画面・APIドキュメントに出るアプリ名
 APP_TITLE = "KirinukiStudio"
+
+# Tauriのwebviewが名乗るオリジン。ページは tauri://localhost で動くので、
+# 127.0.0.1のバックエンドを叩くと必ずクロスオリジンになる
+WEBVIEW_ORIGINS = [
+    "tauri://localhost",       # Linux / macOS
+    "http://tauri.localhost",  # Windows
+    "https://tauri.localhost",
+]
+# 開発中のViteサーバー(ポートは可変)。待ち受けはループバックのみなので
+# ここを開けても外部からは届かない
+LOCAL_ORIGIN_PATTERN = r"^http://(localhost|127\.0\.0\.1)(:\d+)?$"
 
 
 def _report_startup_checks() -> None:
@@ -82,6 +94,13 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title=APP_TITLE, lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=WEBVIEW_ORIGINS,
+    allow_origin_regex=LOCAL_ORIGIN_PATTERN,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 app.include_router(projects_api.router)
 app.include_router(jobs_api.router)
 app.include_router(transcripts_api.router)

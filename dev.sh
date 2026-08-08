@@ -9,6 +9,7 @@
 #   ./dev.sh diarize-models  話者分離のONNXモデルを取得(pyannoteより約4倍速い・HFトークン不要)
 #   ./dev.sh check    型・lint・テスト・ビルドを全部走らせる(コミット前用)
 #   ./dev.sh e2e      E2Eテスト(FakeLLM・一時DBなのでGPU/LLM不要)
+#   ./dev.sh app      デスクトップアプリ(Tauri)として起動
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -24,6 +25,10 @@ case "${1:-all}" in
     ;;
   e2e)
     cd frontend && exec npm run e2e "${@:2}"
+    ;;
+  app)
+    # Tauriシェルがバックエンドを空きポートで起動するので、./dev.sh は要らない
+    cd frontend && exec npm run app
     ;;
   whispercpp)
     # ROCmで最速のASR(公式Whisperの約2.6倍)。外部ビルドなので任意。
@@ -96,7 +101,7 @@ case "${1:-all}" in
     cd frontend && npm run dev
     ;;
   *)
-    echo "使い方: ./dev.sh [all|api|web|sync|whispercpp|diarize-models|e2e|check]" >&2
+    echo "使い方: ./dev.sh [all|app|api|web|sync|whispercpp|diarize-models|e2e|check]" >&2
     exit 1
     ;;
 esac

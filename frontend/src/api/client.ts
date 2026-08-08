@@ -14,8 +14,26 @@ export type Segment = components['schemas']['Segment']
 export type Edit = components['schemas']['Edit']
 export type Question = components['schemas']['Question']
 
-// 常に同一オリジン(Viteプロキシ経由)でAPIを叩く。CORS設定は不要
-export const API_BASE = ''
+declare global {
+  interface Window {
+    /** Tauriシェルが起動時に注入する、Pythonバックエンドの実URL */
+    __KS_API_BASE__?: string
+  }
+}
+
+/**
+ * APIのベースURLを決める。
+ *
+ * ブラウザ開発時は同一オリジン(Viteプロキシ経由)なので空文字。
+ * Tauriのwebviewは `tauri://localhost` で動くため同一オリジンではPythonに届かず、
+ * シェル側が実際に確保したポートを `window.__KS_API_BASE__` に注入する
+ * (ポートは起動のたびに変わるので、ここに固定値は書けない)。
+ */
+export function resolveApiBase(w: Pick<Window, '__KS_API_BASE__'> = window): string {
+  return w.__KS_API_BASE__ ?? ''
+}
+
+export const API_BASE = resolveApiBase()
 
 export class ApiError extends Error {
   status: number

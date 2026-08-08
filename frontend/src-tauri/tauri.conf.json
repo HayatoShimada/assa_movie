@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "KirinukiStudio",
+  "version": "0.4.0",
+  "identifier": "jp.co85store.kirinukistudio",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:5173",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["deb", "appimage"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "category": "Video",
+    "shortDescription": "対談動画から切り抜きを作る",
+    "longDescription": "対談動画をローカルで文字起こし・話者分離し、字幕付きの切り抜き動画を書き出します。音声も映像も外部に送信しません。",
+    "linux": {
+      "deb": {
+        "depends": ["ffmpeg"]
+      }
+    }
+  }
+}

@@ -13,6 +13,7 @@
 
 ```bash
 ./dev.sh              # バックエンド(8000)+フロント(5173)を起動
+./dev.sh app          # デスクトップアプリ(Tauri)として起動
 ./dev.sh check        # コミット前の全チェック(pytest + typecheck + lint + vitest + build)
 ./dev.sh e2e          # E2E(FakeLLM・一時DBなのでGPUもOllamaも不要)
 
@@ -69,6 +70,7 @@ backend/
   e2e_server.py  E2E用サーバー(FakeLLM・一時DB・シードAPI)
 frontend/
   src/api/    型付きクライアント(schema.d.tsは自動生成物なので手で編集しない)
+  src-tauri/  デスクトップシェル(Rust)。Pythonを子プロセスで起動するだけで画面は持たない
   e2e/        Playwright
 tests/        pytest(golden/ に移植前の出力を保存し回帰検証)
 ```

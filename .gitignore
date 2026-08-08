@@ -39,3 +39,7 @@ gemini_api_key.txt
 # アップロードした動画と書き出し結果(成果物なのでコミットしない)
 uploads/
 exports/
+
+# Tauri(Rustのビルド成果物。デバッグビルドで約4GB)
+frontend/src-tauri/target/
+frontend/src-tauri/gen/

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, api } from './client'
+import { ApiError, api, resolveApiBase } from './client'
 
 function mockFetch(body: unknown, status = 200) {
   const spy = vi.fn().mockResolvedValue({
@@ -48,5 +48,18 @@ describe('apiクライアント', () => {
     const [url, init] = spy.mock.calls[0]
     expect(url).toBe('/api/media/2/jobs')
     expect(JSON.parse(init.body)).toEqual({ type: 'resolve', params: { level: 'strong' } })
+  })
+})
+
+describe('APIベースURLの解決', () => {
+  it('ブラウザでは同一オリジン(Viteプロキシ経由)', () => {
+    expect(resolveApiBase({})).toBe('')
+  })
+
+  it('Tauriシェルが注入したURLがあればそれを使う', () => {
+    // webviewは tauri://localhost で動くので、同一オリジンではPythonに届かない
+    expect(resolveApiBase({ __KS_API_BASE__: 'http://127.0.0.1:49321' })).toBe(
+      'http://127.0.0.1:49321',
+    )
   })
 })

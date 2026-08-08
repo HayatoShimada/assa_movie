@@ -1,0 +1,31 @@
+[package]
+name = "kirinuki-studio"
+version = "0.4.0"
+description = "対談動画からローカルで文字起こし・話者分離・切り抜きを作る"
+authors = ["HayatoShimada"]
+edition = "2021"
+rust-version = "1.77"
+
+[lib]
+# 統合テストからバックエンド起動まわりの純粋な処理を呼べるようにする
+name = "kirinuki_studio_lib"
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+
+# 親プロセスが死んだらバックエンドも道連れにするため(prctl PR_SET_PDEATHSIG)。
+# Dropだけではシグナルで殺されたときに走らず、Pythonが残ってポートを掴み続ける
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = "0.2"
+
+[profile.release]
+# 配布サイズを削る(Pythonの同梱分が大きいので、シェル側は絞れるだけ絞る)
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
