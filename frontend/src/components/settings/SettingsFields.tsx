@@ -32,7 +32,10 @@ export function SettingsFields({
   onReset,
 }: {
   values: Record<string, unknown>
-  meta: Pick<SettingsResponse, 'asr_models' | 'asr_engines' | 'llm_providers'>
+  meta: Pick<
+    SettingsResponse,
+    'asr_models' | 'asr_engines' | 'diarization_engines' | 'llm_providers'
+  >
   onSet: (key: string, value: unknown) => void
   idPrefix?: string
   /** プロジェクトモード: グローバルと異なるキー(「既定に戻す」を表示) */
@@ -120,10 +123,31 @@ export function SettingsFields({
         <Row label="話者分離">
           <input
             type="checkbox"
+            data-testid={`${idPrefix}-diarization-enabled`}
             checked={Boolean(v.diarization_enabled)}
             onChange={(e) => set('diarization_enabled')(e.target.checked)}
           />
         </Row>
+        {Boolean(v.diarization_enabled) && (
+          <Row label="話者分離エンジン">
+            <span>
+              <select
+                data-testid={`${idPrefix}-diarization-engine`}
+                className={selectCls}
+                value={String(v.diarization_engine ?? 'auto')}
+                onChange={(e) => set('diarization_engine')(e.target.value)}
+              >
+                {meta.diarization_engines.map((m) => (
+                  // 未準備のエンジン(モデル未取得/HFトークン未設定)は選ばせない
+                  <option key={m.id} value={m.id} disabled={!m.ready}>
+                    {m.ready ? m.label : `${m.label}(未準備)`}
+                  </option>
+                ))}
+              </select>
+              {resetBtn('diarization_engine')}
+            </span>
+          </Row>
+        )}
         <Row label="男性話者の表示名">
           <input
             className={selectCls}

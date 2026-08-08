@@ -11,7 +11,9 @@ from typing import Callable
 from backend.core.device import apply_rocm_workarounds, apply_vram_budget
 from backend.core.project_settings import resolve_settings
 from backend.engines.asr.registry import build_engine
-from backend.engines.diarize import pyannote as diarize
+from backend.engines.diarize import labels as diarize_labels
+from backend.engines.diarize import registry as diarize
+from backend.engines.diarize.pyannote import load_hf_token
 from backend.jobs.queue import register
 from backend.pipeline import audio as audio_io
 from backend.pipeline import filler as filler_mod
@@ -47,14 +49,11 @@ def run_transcribe(
     turns: list = []
     label_map: dict[str, str] = {}
     if s.diarization_enabled:
-        token = diarize.load_hf_token(s.hf_token_file)
-        if token:
-            turns = diarize.run_diarization(
-                audio, token,
-                model=s.diarization_model,
-                num_speakers=s.num_speakers,
-            )
-            label_map = diarize.build_label_map(
+        turns, _engine = diarize.run_diarization(
+            audio, s, token=load_hf_token(s.hf_token_file)
+        )
+        if turns:
+            label_map = diarize_labels.build_label_map(
                 audio, turns,
                 male_name=s.male_name,
                 female_name=s.female_name,
@@ -93,7 +92,7 @@ def run_transcribe(
     conn.execute("DELETE FROM segments WHERE media_id=?", (media_id,))
     rows = []
     for idx, seg in enumerate(result.segments):
-        speaker_label = diarize.assign_speaker(seg, turns) if turns else None
+        speaker_label = diarize_labels.assign_speaker(seg, turns) if turns else None
         words = [
             {"start": w.start, "end": w.end, "text": w.text, "probability": w.probability}
             for w in (seg.words or [])

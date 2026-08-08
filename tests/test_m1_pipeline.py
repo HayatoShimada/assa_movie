@@ -4,7 +4,8 @@ import numpy as np
 import pytest
 
 from backend.engines.asr.base import Segment, Word
-from backend.engines.diarize.pyannote import assign_speaker, build_label_map, load_hf_token
+from backend.engines.diarize.labels import assign_speaker, build_label_map
+from backend.engines.diarize.pyannote import load_hf_token
 from backend.pipeline import audio as audio_io
 from backend.pipeline.aizuchi import is_aizuchi
 from backend.pipeline.subtitle import format_timestamp, srt_block
@@ -85,7 +86,7 @@ def test_assign_speaker_returns_none_when_no_overlap():
 
 # ---- 話者名の割り当て(ピッチ判定はモックで検証) ----
 def _fake_pitch(monkeypatch, mapping):
-    import backend.engines.diarize.pyannote as mod
+    import backend.engines.diarize.labels as mod
 
     monkeypatch.setattr(mod, "estimate_pitch", lambda audio, turns, label: mapping[label])
 

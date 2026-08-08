@@ -14,6 +14,8 @@ from backend.core.config import Settings, settings
 from backend.core.environment import recommend, scan_environment
 from backend.core.project_settings import MUTABLE_FIELDS, save_global_overrides
 from backend.engines.asr.registry import ENGINES, MODELS
+from backend.engines.diarize.registry import ENGINES as DIARIZE_ENGINES
+from backend.engines.diarize.registry import resolve_engine as resolve_diarize_engine
 from backend.engines.llm.gemini import load_api_key
 from backend.engines.llm.registry import PROVIDERS
 
@@ -104,8 +106,19 @@ def list_fonts() -> dict:
 
 @router.get("/settings")
 def get_settings_api() -> dict:
+    from backend.engines.diarize.pyannote import load_hf_token
+
+    has_token = bool(load_hf_token(settings.hf_token_file))
     return {
         "values": {k: getattr(settings, k) for k in sorted(MUTABLE_FIELDS)},
+        "diarization_engines": [
+            {
+                "id": engine_id, "label": label,
+                # モデル未取得/トークン未設定のエンジンはUIで選べないよう伝える
+                "ready": resolve_diarize_engine(engine_id, has_token=has_token) is not None,
+            }
+            for engine_id, label in DIARIZE_ENGINES.items()
+        ],
         "asr_engines": [
             {"id": engine_id, "label": label} for engine_id, label in ENGINES.items()
         ],
@@ -135,6 +148,8 @@ def update_settings(body: SettingsUpdate, db: sqlite3.Connection = Depends(get_d
         raise HTTPException(400, f"未知のASRモデル: {changes['asr_model']}")
     if "asr_engine" in changes and changes["asr_engine"] not in ENGINES:
         raise HTTPException(400, f"未知のASRエンジン: {changes['asr_engine']}")
+    if "diarization_engine" in changes and changes["diarization_engine"] not in DIARIZE_ENGINES:
+        raise HTTPException(400, f"未知の話者分離エンジン: {changes['diarization_engine']}")
     if "llm_provider" in changes and changes["llm_provider"] not in PROVIDERS:
         raise HTTPException(400, f"未知のLLMプロバイダ: {changes['llm_provider']}")
     for key, value in changes.items():

@@ -35,6 +35,8 @@ class Settings(BaseSettings):
 
     # ---- 話者分離 ----
     diarization_enabled: bool = True
+    # auto: ONNXモデルがあればONNX / 無ければHFトークン次第でpyannote
+    diarization_engine: str = "auto"  # auto | onnx | pyannote
     diarization_model: str = "pyannote/speaker-diarization-3.1"
     num_speakers: int | None = 2
     male_name: str = "話者A"

@@ -15,7 +15,8 @@ from backend.core.config import Settings, settings
 # UIから変更可能な項目(誤ってDBパス等を書き換えられないよう明示的に許可する)
 MUTABLE_FIELDS = {
     "asr_model", "asr_engine", "asr_language", "asr_beam_size", "asr_vad_filter",
-    "diarization_enabled", "num_speakers", "male_name", "female_name",
+    "diarization_enabled", "diarization_engine",
+    "num_speakers", "male_name", "female_name",
     "aizuchi_filter_enabled", "aizuchi_max_duration",
     "filler_level",
     "pronoun_enabled", "pronoun_level", "pronoun_form", "pronoun_apply_mode",

@@ -6,6 +6,7 @@
 #   ./dev.sh web      フロントのみ
 #   ./dev.sh sync     Python依存の同期(既定はROCm。WL_TORCH_EXTRA=cu128 でNVIDIA向け)
 #   ./dev.sh whispercpp  whisper.cppをROCm向けにビルド(任意・ASRが約2.6倍速くなる)
+#   ./dev.sh diarize-models  話者分離のONNXモデルを取得(pyannoteより約4倍速い・HFトークン不要)
 #   ./dev.sh check    型・lint・テスト・ビルドを全部走らせる(コミット前用)
 #   ./dev.sh e2e      E2Eテスト(FakeLLM・一時DBなのでGPU/LLM不要)
 set -euo pipefail
@@ -48,6 +49,26 @@ case "${1:-all}" in
     fi
     set +x
     echo "=== whisper.cpp の準備ができました: $HOME_DIR ==="
+    ;;
+  diarize-models)
+    # 話者分離のONNXモデル(計76MB)。pyannote(torch 14GB・HFトークン必須)の代わりで、
+    # 実測で約4倍速く一致率94.8%(docs/V1_PLAN.md M23)。取得すると自動で使われる。
+    HOME_DIR="${WL_MODELS_HOME:-$HOME/.cache/whisper-local}"
+    SEG_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-segmentation-models/sherpa-onnx-pyannote-segmentation-3-0.tar.bz2"
+    EMB_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_eres2netv2_sv_zh-cn_16k-common.onnx"
+    mkdir -p "$HOME_DIR/models"
+    # 途中で止めても壊れたモデルが残らないよう、完了してから置き換える
+    # (中途半端なファイルがあるとエンジンが「使える」と誤判定してしまう)
+    if [ ! -f "$HOME_DIR/models/sherpa-onnx-pyannote-segmentation-3-0/model.onnx" ]; then
+      curl -L --progress-bar -o "$HOME_DIR/models/seg.tar.bz2.part" "$SEG_URL"
+      tar xf "$HOME_DIR/models/seg.tar.bz2.part" -C "$HOME_DIR/models"
+      rm -f "$HOME_DIR/models/seg.tar.bz2.part"
+    fi
+    if [ ! -f "$HOME_DIR/models/speaker-embedding.onnx" ]; then
+      curl -L --progress-bar -o "$HOME_DIR/models/speaker-embedding.onnx.part" "$EMB_URL"
+      mv "$HOME_DIR/models/speaker-embedding.onnx.part" "$HOME_DIR/models/speaker-embedding.onnx"
+    fi
+    echo "=== 話者分離モデルの準備ができました: $HOME_DIR/models ==="
     ;;
   sync)
     # torchのwheelはGPUベンダーごとにindexが違う(pyproject.tomlのグループ参照)。

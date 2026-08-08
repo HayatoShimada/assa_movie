@@ -149,6 +149,8 @@ export interface AssistResponse {
 export interface SettingsResponse {
   values: Record<string, unknown>
   asr_engines: { id: string; label: string }[]
+  /** ready=false はモデル未取得/HFトークン未設定で選べないエンジン */
+  diarization_engines: { id: string; label: string; ready: boolean }[]
   asr_models: { id: string; label: string; rtf: number; word_timestamps: boolean; note: string }[]
   llm_providers: {
     id: string
