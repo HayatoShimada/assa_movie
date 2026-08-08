@@ -22,10 +22,19 @@ describe('overlayGeometry(backendのscaled_styleと同じ規則)', () => {
     expect(overlayGeometry(position, offset, 48)).toMatchObject(expected)
   })
 
-  it('中央はオフセットを無視する(backendと同じ)', () => {
-    const g = overlayGeometry('center', 100, 48)
-    expect(g).toMatchObject({ top: '50%', transform: 'translateY(-50%)' })
-    expect(g.bottom).toBeUndefined()
+  it('中央でもオフセット分ずれる(書き出しの \\pos と同じ量)', () => {
+    expect(overlayGeometry('center', 0, 48)).toMatchObject({
+      top: '50%',
+      transform: 'translateY(calc(-50% + 0.000cqh))',
+    })
+    // +54px@1080 = 高さの5%下へ
+    expect(overlayGeometry('center', 54, 48).transform).toBe(
+      'translateY(calc(-50% + 5.000cqh))',
+    )
+    expect(overlayGeometry('center', -54, 48).transform).toBe(
+      'translateY(calc(-50% + -5.000cqh))',
+    )
+    expect(overlayGeometry('center', 100, 48).bottom).toBeUndefined()
   })
 
   it('オフセットは±120でクランプし、余白は0未満にならない', () => {

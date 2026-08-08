@@ -62,7 +62,7 @@ def test_scaled_style_portrait_keeps_width_ratio():
     [
         ("top", 0, 8, 40),
         ("top", 20, 8, 60),      # +は下方向 → topでは余白が増える
-        ("center", 50, 5, 0),    # centerはオフセット無効
+        ("center", 50, 5, 0),    # centerはMarginVを使わない(\posでずらす)
         ("bottom", 0, 2, 40),
         ("bottom", 30, 2, 10),   # +は下方向 → bottomでは余白が減る
         ("bottom", 300, 2, 0),   # クランプ(±120)後に下限0
@@ -73,6 +73,39 @@ def test_scaled_style_position_table(position, offset, alignment, margin_v):
     st = scaled_style(s, 1920, 1080, position, offset)
     assert st.alignment == alignment
     assert st.margin_v == margin_v
+
+
+def test_center_offset_is_carried_and_scaled():
+    """中央配置のずらし量は margin_v ではなく center_offset_y に入る"""
+    s = Settings(_env_file=None)
+    st = scaled_style(s, 1920, 1080, "center", 54)
+    assert st.margin_v == 0  # ASSは中央揃えでMarginVを無視する
+    assert st.center_offset_y == 54
+    # 縦出力では高さ比率でスケールする(1920/1080=約1.78倍)
+    assert scaled_style(s, 1080, 1920, "center", 54).center_offset_y == 96
+    # 中央以外では使わない
+    assert scaled_style(s, 1920, 1080, "bottom", 54).center_offset_y == 0
+
+
+def test_build_ass_center_offset_emits_pos():
+    """中央でずらす場合は \\pos で位置を明示する(MarginVが効かないため)"""
+    style = SubtitleStyle(alignment=5, center_offset_y=54, play_res_x=1080, play_res_y=1920)
+    out = build_ass(EVENTS, style)
+    # 画面中央(540, 960)から54px下
+    assert "{\\pos(540,1014)}" in out
+    dialogues = [l for l in out.splitlines() if l.startswith("Dialogue:")]
+    assert all("{\\pos(540,1014)}" in l for l in dialogues)
+
+
+def test_build_ass_center_without_offset_has_no_pos():
+    out = build_ass(EVENTS, SubtitleStyle(alignment=5, center_offset_y=0))
+    assert "\\pos(" not in out
+
+
+def test_build_ass_non_center_has_no_pos():
+    """上下配置はMarginVで動くので\\posは出さない"""
+    out = build_ass(EVENTS, SubtitleStyle(alignment=2, center_offset_y=54))
+    assert "\\pos(" not in out
 
 
 def test_scaled_style_carries_style_settings():

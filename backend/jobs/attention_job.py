@@ -50,7 +50,9 @@ def run_attention(
         progress(min(0.8, (n + 1) / len(starts) * 0.8))
 
     # ---- 行番号→時刻に変換し、機械特徴と合成 ----
-    conn.execute("DELETE FROM clips WHERE media_id=? AND status='suggested'", (media_id,))
+    # 再探索は候補を作り直す操作なので、このメディアのクリップを全て消してから入れ直す
+    # (書き出し済みのmp4はファイルとして残るので、成果物は失われない)
+    conn.execute("DELETE FROM clips WHERE media_id=?", (media_id,))
     seen_ranges: list[tuple[float, float]] = []
     inserted = 0
     for c in raw_candidates:

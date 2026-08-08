@@ -133,6 +133,9 @@ class SubtitleStyle:
     bg: str = "none"              # none(縁取りのみ) | box(背景ボックス)
     bg_color: str = "#000000"
     bg_opacity: float = 0.5       # 0..1(boxのとき有効)
+    # 中央配置(alignment=5)のときの上下ずらし量(出力解像度のpx。+で下)。
+    # ASSは中央揃えでMarginVを無視するため、\posで位置を明示する必要がある
+    center_offset_y: int = 0
 
 
 def scaled_style(
@@ -155,7 +158,8 @@ def scaled_style(
     if position == "top":
         alignment, margin_base = 8, 40 + offset
     elif position == "center":
-        alignment, margin_base = 5, 0  # 中央はオフセット無効
+        # 中央はMarginVが効かないので、ずらし量は center_offset_y として持ち回る
+        alignment, margin_base = 5, 0
     else:
         alignment, margin_base = 2, 40 - offset
     return SubtitleStyle(
@@ -174,6 +178,7 @@ def scaled_style(
         bg=settings.subtitle_bg,
         bg_color=settings.subtitle_bg_color,
         bg_opacity=settings.subtitle_bg_opacity,
+        center_offset_y=round(offset * fy) if position == "center" else 0,
     )
 
 
@@ -231,12 +236,19 @@ Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour,
         "[Events]",
         "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
     ]
+    # 中央配置でずらす場合だけ、位置を明示する(MarginVが効かないため)
+    pos_tag = ""
+    if style.alignment == 5 and style.center_offset_y:
+        cx = round(style.play_res_x / 2)
+        cy = round(style.play_res_y / 2) + style.center_offset_y
+        pos_tag = f"{{\\pos({cx},{cy})}}"
+
     for e in events:
         wrapped = "\\N".join(wrap_subtitle(e.text, style.max_chars_per_line))
         style_name = style_of.get(e.speaker, ("Default", ""))[0] if e.speaker else "Default"
         event_lines.append(
             f"Dialogue: 0,{format_ass_time(e.start)},{format_ass_time(e.end)},"
-            f"{style_name},{e.speaker or ''},0,0,0,,{wrapped}"
+            f"{style_name},{e.speaker or ''},0,0,0,,{pos_tag}{wrapped}"
         )
 
     return header + "\n".join(style_lines) + "\n".join([""] + event_lines[1:]) + "\n"

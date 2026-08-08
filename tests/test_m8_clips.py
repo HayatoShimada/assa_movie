@@ -164,6 +164,24 @@ def test_attention_creates_suggested_clips(client, media):
     assert c["score"] > 8
 
 
+def test_attention_rerun_replaces_all_clips(client, media):
+    """再探索は候補を作り直す操作なので、既存クリップを全て置き換える"""
+    mid = media["media_id"]
+    # 手動クリップと書き出し済みクリップが混ざった状態を作る
+    manual = client.post(f"/api/media/{mid}/clips", json={"start": 1, "end": 5}).json()
+    client.patch(f"/api/clips/{manual['id']}", json={"status": "exported"})
+    client.post(f"/api/media/{mid}/clips", json={"start": 6, "end": 9})
+    assert len(client.get(f"/api/media/{mid}/clips").json()) == 2
+
+    use_fake([ATTENTION_RESPONSE])
+    job = run_job(client, mid, "attention", {"target_duration": 30})
+    assert job["status"] == "completed", job["error"]
+
+    clips = client.get(f"/api/media/{mid}/clips").json()
+    assert len(clips) == 1  # 古いクリップは残らない
+    assert clips[0]["status"] == "suggested"
+
+
 def test_attention_uses_brief_in_prompt(client, media):
     mid = media["media_id"]
     client.patch(f"/api/media/{mid}/brief", json={"theme": "AI活用の対談", "people": "", "notes": ""})

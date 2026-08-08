@@ -108,6 +108,62 @@ test('クリップ: 字幕位置を変更して保存できる', async ({ page, 
     .toBe('top:-30')
 })
 
+test('クリップ: 個別の削除ボタンでそのクリップだけ消える', async ({ page, request }) => {
+  const mediaId = await seedTranscribed(request)
+  for (const title of ['消すクリップ', '残すクリップ']) {
+    await request.post(`${API}/api/media/${mediaId}/clips`, {
+      data: { start: 0, end: 5, title },
+    })
+  }
+
+  await page.goto(`/#/media/${mediaId}`)
+  await page.getByTestId('tab-clips').click()
+  await expect(page.getByText('消すクリップ')).toBeVisible()
+
+  // 削除は独立したボタン(カードの選択とは別)
+  const clips0 = await (await request.get(`${API}/api/media/${mediaId}/clips`)).json()
+  const doomed = clips0.find((c: { title: string }) => c.title === '消すクリップ')
+  await page.getByTestId(`clip-delete-${doomed.id}`).click()
+
+  await expect(page.getByText('消すクリップ')).toHaveCount(0)
+  await expect(page.getByText('残すクリップ')).toBeVisible()
+  const clips = await (await request.get(`${API}/api/media/${mediaId}/clips`)).json()
+  expect(clips.map((c: { title: string }) => c.title)).toEqual(['残すクリップ'])
+})
+
+test('クリップ: 上下微調整がプレビューに即反映される(中央配置でも)', async ({
+  page,
+  request,
+}) => {
+  const mediaId = await seedTranscribed(request)
+  await request.post(`${API}/api/media/${mediaId}/clips`, {
+    data: { start: 0, end: 8, title: 'オフセット反映テスト' },
+  })
+
+  await page.goto(`/#/media/${mediaId}`)
+  await page.getByTestId('tab-clips').click()
+  await page.getByText('オフセット反映テスト').click()
+
+  // 再生位置0秒の字幕が出ている状態で、スライダーを動かして位置が動くか見る
+  const overlay = page.getByTestId('subtitle-overlay')
+  await expect(overlay).toBeVisible()
+  const topOf = async () => (await overlay.boundingBox())!.y
+
+  for (const position of ['bottom', 'center'] as const) {
+    await page.getByTestId('clip-subtitle-position').selectOption(position)
+    await page.getByTestId('clip-subtitle-offset').fill('-100')
+    await expect(page.getByTestId('clip-subtitle-offset')).toHaveValue('-100')
+    const up = await topOf()
+
+    await page.getByTestId('clip-subtitle-offset').fill('100')
+    await expect(page.getByTestId('clip-subtitle-offset')).toHaveValue('100')
+    const down = await topOf()
+
+    // +は下方向。中央配置でもオフセットが効く(書き出しでは \pos で表現)
+    expect(down, `位置=${position} でプレビューが動いていない`).toBeGreaterThan(up)
+  }
+})
+
 test('クリップ: 全体設定で上書きボタンが効く', async ({ page, request }) => {
   const mediaId = await seedTranscribed(request)
   const clip = await (

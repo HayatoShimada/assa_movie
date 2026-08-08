@@ -38,7 +38,16 @@ export function overlayGeometry(
   const offset = Math.max(-OFFSET_LIMIT, Math.min(OFFSET_LIMIT, offsetY))
   const common = { left: cqw(BASE_MARGIN_H), right: cqw(BASE_MARGIN_H), fontSize: cqw(fontSize) }
   if (position === 'top') return { ...common, top: cqh(BASE_MARGIN_V + offset) }
-  if (position === 'center') return { ...common, top: '50%', transform: 'translateY(-50%)' }
+  if (position === 'center') {
+    // 中央からのずらしは書き出し側では \pos で表現する(ASSは中央揃えで
+    // MarginVを無視するため)。ここでは同じ量をtransformで足す
+    const shift = ((offset / BASE_RES_Y) * 100).toFixed(3)
+    return {
+      ...common,
+      top: '50%',
+      transform: `translateY(calc(-50% + ${shift}cqh))`,
+    }
+  }
   return { ...common, bottom: cqh(BASE_MARGIN_V - offset) }
 }
 

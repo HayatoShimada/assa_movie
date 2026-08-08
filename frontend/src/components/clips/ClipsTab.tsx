@@ -5,6 +5,7 @@ import { api } from '../../api/client'
 import { clipsApi, type Clip } from '../../api/clips'
 import { useJobProgress } from '../../hooks/useJobProgress'
 import { CONVERT_METHOD_LABELS } from '../../lib/catalogs'
+import { TrashIcon } from '../icons'
 import { usePlayback } from '../../stores/playback'
 import { Button, ProgressBar, formatTime } from '../ui'
 import { ClipTimeline } from './ClipTimeline'
@@ -360,51 +361,57 @@ export function ClipsTab({
       )}
       {clips.data?.map((clip) => (
         <div key={clip.id}>
+          {/* 選択と削除は別々のボタンにする(入れ子のボタンは押し分けが壊れるため) */}
           <div
-            role="button"
-            tabIndex={0}
-            data-testid={`clip-${clip.id}`}
-            onClick={() => setSelectedId(selectedId === clip.id ? null : clip.id)}
-            onKeyDown={(e) => e.key === 'Enter' && setSelectedId(selectedId === clip.id ? null : clip.id)}
-            className={`w-full cursor-pointer border-b border-neutral-100 p-3 text-left text-sm hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900 ${
+            className={`flex items-start gap-1 border-b border-neutral-100 pr-2 dark:border-neutral-800 ${
               selectedId === clip.id ? 'bg-blue-50 dark:bg-blue-950' : ''
             }`}
           >
-            <div className="flex items-center gap-2">
-              <span className="font-medium">{clip.title || '(無題)'}</span>
-              {clip.score != null && (
-                <span className="rounded bg-amber-100 px-1.5 text-xs text-amber-800 dark:bg-amber-900 dark:text-amber-200">
-                  {clip.score.toFixed(1)}
+            <button
+              type="button"
+              data-testid={`clip-${clip.id}`}
+              onClick={() => setSelectedId(selectedId === clip.id ? null : clip.id)}
+              className="min-w-0 flex-1 cursor-pointer p-3 text-left text-sm hover:bg-neutral-50 dark:hover:bg-neutral-900"
+            >
+              <div className="flex items-center gap-2">
+                <span className="font-medium">{clip.title || '(無題)'}</span>
+                {clip.score != null && (
+                  <span className="rounded bg-amber-100 px-1.5 text-xs text-amber-800 dark:bg-amber-900 dark:text-amber-200">
+                    {clip.score.toFixed(1)}
+                  </span>
+                )}
+                <span className="ml-auto font-mono text-xs text-neutral-400">
+                  {formatTime(clip.start)}〜 {Math.round(clip.end - clip.start)}秒
                 </span>
+              </div>
+              {clip.hook_text && (
+                <p className="mt-0.5 text-xs text-neutral-500">「{clip.hook_text}」</p>
               )}
-              <span className="ml-auto font-mono text-xs text-neutral-400">
-                {formatTime(clip.start)}〜 {Math.round(clip.end - clip.start)}秒
-              </span>
-              <button
-                type="button"
-                className="text-xs text-neutral-400 hover:text-red-600"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  remove.mutate(clip.id)
-                }}
-              >
-                削除
-              </button>
-            </div>
-            {clip.hook_text && <p className="mt-0.5 text-xs text-neutral-500">「{clip.hook_text}」</p>}
-            <div className="mt-1 flex flex-wrap gap-1">
-              {clip.score_reasons.map((r) => (
-                <span
-                  key={r}
-                  className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"
-                >
-                  {r}
+              <div className="mt-1 flex flex-wrap gap-1">
+                {clip.score_reasons.map((r) => (
+                  <span
+                    key={r}
+                    className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"
+                  >
+                    {r}
+                  </span>
+                ))}
+                <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-neutral-400 dark:bg-neutral-800">
+                  {clip.status}
                 </span>
-              ))}
-              <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-neutral-400 dark:bg-neutral-800">
-                {clip.status}
-              </span>
-            </div>
+              </div>
+            </button>
+            <button
+              type="button"
+              data-testid={`clip-delete-${clip.id}`}
+              title="このクリップを削除"
+              aria-label="このクリップを削除"
+              disabled={remove.isPending}
+              onClick={() => remove.mutate(clip.id)}
+              className="mt-2 rounded p-2 text-neutral-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-40 dark:hover:bg-red-950"
+            >
+              <TrashIcon className="h-4 w-4" />
+            </button>
           </div>
           {selected?.id === clip.id && (
             <ClipEditor
