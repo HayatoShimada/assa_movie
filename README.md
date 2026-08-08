@@ -1,9 +1,9 @@
 # KirinukiStudio
 
 対談・イベント動画から **文字起こし → 話者分離 → 指示語の解決 → 字幕生成 → 切り抜き動画作成** までを、
-すべてローカルGPUで行うアプリケーションです。バージョン **0.4.0**。
+すべてローカルGPUで行うアプリケーションです。バージョン **0.9.0**。
 
-<https://github.com/> ※公開リポジトリのURLが決まったらここに記載
+<https://github.com/HayatoShimada/assa_movie>
 
 ## 何ができるか
 
@@ -47,10 +47,28 @@ LLMはローカル(Ollama)とクラウド(Gemini API)を切り替え可能。ロ
   クラッシュするため float16 固定です(設定済み・変更不要)
 - Ollamaを使わない場合は Gemini API キーで代替できます(後述)
 
-## セットアップ
+## インストール(使うだけの人向け)
+
+Linux(Ubuntu 24.04で確認)は `.deb` をインストールするだけです。
+Pythonの用意もリポジトリのcloneも要りません。
 
 ```bash
-git clone <このリポジトリ> && cd kirinuki-studio
+sudo apt install ./KirinukiStudio_0.9.0_amd64.deb
+```
+
+アプリメニューに **KirinukiStudio** が登録されます。AppImageもあります
+(`chmod +x` して実行)。データは `~/.local/share/kirinuki-studio/` に作られます。
+
+初回起動後、設定タブの「セットアップ」から話者分離モデル(76MB)を取得してください。
+AMD GPUをお使いなら、`./dev.sh whispercpp` でwhisper.cppを用意すると
+文字起こしが約3倍速くなります(ビルドが要るのでアプリからは入れられません)。
+
+**Windowsは未対応です**(v1.0.0で対応予定)。
+
+## 開発環境のセットアップ
+
+```bash
+git clone https://github.com/HayatoShimada/assa_movie && cd assa_movie
 
 # 1. Python依存(初回は数GBのダウンロード)
 #    AMD GPU (ROCm、既定):
