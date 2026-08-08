@@ -34,3 +34,7 @@ frontend/test-results/
 
 # APIキー
 gemini_api_key.txt
+
+# アップロードした動画と書き出し結果(成果物なのでコミットしない)
+uploads/
+exports/
