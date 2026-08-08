@@ -191,6 +191,17 @@ def build_app():
     key_dir = Path(tempfile.mkdtemp(prefix="ks-e2e-keys-"))
     keys_api.key_path = lambda provider: key_dir / f"{provider}.txt"
 
+    # モデルも一時ディレクトリを指す。開発機に本物が入っているかどうかで
+    # セットアップ画面のE2Eの結果が変わらないようにする
+    from backend.engines.asr import whispercpp
+    from backend.engines.diarize import onnx
+
+    model_dir = Path(tempfile.mkdtemp(prefix="ks-e2e-models-"))
+    onnx.DEFAULT_SEGMENTATION = model_dir / "seg" / "model.onnx"
+    onnx.DEFAULT_EMBEDDING = model_dir / "embedding.onnx"
+    whispercpp.DEFAULT_BINARY = model_dir / "bin" / "whisper-cli"
+    whispercpp.DEFAULT_MODEL = model_dir / "models" / "ggml-large-v3.bin"
+
     app.include_router(router)
     resolve_job.set_client_factory(lambda: FakeLLMClient(responses=_fake_llm))
     return app

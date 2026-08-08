@@ -8,6 +8,7 @@ import { useState } from 'react'
 import { api } from '../../api/client'
 import type { SettingsValues } from '../../lib/settings'
 import { ApiKeysPanel } from './ApiKeysPanel'
+import { SetupPanel } from './SetupPanel'
 import { EnvironmentPanel } from './EnvironmentPanel'
 import { LicensePanel } from './LicensePanel'
 import { SaveBar } from './SaveBar'
@@ -34,6 +35,7 @@ export function SettingsForm() {
   return (
     <div className="p-4">
       <LicensePanel />
+      <SetupPanel />
       <EnvironmentPanel />
       <ApiKeysPanel />
       <p className="mb-2 text-xs text-neutral-500">

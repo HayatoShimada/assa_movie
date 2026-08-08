@@ -133,6 +133,8 @@ export const api = {
   updateSettings: (patch: Record<string, unknown>) =>
     request<SettingsResponse>('/api/settings', { method: 'PATCH', body: JSON.stringify(patch) }),
   getFonts: () => request<{ fonts: string[] }>('/api/fonts'),
+  getSetupStatus: () => request<Record<string, SetupItem>>('/api/setup'),
+  createSetupJob: (item: string) => post<Job>(`/api/setup/${item}`),
   getApiKeys: () => request<Record<string, ApiKeyStatus>>('/api/keys'),
   registerApiKey: (provider: string, key: string) =>
     request<Record<string, ApiKeyStatus>>(`/api/keys/${provider}`, {
@@ -155,6 +157,15 @@ export const api = {
  * パネルを開くたびに再スキャンしない(変わる操作の後は明示的にinvalidateする)。
  */
 export const machineQueryOptions = { staleTime: Infinity } as const
+
+export interface SetupItem {
+  label: string
+  ready: boolean
+  size_mb: number
+  /** falseならアプリからは入れられない(手順を案内するだけ) */
+  installable: boolean
+  note: string
+}
 
 export interface ApiKeyStatus {
   label: string

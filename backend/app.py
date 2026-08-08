@@ -23,6 +23,7 @@ from backend.jobs import export_job  # noqa: F401
 from backend.jobs import filler_job  # noqa: F401
 from backend.jobs import judge_job  # noqa: F401
 from backend.jobs import resolve_job  # noqa: F401
+from backend.jobs import setup_job  # noqa: F401
 from backend.jobs import terms_job  # noqa: F401
 from backend.jobs import transcribe_job  # noqa: F401
 from backend.jobs.queue import JobQueue

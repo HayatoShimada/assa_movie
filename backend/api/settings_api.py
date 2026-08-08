@@ -9,7 +9,7 @@ import sqlite3
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, create_model
 
-from backend.api.deps import get_db
+from backend.api.deps import get_db, get_jobs
 from backend.core.config import Settings, settings
 from backend.core.environment import recommend, scan_environment
 from backend.core.project_settings import MUTABLE_FIELDS, save_global_overrides
@@ -159,3 +159,25 @@ def update_settings(body: SettingsUpdate, db: sqlite3.Connection = Depends(get_d
         setattr(settings, key, value)
     save_global_overrides(db, changes)  # 再起動しても消えないようDBにも保存
     return get_settings_api()
+
+
+@router.get("/setup")
+def get_setup_status() -> dict:
+    """初回セットアップの状態(モデルが揃っているか)"""
+    from backend.jobs.setup_job import status
+
+    return status()
+
+
+# アプリから取得できるもの(画面のIDとジョブ種別の対応)
+SETUP_JOBS = {"diarization": "setup_diarization"}
+
+
+@router.post("/setup/{item}")
+def start_setup(item: str, jobs=Depends(get_jobs)) -> dict:
+    """モデル取得を始める。進捗は既存のジョブAPI(SSE)で受け取る"""
+    if item not in SETUP_JOBS:
+        raise HTTPException(404, f"アプリから取得できない項目です: {item}")
+    # メディアに紐づかないジョブなので media_id は None
+    job_id = jobs.enqueue(None, SETUP_JOBS[item], {})
+    return {"id": job_id, "type": SETUP_JOBS[item], "status": "queued", "progress": 0.0}

@@ -253,8 +253,11 @@ ffmpeg/VAAPIを検出、新規インストール時のDBが
 - Windows: MSI/NSIS。**ROCm は Windows で使えない**ため、
   NVIDIA(CUDA)/ CPU / whisper.cpp の Vulkan バックエンドから自動選択する
   (要検証: Vulkan版whisper.cppの速度)。この開発機では検証できない
-- 初回起動時のモデル取得(whisper.cpp の ggml 3.1GB、話者分離モデル 76MB)の進捗UI。
-  現状は `./dev.sh whispercpp` / `./dev.sh diarize-models` を手で叩く前提
+- ~~初回起動時のモデル取得の進捗UI~~ ✅ 設定タブに「セットアップ」パネルを追加。
+  何が足りていないかを示し、話者分離モデル(76MB)はその場でダウンロードできる
+  (既存のジョブキュー+SSEに乗せたので進捗バーが出る)。
+  whisper.cppはhipccでのビルドが要るためアプリからは入れられないので、
+  状態と手順の案内だけにした
 
 ### M29: 通し検証とリリース
 
