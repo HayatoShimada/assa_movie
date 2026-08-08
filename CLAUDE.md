@@ -37,6 +37,10 @@ cd frontend && npm run gen:api    # バックエンドのAPIを変えたら必�
 4. **純関数に寄せる。** 判定・整形・プロンプト合成はDBやHTTPから切り離してテーブル駆動テストにする
    (例: `backend/pipeline/pronoun.py`)。
 5. **UIを変えたらE2Eも足す。** `frontend/e2e/` に画面操作のテストを書く。
+6. **日本語を出力するPythonは標準出力をUTF-8に固定する**(`backend/core/console.py` の
+   `force_utf8_stdio()`)。Windowsの既定は日本語環境がcp932・CIの英語環境がcp1252で、
+   どちらも「⚠」や日本語でUnicodeEncodeErrorになりプロセスごと落ちる。
+   これで2回落としている(v0.9.2のアプリ起動と、v0.9.3のCIビルド)。
 
 ## 設計上の重要な決定(変えるときは相談)
 

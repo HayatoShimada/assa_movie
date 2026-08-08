@@ -151,6 +151,14 @@ def build_notice(dists: list[metadata.Distribution]) -> str:
 
 
 def main() -> int:
+    # 進捗の表示は日本語。標準出力の文字コードはOSのロケール任せなので、
+    # 英語WindowsのCI(cp1252)や日本語Windows(cp932)ではそのままだと
+    # UnicodeEncodeErrorでビルドごと落ちる(実測)。バックエンドと同じ対処をする
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from backend.core.console import force_utf8_stdio
+
+    force_utf8_stdio()
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
