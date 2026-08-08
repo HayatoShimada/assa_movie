@@ -1,7 +1,7 @@
 # KirinukiStudio
 
 対談・イベント動画から **文字起こし → 話者分離 → 指示語の解決 → 字幕生成 → 切り抜き動画作成** までを、
-すべてローカルGPUで行うアプリケーションです。バージョン **0.9.4**。
+すべてローカルGPUで行うアプリケーションです。バージョン **0.9.5**。
 
 <https://github.com/HayatoShimada/assa_movie>
 
@@ -72,7 +72,8 @@ LLMはローカル(Ollama)とクラウド(Gemini API)を切り替え可能。ロ
 | macOS | `~/Library/Application Support/kirinuki-studio/` |
 | Windows | `%APPDATA%\kirinuki-studio\` |
 
-初回起動後、設定タブの「セットアップ」から次を取得してください。
+初回起動時にセットアップの案内が出ます。そこで次を取得できます
+(あとから設定タブでも取得・変更できます)。
 
 | | 大きさ | 効果 |
 |---|---|---|

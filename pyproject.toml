@@ -1,6 +1,6 @@
 [project]
 name = "kirinuki-studio"
-version = "0.9.4"
+version = "0.9.5"
 description = "対談動画からローカルで文字起こし・話者分離・切り抜きを作る (CUDA / ROCm 両対応)"
 readme = "README.md"
 authors = [
