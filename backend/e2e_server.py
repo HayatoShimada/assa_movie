@@ -112,6 +112,25 @@ router = APIRouter(prefix="/api/e2e", tags=["e2e"])
 _E2E_ISSUER = Ed25519PrivateKey.generate()
 
 
+def apply_e2e_defaults() -> None:
+    """グローバル設定をE2Eの初期状態に戻す。
+
+    起動時とreset時の両方から呼ぶ。1箇所にまとめておかないと、resetが
+    「本来の既定値」に戻してE2E固有の設定(話者分離オフ等)を消してしまう。
+    """
+    from backend.core.config import Settings
+    from backend.core.project_settings import MUTABLE_FIELDS
+
+    defaults = Settings()
+    for field in MUTABLE_FIELDS:
+        setattr(settings, field, getattr(defaults, field))
+
+    # 話者分離はモデルもGPUも要るのでE2Eでは常にオフ
+    settings.diarization_enabled = False
+    # 初回セットアップは済ませた状態から始める(ウィザードのspecだけfalseに戻す)
+    settings.setup_completed = True
+
+
 @router.post("/reset")
 def reset(request: Request) -> dict:
     """DBを空にして、テストの独立性を保つ"""
@@ -128,6 +147,12 @@ def reset(request: Request) -> dict:
 
     for provider in keys_api.PROVIDERS:
         keys_api.key_path(provider).unlink(missing_ok=True)
+
+    # グローバル設定も既定に戻す。あるspecが変えた値(ASRモデル等)が次のspecへ
+    # 持ち越されると、単独では通るのに通しで落ちる。実際にそうなっていた
+    db.execute("DELETE FROM app_settings")
+    db.commit()
+    apply_e2e_defaults()
     return {"status": "reset"}
 
 
@@ -174,7 +199,7 @@ def build_app():
     tmp = Path(tempfile.gettempdir()) / "whisper_e2e.db"
     tmp.unlink(missing_ok=True)
     settings.db_path = tmp
-    settings.diarization_enabled = False
+    apply_e2e_defaults()
 
     from backend.api import license_api
     from backend.app import app

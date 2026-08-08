@@ -14,7 +14,8 @@ function formatSize(mb: number): string {
   return mb >= 1024 ? `${(mb / 1024).toFixed(1)}GB` : `${mb}MB`
 }
 
-function Item({ id, item }: { id: string; item: SetupItem }) {
+/** 1項目ぶんの取得UI。初回セットアップのウィザードからも使う(components/setup/) */
+export function SetupItemRow({ id, item }: { id: string; item: SetupItem }) {
   const queryClient = useQueryClient()
   const [progress, setProgress] = useState<number | null>(null)
 
@@ -93,7 +94,7 @@ export function SetupPanel() {
         足りていないものがあります。無くても文字起こしはできますが、揃えると精度と速度が上がります。
       </p>
       {Object.entries(setup.data).map(([id, item]) => (
-        <Item key={id} id={id} item={item} />
+        <SetupItemRow key={id} id={id} item={item} />
       ))}
     </section>
   )

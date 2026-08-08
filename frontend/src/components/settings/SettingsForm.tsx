@@ -14,6 +14,7 @@ import { LicensePanel } from './LicensePanel'
 import { OpenSourcePanel } from './OpenSourcePanel'
 import { SaveBar } from './SaveBar'
 import { SettingsFields } from './SettingsFields'
+import { Button } from '../ui'
 
 export function SettingsForm() {
   const queryClient = useQueryClient()
@@ -26,6 +27,11 @@ export function SettingsForm() {
       queryClient.setQueryData(['settings'], data)
       setDraft({})
     },
+  })
+  // 未完了に戻すとAppがウィザードを出す(この画面の上に重なる)
+  const rerunSetup = useMutation({
+    mutationFn: () => api.updateSettings({ setup_completed: false }),
+    onSuccess: (data) => queryClient.setQueryData(['settings'], data),
   })
 
   if (settings.isPending) return <p className="p-4 text-sm text-neutral-500">読み込み中...</p>
@@ -58,6 +64,23 @@ export function SettingsForm() {
         meta={settings.data}
         onSet={(key, value) => setDraft((d) => ({ ...d, [key]: value }))}
       />
+      <section
+        data-testid="rerun-setup-panel"
+        className="mb-4 mt-4 rounded-lg border border-neutral-200 p-3 dark:border-neutral-800"
+      >
+        <h3 className="mb-1 text-sm font-semibold">はじめの設定</h3>
+        <p className="mb-2 text-xs text-neutral-500">
+          環境の確認・使うAIの選択・モデルの取得を、もう一度順に案内します。
+        </p>
+        <Button
+          data-testid="rerun-setup"
+          type="button"
+          onClick={() => rerunSetup.mutate()}
+          disabled={rerunSetup.isPending}
+        >
+          やり直す
+        </Button>
+      </section>
       {/* 設定項目ではなく参照情報なので最後に置く */}
       <OpenSourcePanel />
     </div>

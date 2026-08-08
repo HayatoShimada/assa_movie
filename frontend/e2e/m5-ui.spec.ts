@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { API } from './helpers'
+import { API, reset } from './helpers'
 
 /** M5: ホーム画面 → 文字起こし → エディタ の画面操作テスト */
 test.beforeEach(async ({ request }) => {
@@ -70,6 +70,9 @@ test('エディタでセグメントが表示されクリックで選択でき�
 })
 
 test('設定タブでASRモデルを切り替えると保存される', async ({ page, request }) => {
+  // 既定値から始めたいので必ずリセットする。seedを直に叩くと、前のspecが
+  // 変えたグローバル設定を引き継いでしまう
+  await reset(request)
   const seed = await (await request.post(`${API}/api/e2e/seed`)).json()
   await page.goto(`/#/media/${seed.media_id}`)
   await page.getByRole('button', { name: '設定' }).click()
