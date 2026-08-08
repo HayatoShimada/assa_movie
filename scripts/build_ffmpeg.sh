@@ -40,10 +40,29 @@ mkdir -p "$SRC_DIR" "$OUT_DIR"
 
 if [ ! -d "$BUILD_DIR" ]; then
   echo "=== ソースを取得 (ffmpeg $FFMPEG_VERSION) ==="
-  TARBALL="$SRC_DIR/ffmpeg-$FFMPEG_VERSION.tar.xz"
-  [ -f "$TARBALL" ] || curl -fL -o "$TARBALL" \
-    "https://ffmpeg.org/releases/ffmpeg-$FFMPEG_VERSION.tar.xz"
-  tar -xf "$TARBALL" -C "$SRC_DIR"
+  # 拡張子は入手先で違うが tar が中身を見て判断するので付けない
+  TARBALL="$SRC_DIR/ffmpeg-$FFMPEG_VERSION.tar"
+  # ffmpeg.org へ届かない環境がある(GitHubのランナーとMSYS2で実測。443がタイムアウト)。
+  # 公式のGitHubミラーを先に試す。中身は同じもの(タグ n<version>)
+  if [ ! -f "$TARBALL" ]; then
+    for url in \
+      "https://github.com/FFmpeg/FFmpeg/archive/refs/tags/n$FFMPEG_VERSION.tar.gz" \
+      "https://ffmpeg.org/releases/ffmpeg-$FFMPEG_VERSION.tar.xz"
+    do
+      echo "  $url"
+      curl -fL --retry 3 --retry-delay 5 --connect-timeout 20 -o "$TARBALL" "$url" && break
+      rm -f "$TARBALL"
+    done
+    [ -f "$TARBALL" ] || { echo "ソースを取得できませんでした" >&2; exit 1; }
+  fi
+  # 展開後のディレクトリ名が入手先で変わる(ffmpeg-8.0 / FFmpeg-n8.0)ため、
+  # いったん受け皿に展開してから既知の名前へ移す
+  STAGE="$SRC_DIR/stage-$FFMPEG_VERSION"
+  rm -rf "$STAGE"
+  mkdir -p "$STAGE"
+  tar -xf "$TARBALL" -C "$STAGE"
+  mv "$STAGE"/*/ "$BUILD_DIR"
+  rm -rf "$STAGE"
 fi
 
 cd "$BUILD_DIR"

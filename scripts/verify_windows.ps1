@@ -86,11 +86,16 @@ while ((Get-Date) -lt $deadline) {
 }
 
 if ($app.HasExited) {
+    # v0.9.2のWindows版はここで落ちていた(0.06秒でexit 1)。この判定が本丸
     Ng "アプリが起動せずに終了した (ExitCode=$($app.ExitCode))"
 } elseif ($windowTitle) {
     Ok "ウィンドウが開いた: '$windowTitle'"
 } else {
-    Ng "$ReadyTimeoutSec 秒たってもウィンドウが出ない"
+    # ウィンドウの生成はデスクトップセッションの有無に左右される(CIのランナーなど)。
+    # プロセスが生きていてAPIが応答するなら、起動そのものは成立している。
+    # 「即終了する」退行は上の分岐で捕まえられるので、ここは警告に留める
+    Info "$ReadyTimeoutSec 秒たってもウィンドウが出ない(プロセスは生存中)"
+    Info "デスクトップセッションが無い環境ではここは出ない。下の疎通確認で判断する"
 }
 
 # ---- 4. バックエンドの疎通 ----------------------------------------------
@@ -100,20 +105,32 @@ if (-not $app.HasExited) {
     $be = $children | Where-Object { $_.Name -like "*backend*" }
     if ($be) { Ok "バックエンドの子プロセスが動いている (PID=$($be.ProcessId -join ','))" } else { Ng "バックエンドの子プロセスが無い" }
 
-    # シェルがログに書いたAPIのURLを拾って直接叩く(ポートは起動ごとに変わるため)
+    # シェルがログに書いたAPIのURLを拾って直接叩く(ポートは起動ごとに変わるため)。
+    # ウィンドウが出ない環境ではここが唯一の「本当に動いている」証拠になるので、
+    # 起動待ちの上限まで粘る
     $shellLog = "$LogDir\shell.log"
-    if (Test-Path $shellLog) {
-        $m = Select-String -Path $shellLog -Pattern 'http://127\.0\.0\.1:\d+' -Encoding utf8 | Select-Object -Last 1
-        if ($m) {
-            $base = $m.Matches[0].Value
-            try {
-                $r = Invoke-WebRequest "$base/api/health" -UseBasicParsing -TimeoutSec 10
-                Ok "GET $base/api/health => $($r.StatusCode) $($r.Content)"
-            } catch {
-                Ng "health が叩けない: $_"
-            }
-        } else { Info "shell.log にAPIのURLが見つからない" }
-    } else { Info "shell.log が無い (ログ基盤が未導入のバージョン)" }
+    $base = $null
+    $deadline = (Get-Date).AddSeconds($ReadyTimeoutSec)
+    while (-not $base -and (Get-Date) -lt $deadline) {
+        if (Test-Path $shellLog) {
+            $m = Select-String -Path $shellLog -Pattern 'http://127\.0\.0\.1:\d+' -Encoding utf8 |
+                Select-Object -Last 1
+            if ($m) { $base = $m.Matches[0].Value; break }
+        }
+        if ($app.HasExited) { break }
+        Start-Sleep -Milliseconds 500
+    }
+
+    if (-not $base) {
+        Ng "shell.log にAPIのURLが出てこない(バックエンドが起動していない)"
+    } else {
+        try {
+            $r = Invoke-WebRequest "$base/api/health" -UseBasicParsing -TimeoutSec 10
+            Ok "GET $base/api/health => $($r.StatusCode) $($r.Content)"
+        } catch {
+            Ng "health が叩けない: $_"
+        }
+    }
 } else {
     Info "アプリが落ちているので疎通確認はスキップ"
 }
