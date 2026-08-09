@@ -202,9 +202,21 @@ jobs:
       - name: インストーラを実機で検証(Windows)
         if: matrix.os == 'windows-latest'
         shell: pwsh
+        # ログのダウンロードにはリポジトリの管理者権限が要る。それが無いと
+        # 「exit code 1」しか見えないので、NG行をアノテーションに出す
         run: |
           $installer = (Get-Item frontend/src-tauri/target/release/bundle/nsis/*-setup.exe).FullName
-          ./scripts/verify_windows.ps1 -Installer $installer
+          # 子プロセスで走らせる。`./script.ps1` だと中の `exit 1` が
+          # このステップごと終わらせてしまい、下のアノテーションに届かない
+          pwsh -File ./scripts/verify_windows.ps1 -Installer $installer 2>&1 |
+            Tee-Object verify.log
+          if ($LASTEXITCODE -ne 0) {
+            $ng = (Select-String -Path verify.log -Pattern "NG" |
+                   Select-Object -First 15 |
+                   ForEach-Object { $_.Line.Trim() }) -join " / "
+            Write-Host "::error title=Windowsの実機検証::$ng"
+            exit 1
+          }
 
       # .deb / .AppImage / .dmg は**一度もインストール・起動されずに配布されていた**。
       # ここで実際に展開して、同梱物が揃っていること・バックエンドが起動すること・
@@ -213,17 +225,26 @@ jobs:
         if: matrix.os == 'ubuntu-24.04'
         shell: bash
         run: |
-          set -e
           for pkg in frontend/src-tauri/target/release/bundle/deb/*.deb \
                      frontend/src-tauri/target/release/bundle/appimage/*.AppImage; do
             echo "### $pkg"
-            ./scripts/verify_unix.sh "$pkg"
+            ./scripts/verify_unix.sh "$pkg" 2>&1 | tee verify.log || {
+              ng=$(grep NG verify.log | head -15 | paste -sd'|' -)
+              echo "::error title=Linuxの実機検証 ($(basename "$pkg"))::$ng"
+              exit 1
+            }
           done
 
       - name: パッケージを実機で検証(macOS)
         if: matrix.os == 'macos-14'
         shell: bash
-        run: ./scripts/verify_unix.sh frontend/src-tauri/target/release/bundle/dmg/*.dmg
+        run: |
+          dmg=$(ls frontend/src-tauri/target/release/bundle/dmg/*.dmg | head -1)
+          ./scripts/verify_unix.sh "$dmg" 2>&1 | tee verify.log || {
+            ng=$(grep NG verify.log | head -15 | paste -sd'|' -)
+            echo "::error title=macOSの実機検証::$ng"
+            exit 1
+          }
 
       - name: 成果物を集める
         uses: actions/upload-artifact@v4
