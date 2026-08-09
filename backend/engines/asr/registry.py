@@ -18,7 +18,6 @@ from backend.engines.asr.base import ASREngine
 from backend.engines.asr.fasterwhisper import FasterWhisperEngine
 from backend.engines.asr.openai_whisper import OpenAIWhisperEngine
 from backend.engines.asr.openai_whisper import is_available as openai_whisper_available
-from backend.engines.asr.transformers_whisper import TransformersWhisperEngine
 from backend.engines.asr.whispercpp import WhisperCppEngine
 from backend.engines.asr.whispercpp import is_available as whispercpp_available
 
@@ -29,17 +28,15 @@ class ModelInfo:
     label: str
     rtf: int          # 実時間比(RTX PRO 6000実測)
     word_timestamps: bool
-    hf_id: str = ""   # transformersエンジンで使うHugging FaceのモデルID
     vram_fw_mb: int = 0  # faster-whisper(float16)でのVRAM目安
-    vram_tf_mb: int = 0  # PyTorch系(公式/transformers、float16)でのVRAM目安
+    vram_tf_mb: int = 0  # 公式Whisper(PyTorch、float16)でのVRAM目安
     note: str = ""
 
     def vram_mb(self, engine: str) -> int:
         """指定エンジンで動かしたときのVRAM目安(推奨判定と選択UIで共用)"""
         # PyTorch実装は重みに加えて注意重み等を持つため目安が大きい。
         # whisper.cppはggml量子化なしでもfaster-whisper並に収まる
-        torch_engines = ("transformers", "openai_whisper")
-        return self.vram_tf_mb if engine in torch_engines else self.vram_fw_mb
+        return self.vram_tf_mb if engine == "openai_whisper" else self.vram_fw_mb
 
 
 MODELS: dict[str, ModelInfo] = {
@@ -48,7 +45,6 @@ MODELS: dict[str, ModelInfo] = {
         label="large-v3(精度優先・既定)",
         rtf=25,
         word_timestamps=True,
-        hf_id="openai/whisper-large-v3",
         vram_fw_mb=5000,
         vram_tf_mb=10000,
         note="方言や言い回しをそのまま保持します。75分の動画で約3分。",
@@ -58,7 +54,6 @@ MODELS: dict[str, ModelInfo] = {
         label="large-v3-turbo(速度優先)",
         rtf=111,
         word_timestamps=True,
-        hf_id="openai/whisper-large-v3-turbo",
         vram_fw_mb=2500,
         vram_tf_mb=6500,
         note="約4.5倍高速ですが、発話が標準語化される場合があります。",
@@ -72,7 +67,6 @@ ENGINES: dict[str, str] = {
     "faster_whisper": "faster-whisper(CUDA/CPU)",
     "whispercpp": "whisper.cpp(ROCm最速・要ビルド)",
     "openai_whisper": "公式Whisper(ROCm/CUDA)",
-    "transformers": "transformers Whisper(単語確率なし)",
 }
 
 
@@ -135,12 +129,6 @@ def build_engine(settings) -> ASREngine:
             device=torch_device,
             beam_size=settings.asr_beam_size,
         )
-    if engine_id == "transformers":
-        return TransformersWhisperEngine(
-            model_id=MODELS[settings.asr_model].hf_id,
-            device=torch_device,
-        )
-
     # CTranslate2はROCm非対応のため、rocm/cpuともCPU実行にフォールバック
     # (int8クラッシュはBlackwell GPU限定でCPUは安全)
     device, compute_type = (

@@ -46,19 +46,6 @@ def get_environment() -> dict:
     budget = int(settings.vram_budget_mb or 0)
     effective = min(budget, total) if budget > 0 else total
 
-    asr_options = [
-        {
-            "model": m.id,
-            "engine": engine,
-            "vram_mb": vram,
-            # CPU実行はVRAM制約なし。GPUがあれば割当内に収まるかを判定
-            "fits": (not has_gpu) or vram <= effective,
-        }
-        for m in MODELS.values()
-        for engine in ENGINES
-        if engine != "auto"
-        for vram in [m.vram_mb(engine)]
-    ]
     ollama_options = [
         {**m, "fits": has_gpu and m["vram_mb"] <= effective}
         for m in env["ollama"]["models"]
@@ -72,7 +59,6 @@ def get_environment() -> dict:
             effective, env["accel"], env["ollama"]["models"],
             has_gpu=bool(env["gpu"].get("name")),
         ),
-        "asr_options": asr_options,
         "ollama_options": ollama_options,
     }
 
@@ -132,16 +118,13 @@ def list_fonts() -> dict:
 
 @router.get("/settings")
 def get_settings_api() -> dict:
-    from backend.engines.diarize.pyannote import load_hf_token
-
-    has_token = bool(load_hf_token(settings.hf_token_file))
     return {
         "values": {k: getattr(settings, k) for k in sorted(MUTABLE_FIELDS)},
         "diarization_engines": [
             {
                 "id": engine_id, "label": label,
-                # モデル未取得/トークン未設定のエンジンはUIで選べないよう伝える
-                "ready": resolve_diarize_engine(engine_id, has_token=has_token) is not None,
+                # モデル未取得のエンジンはUIで選べないよう伝える
+                "ready": resolve_diarize_engine(engine_id) is not None,
             }
             for engine_id, label in DIARIZE_ENGINES.items()
         ],

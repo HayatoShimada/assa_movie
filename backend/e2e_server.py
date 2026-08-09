@@ -9,6 +9,7 @@
 起動: uv run python -m backend.e2e_server
 """
 
+import os
 import sqlite3
 import tempfile
 from pathlib import Path
@@ -260,7 +261,11 @@ def build_app():
     onnx.DEFAULT_SEGMENTATION = model_dir / "seg" / "model.onnx"
     onnx.DEFAULT_EMBEDDING = model_dir / "embedding.onnx"
     whispercpp.DEFAULT_HOME = model_dir
-    whispercpp.bundled_dir = lambda: model_dir
+    # 同梱物の場所は KS_RESOURCE_DIR で決まる(backend/core/bundled.py)。
+    # 環境変数にしておけば ffmpeg・whisper.cpp・ONNX の3つとも同時に空になる。
+    # 以前は whispercpp の bundled_dir だけを差し替えていて、残り2つは
+    # 開発機の本物を見ていた
+    os.environ["KS_RESOURCE_DIR"] = str(model_dir)
 
     app.include_router(router)
     resolve_job.set_client_factory(lambda: FakeLLMClient(responses=_fake_llm))

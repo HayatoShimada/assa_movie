@@ -6,10 +6,10 @@ import pytest
 from fastapi.testclient import TestClient
 
 from backend.core.environment import recommend, scan_ollama
-from backend.core.device import apply_vram_budget, gpu_info
+from backend.core.device import apply_vram_budget
 
 
-# ---- gpu_info / apply_vram_budget(fake torchで検証) ----
+# ---- apply_vram_budget(fake torchで検証) ----
 
 def _fake_torch(total_mb=24560, free_mb=20000, available=True):
     calls = {}
@@ -27,17 +27,6 @@ def _fake_torch(total_mb=24560, free_mb=20000, available=True):
         version=SimpleNamespace(hip="6.4", cuda=None),
         _calls=calls,
     )
-
-
-def test_gpu_info_with_gpu():
-    info = gpu_info(_fake_torch())
-    assert info["name"] == "Radeon RX 7900 XTX"
-    assert info["vram_total_mb"] == 24560
-    assert info["vram_free_mb"] == 20000
-
-
-def test_gpu_info_without_gpu():
-    assert gpu_info(_fake_torch(available=False)) == {}
 
 
 def test_apply_vram_budget_sets_fraction():
@@ -150,9 +139,8 @@ def test_environment_api_shape(client):
     assert body["accel"] in ("cuda", "rocm", "cpu")
     assert "gpu" in body and "ffmpeg" in body and "ollama" in body
     assert "recommendations" in body
-    assert isinstance(body["asr_options"], list)
-    for opt in body["asr_options"]:
-        assert {"model", "engine", "vram_mb", "fits"} <= set(opt)
+    # Ollamaのモデルは環境パネルが「割当に収まるか」を出すのに使う
+    assert isinstance(body["ollama_options"], list)
 
 
 def test_vram_budget_setting_persists(client):

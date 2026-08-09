@@ -7,7 +7,6 @@ from backend.core.config import Settings
 from backend.engines.asr.fasterwhisper import FasterWhisperEngine
 from backend.engines.asr.registry import DEFAULT_MODEL, ENGINES, MODELS, build_engine
 from backend.engines.asr.openai_whisper import OpenAIWhisperEngine
-from backend.engines.asr.transformers_whisper import TransformersWhisperEngine
 
 
 def test_default_model_is_large_v3():
@@ -94,16 +93,16 @@ def test_build_engine_falls_back_to_faster_whisper_without_torch(monkeypatch):
     assert isinstance(build_engine(Settings(_env_file=None)), FasterWhisperEngine)
 
 
-def test_build_engine_explicit_transformers_on_cpu(monkeypatch):
-    from backend.engines.asr import registry
+def test_transformersエンジンはもう選べない():
+    """M41で削除した。単語確率とinitial_promptが取れず、torch依存で
+    配布物にも入らないため、選択肢として残す理由が無くなった"""
+    from backend.engines.asr.registry import ENGINES
 
-    monkeypatch.setattr(registry, "detect_accel", lambda: "cpu")
+    assert "transformers" not in ENGINES
     s = Settings(_env_file=None)
     s.asr_engine = "transformers"
-    engine = build_engine(s)
-    assert isinstance(engine, TransformersWhisperEngine)
-    assert engine.device == "cpu"
-    assert engine.model_id == "openai/whisper-large-v3"
+    with pytest.raises(ValueError, match="未知のASRエンジン"):
+        build_engine(s)
 
 
 def test_build_engine_rejects_unknown_model():

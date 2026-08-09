@@ -12,13 +12,13 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "gpu: GPUを使うテスト(既定でスキップ)")
     config.addinivalue_line(
         "markers",
-        "torch: torch系(transformers/openai-whisper/pyannote)が要るテスト。"
+        "torch: 公式Whisper(torch依存)が要るテスト。"
         "配布物にtorchは入れないので、入っていない環境では自動でスキップする",
     )
 
 
 # マーカー名 → 実際に import できるかを見るモジュール名
-_TORCH_MODULES = ("torch", "transformers", "whisper", "pyannote.audio")
+_TORCH_MODULES = ("torch", "whisper")
 
 
 def pytest_collection_modifyitems(config, items):

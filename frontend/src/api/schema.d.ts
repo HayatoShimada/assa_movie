@@ -1117,8 +1117,6 @@ export interface components {
         };
         /** SettingsUpdate */
         SettingsUpdate: {
-            /** Aizuchi Filter Enabled */
-            aizuchi_filter_enabled?: boolean | null;
             /** Aizuchi Max Duration */
             aizuchi_max_duration?: number | null;
             /** Asr Beam Size */
@@ -1155,8 +1153,6 @@ export interface components {
             ollama_model?: string | null;
             /** Pronoun Apply Mode */
             pronoun_apply_mode?: string | null;
-            /** Pronoun Enabled */
-            pronoun_enabled?: boolean | null;
             /** Pronoun Form */
             pronoun_form?: string | null;
             /** Pronoun Level */
@@ -1177,10 +1173,6 @@ export interface components {
             subtitle_font_size?: number | null;
             /** Subtitle Max Chars Per Line */
             subtitle_max_chars_per_line?: number | null;
-            /** Subtitle Max Lines */
-            subtitle_max_lines?: number | null;
-            /** Subtitle Mode */
-            subtitle_mode?: string | null;
             /** Subtitle Offset Y */
             subtitle_offset_y?: number | null;
             /** Subtitle Position */

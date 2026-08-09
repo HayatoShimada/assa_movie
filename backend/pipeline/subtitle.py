@@ -78,18 +78,6 @@ def srt_block(index: int, start: float, end: float, text: str) -> str:
     return f"{index}\n{format_timestamp(start)} --> {format_timestamp(end)}\n{text}\n\n"
 
 
-def write_srt(path: Path, entries: list[tuple[float, float, str]]) -> None:
-    with open(path, "w", encoding="utf-8") as f:
-        for i, (start, end, text) in enumerate(entries, start=1):
-            f.write(srt_block(i, start, end, text))
-
-
-def write_txt(path: Path, texts: list[str]) -> None:
-    with open(path, "w", encoding="utf-8") as f:
-        for text in texts:
-            f.write(text + "\n")
-
-
 # ---- ASS生成 ----
 
 # 話者に順番に割り当てる文字色(ASSは &HBBGGRR)

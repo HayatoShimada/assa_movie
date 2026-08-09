@@ -10,11 +10,11 @@
 """
 
 import os
-import sys
 from pathlib import Path
 
 import numpy as np
 
+from backend.core.bundled import bundled_dir
 from backend.core.paths import cache_dir
 
 # 取得元と相対パスは model_sources.py が唯一の定義(取得スクリプトと共有する)
@@ -25,16 +25,6 @@ SAMPLE_RATE = 16000
 DEFAULT_HOME = Path(os.environ.get("KS_MODELS_HOME") or cache_dir())
 DEFAULT_SEGMENTATION = DEFAULT_HOME / SEGMENTATION_REL
 DEFAULT_EMBEDDING = DEFAULT_HOME / EMBEDDING_REL
-
-
-def bundled_dir() -> Path:
-    """配布版に同梱したモデルの置き場所。
-
-    場所はパッケージ形式で変わるので自分で組み立てず、Tauriシェルが
-    KS_RESOURCE_DIR で教えてくれた場所を使う(whispercpp.pyと同じ)。
-    """
-    resource_dir = os.environ.get("KS_RESOURCE_DIR", "").strip()
-    return Path(resource_dir) if resource_dir else Path(sys.executable).parent
 
 
 def _resolve(relative: str, downloaded: Path) -> Path:

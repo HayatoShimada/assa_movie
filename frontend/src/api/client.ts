@@ -201,7 +201,6 @@ export interface EnvironmentResponse {
   vram_budget_mb: number
   effective_vram_mb: number
   recommendations: { asr_engine: string; asr_model: string; ollama_model: string | null }
-  asr_options: { model: string; engine: string; vram_mb: number; fits: boolean }[]
   ollama_options: { name: string; vram_mb: number; fits: boolean }[]
 }
 

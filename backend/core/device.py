@@ -204,9 +204,13 @@ def probe_gpu_mac() -> dict:
     return parse_mac_gpu(_run(["system_profiler", "SPDisplaysDataType"]), ram)
 
 
-def probe_gpu_cli() -> dict:
-    """ベンダーCLIからGPUを調べる。見つからなければ空dict"""
-    if platform.system() == "Darwin":
+def probe_gpu_cli(os_name: str | None = None) -> dict:
+    """ベンダーCLIからGPUを調べる。見つからなければ空dict。
+
+    os_name を渡せるのは、macOSだけ経路が違う(system_profiler)ため。
+    実行中のOSに任せるとNVIDIA/AMDの判定テストがmacOSで意味を失う
+    """
+    if (os_name or platform.system()) == "Darwin":
         return probe_gpu_mac()
     nvidia = parse_nvidia_smi(
         _run(["nvidia-smi", "--query-gpu=name,memory.total,memory.free",
@@ -234,24 +238,6 @@ def detect_accel(torch_module=None) -> str:
         return "rocm" if getattr(t.version, "hip", None) else "cuda"
     except Exception:
         return "cpu"
-
-
-def gpu_info(torch_module=None) -> dict:
-    """GPU名とVRAM量を返す: {name, vram_total_mb, vram_free_mb}。GPU無しは空dict"""
-    t = _torch(torch_module)
-    if t is None:
-        return {}
-    try:
-        if not t.cuda.is_available():
-            return {}
-        free, total = t.cuda.mem_get_info()
-        return {
-            "name": t.cuda.get_device_name(0),
-            "vram_total_mb": int(total / 1024**2),
-            "vram_free_mb": int(free / 1024**2),
-        }
-    except Exception:
-        return {}
 
 
 def apply_vram_budget(budget_mb: int, torch_module=None) -> None:

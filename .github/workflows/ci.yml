@@ -130,28 +130,45 @@ jobs:
         with:
           workspaces: frontend/src-tauri
 
+      # 下の置き場所づくりで使う(3OSで同じPythonが手に入る)
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
       # tauri.conf.json が frontendDist を要求するので、空でも用意しておく
       - name: フロントの出力先を用意する
         shell: bash
         run: mkdir -p frontend/dist && touch frontend/dist/index.html
 
-      # tauri-buildは tauri.<os>.conf.json が挙げるリソースの実在を確かめる。
-      # 中身(ffmpeg・whisper-cli・モデル)は release.yml でしか作らないので、
-      # ここでは空ファイルを置く。cargo testはリソースの中身を使わない
-      - name: 同梱リソースの置き場所を用意する
+      # tauri-buildは externalBin(Pythonサイドカー)と resources の実在を
+      # 確かめる。中身は release.yml でしか作らないので、ここでは空を置く。
+      # cargo testはどちらの中身も使わない
+      - name: 同梱物の置き場所を用意する
         shell: bash
         run: |
-          python3 - <<'PY'
-          import json, pathlib, platform
+          uv run --no-project python - <<'PY'
+          import json, pathlib, platform, subprocess
           root = pathlib.Path("frontend/src-tauri")
-          conf = {"Linux": "linux", "Windows": "windows", "Darwin": "macos"}[platform.system()]
+          osname = platform.system()
+
+          conf = {"Linux": "linux", "Windows": "windows", "Darwin": "macos"}[osname]
           data = json.loads((root / f"tauri.{conf}.conf.json").read_text(encoding="utf-8"))
-          for src in data["bundle"]["resources"]:
-              path = root / src
+          paths = list(data["bundle"]["resources"])
+
+          # externalBin は「<名前>-<ターゲットトリプル>」で探される
+          base = json.loads((root / "tauri.conf.json").read_text(encoding="utf-8"))
+          triple = subprocess.run(
+              ["rustc", "-vV"], capture_output=True, text=True, check=True
+          ).stdout.split("host: ")[1].split("\n")[0].strip()
+          suffix = ".exe" if osname == "Windows" else ""
+          paths += [f"{name}-{triple}{suffix}" for name in base["bundle"]["externalBin"]]
+
+          for rel in paths:
+              path = root / rel
               path.parent.mkdir(parents=True, exist_ok=True)
               if not path.exists():
                   path.write_bytes(b"")
-                  print("placeholder:", src)
+                  print("placeholder:", rel)
           PY
 
       - name: cargo test

@@ -42,8 +42,8 @@ dependencies = [
 # torch/torchaudioはGPUベンダーごとにwheelのindexが違うためグループで切り替える。
 # 既定(default-groups)はrocm。NVIDIA機では:
 #   uv sync --no-default-groups --group dev --group cu128
-# pyannote-audio 3.x はtorchaudio 2.9以降の削除APIに依存しているため2.8系に固定
-# (2.8+cu128はBlackwell/sm_120対応済み。2.8+rocm6.4はgfx1100=RX 7900系対応)
+# torch 2.8系に固定(2.8+cu128はBlackwell/sm_120対応済み。
+# 2.8+rocm6.4はgfx1100=RX 7900系対応)
 # dependency-groupは配布物(project.dependencies)には入らないので、
 # 開発と比較検証でだけ使うものはここに置く
 [dependency-groups]
@@ -55,15 +55,10 @@ dependencies = [
 # 開発もE2Eも一切動かせなくなる(手作りのvenvで凌ぐ羽目になっていた)。
 # これらに依存するテストは @pytest.mark.torch で自動スキップされる
 torch-engines = [
-    # ROCmでtorch経由で動くWhisper実装(whisper.cppが無い環境向けの保険)
-    "transformers>=4.44; sys_platform == 'linux'",
-    # 公式Whisper。依存のtritonはNVIDIA版でpytorch-triton-rocmと同じモジュール名を
-    # 奪うため tool.uv.override-dependencies で除外している
+    # 公式Whisper。ROCmでGPUを使える唯一のtorch実装で、whisper.cppが無い
+    # 開発環境向けの保険。依存のtritonはNVIDIA版でpytorch-triton-rocmと同じ
+    # モジュール名を奪うため tool.uv.override-dependencies で除外している
     "openai-whisper>=20240930; sys_platform == 'linux'",
-    # 旧・話者分離エンジン。4.x系は同意済みでないモデルを要求するため3.x系に固定
-    "pyannote-audio>=3.3,<4; sys_platform == 'linux'",
-    # pyannote-audio 3.x はhuggingface_hub 1.0で削除されたuse_auth_token引数を使う
-    "huggingface-hub<1.0; sys_platform == 'linux'",
 ]
 
 dev = [

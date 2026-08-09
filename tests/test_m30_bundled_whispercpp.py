@@ -10,6 +10,7 @@ import platform
 
 import pytest
 
+from backend.core import bundled
 from backend.engines.asr import whispercpp
 
 
@@ -98,11 +99,11 @@ def test_モデルだけでは使えない(dirs):
     assert whispercpp.is_available() is False
 
 
-# ---- 同梱先の決め方 ----
+# ---- 同梱先の決め方(backend/core/bundled.py) ----
 def test_同梱先はTauriが教えてくれた場所(monkeypatch, tmp_path):
     """同梱物の場所はパッケージ形式で変わるので、シェルに教えてもらう"""
     monkeypatch.setenv("KS_RESOURCE_DIR", str(tmp_path / "usr/lib/KirinukiStudio"))
-    assert whispercpp.bundled_dir() == tmp_path / "usr/lib/KirinukiStudio"
+    assert bundled.bundled_dir() == tmp_path / "usr/lib/KirinukiStudio"
 
 
 def test_教えられていなければ実行ファイルの隣を見る(monkeypatch, tmp_path):
@@ -111,8 +112,21 @@ def test_教えられていなければ実行ファイルの隣を見る(monkeyp
     exe = tmp_path / "usr" / "bin" / "kirinuki-studio-backend"
     exe.parent.mkdir(parents=True)
     exe.write_text("")
-    monkeypatch.setattr(whispercpp.sys, "executable", str(exe))
-    assert whispercpp.bundled_dir() == exe.parent
+    monkeypatch.setattr(bundled.sys, "executable", str(exe))
+    assert bundled.bundled_dir() == exe.parent
+
+
+def test_同梱物を探す3箇所が同じ実装を使う():
+    """ffmpeg・whisper.cpp・話者分離モデルで同じコードが3つに分かれていた。
+
+    テストやE2Eで差し替えるとき1つしか差し替えず、残り2つが本物を見ていた
+    (e2e_server.py が実際にそうなっていた)
+    """
+    from backend.core import ffmpeg
+    from backend.engines.diarize import onnx
+
+    for module in (ffmpeg, whispercpp, onnx):
+        assert module.bundled_dir is bundled.bundled_dir, module.__name__
 
 
 # ---- エンジンが解決結果を使う ----

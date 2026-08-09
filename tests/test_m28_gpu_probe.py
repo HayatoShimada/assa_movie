@@ -60,11 +60,13 @@ def test_読めないnvidia出力はGPU無しとして扱う(payload):
 
 
 # ---- 選択の順番 ----
+# macOSはsystem_profiler経由の別経路なので、OSを明示して他OSの判定を確かめる
+# (実行中のOSに任せると、macOSのCIでNVIDIA/AMDの分岐に一切入らない)
 def test_NVIDIAが見つかればそれを使う(monkeypatch):
     monkeypatch.setattr(device, "_run", lambda cmd: {
         "nvidia-smi": "RTX 4090, 24564, 23000",
     }.get(cmd[0], ""))
-    assert device.probe_gpu_cli()["accel"] == "cuda"
+    assert device.probe_gpu_cli(os_name="Linux")["accel"] == "cuda"
 
 
 def test_AMDが見つかればそれを使う(monkeypatch):
@@ -74,12 +76,19 @@ def test_AMDが見つかればそれを使う(monkeypatch):
         return ROCM_NAME if "--showproductname" in cmd else ROCM_MEMORY
 
     monkeypatch.setattr(device, "_run", fake)
-    assert device.probe_gpu_cli()["accel"] == "rocm"
+    assert device.probe_gpu_cli(os_name="Linux")["accel"] == "rocm"
 
 
 def test_どちらも無ければ空(monkeypatch):
     monkeypatch.setattr(device, "_run", lambda cmd: "")
-    assert device.probe_gpu_cli() == {}
+    assert device.probe_gpu_cli(os_name="Linux") == {}
+
+
+def test_macOSはsystem_profilerを見る(monkeypatch):
+    """ベンダーCLIはmacOSに無い。呼ぶだけ無駄なので経路を分けている"""
+    monkeypatch.setattr(device, "_run", lambda cmd: pytest.fail(f"呼ばれた: {cmd}"))
+    monkeypatch.setattr(device, "probe_gpu_mac", lambda: {"accel": "metal"})
+    assert device.probe_gpu_cli(os_name="Darwin")["accel"] == "metal"
 
 
 def test_probe_gpuはCLIで足りればtorchを起動しない(monkeypatch):

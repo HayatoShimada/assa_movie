@@ -5,7 +5,6 @@ import pytest
 
 from backend.engines.asr.base import Segment, Word
 from backend.engines.diarize.labels import assign_speaker, build_label_map
-from backend.engines.diarize.pyannote import load_hf_token
 from backend.pipeline import audio as audio_io
 from backend.pipeline.aizuchi import is_aizuchi
 from backend.pipeline.subtitle import format_timestamp, srt_block
@@ -120,23 +119,3 @@ def test_build_label_map_explicit_names_win(monkeypatch):
         speaker_names={"A": "しまだ"}, log=lambda *_: None,
     )
     assert m == {"A": "しまだ", "B": "B"}
-
-
-# ---- HFトークン読み込み ----
-def test_load_hf_token_from_env(monkeypatch, tmp_path):
-    monkeypatch.setenv("HF_TOKEN", "hf_fromenv")
-    assert load_hf_token(tmp_path / "none.txt") == "hf_fromenv"
-
-
-def test_load_hf_token_from_file(monkeypatch, tmp_path):
-    monkeypatch.delenv("HF_TOKEN", raising=False)
-    f = tmp_path / "t.txt"
-    f.write_text("hf_fromfile\n")
-    assert load_hf_token(f) == "hf_fromfile"
-
-
-def test_load_hf_token_rejects_placeholder(monkeypatch, tmp_path):
-    monkeypatch.delenv("HF_TOKEN", raising=False)
-    f = tmp_path / "t.txt"
-    f.write_text("ここにトークンを貼り付けてください\n複数行の説明\n")
-    assert load_hf_token(f) is None

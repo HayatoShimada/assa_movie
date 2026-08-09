@@ -24,13 +24,12 @@ class Settings(BaseSettings):
 
     # ---- 基盤 ----
     db_path: Path = Field(default_factory=paths.db_path)
-    hf_token_file: Path = Field(default_factory=lambda: paths.config_file("hf_token.txt"))
 
     # ---- ASR ----
     # 既定はlarge-v3(精度優先・単語タイムスタンプ必須の要件による。BACKEND_DESIGN.md参照)
     asr_model: str = "large-v3"
-    # auto: CUDA→faster-whisper / ROCm→transformers / CPU→faster-whisper(int8)
-    asr_engine: str = "auto"  # auto | faster_whisper | transformers
+    # auto: CUDA→faster-whisper / ROCm→whisper.cpp / CPU→faster-whisper(int8)
+    asr_engine: str = "auto"  # auto | faster_whisper | whispercpp
     asr_compute_type: str = "float16"  # Blackwellではint8がクラッシュするため固定
     asr_language: str = "ja"
     asr_beam_size: int = 5
@@ -40,34 +39,33 @@ class Settings(BaseSettings):
 
     # ---- 話者分離 ----
     diarization_enabled: bool = True
-    # auto: ONNXモデルがあればONNX / 無ければHFトークン次第でpyannote
-    diarization_engine: str = "auto"  # auto | onnx | pyannote
-    diarization_model: str = "pyannote/speaker-diarization-3.1"
+    # 実装はONNXだけ。torchを使うpyannoteは配布物で動かないため削除した
+    diarization_engine: str = "auto"  # auto | onnx
     num_speakers: int | None = 2
     male_name: str = "話者A"
     female_name: str = "話者B"
 
     # ---- 相槌除外 ----
-    aizuchi_filter_enabled: bool = True
+    # 相槌は字幕から常に除外する(subtitle.py)。有無を切り替える設定は置かない
     aizuchi_max_duration: float = 2.0
 
     # ---- フィラー排除 ----
     filler_level: str = "off"  # off | weak | strong
 
     # ---- 指示語置換 ----
-    pronoun_enabled: bool = True
+    # 実行はレビュータブのボタンで始める。使うかどうかは押すかどうかで決まる
     pronoun_level: str = "medium"  # weak | medium | strong
     pronoun_form: str = "annotate"  # annotate | replace | complete
     pronoun_apply_mode: str = "auto_and_review"  # full_auto | auto_and_review | all_review
 
     # ---- 字幕 ----
-    subtitle_mode: str = "all"  # all | selective
-    subtitle_adoption_rate: float = 0.3  # selective時の採用率
+    # 字幕の採否は judge ジョブが決める(subtitle_show)。採用率はその閾値
+    subtitle_adoption_rate: float = 0.3
     subtitle_font_size: int = 48
     subtitle_position: str = "bottom"  # top | center | bottom
     subtitle_offset_y: int = 0  # +で下、-で上
+    # 行数はこの折り返し幅で決まる(上限を別に持つと二重管理になる)
     subtitle_max_chars_per_line: int = 15
-    subtitle_max_lines: int = 2
     # スタイル(px値は1920×1080基準。出力解像度へは幅/高さ比率で自動換算)
     subtitle_font_family: str = "Noto Sans JP"
     subtitle_text_color: str = "#FFFFFF"
@@ -106,13 +104,9 @@ class Settings(BaseSettings):
     vram_budget_mb: int = 0
 
     # ---- ジョブ ----
-    max_replacement_len: int = 40
+    # 置換の長さ上限は積極性(pronoun_level)ごとに違うので pipeline/pronoun.py の
+    # LEVELS が持つ。ここに置くと二重管理になり、実際こちらは読まれていなかった
     llm_retries: int = 3
 
 
 settings = Settings()
-
-
-def get_settings() -> Settings:
-    """FastAPIの依存性注入用(テストで差し替えやすくする)"""
-    return settings

@@ -13,7 +13,6 @@ from backend.core.project_settings import resolve_settings
 from backend.engines.asr.registry import build_engine
 from backend.engines.diarize import labels as diarize_labels
 from backend.engines.diarize import registry as diarize
-from backend.engines.diarize.pyannote import load_hf_token
 from backend.jobs.queue import register
 from backend.pipeline import audio as audio_io
 from backend.pipeline import filler as filler_mod
@@ -49,9 +48,7 @@ def run_transcribe(
     turns: list = []
     label_map: dict[str, str] = {}
     if s.diarization_enabled:
-        turns, _engine = diarize.run_diarization(
-            audio, s, token=load_hf_token(s.hf_token_file)
-        )
+        turns, _engine = diarize.run_diarization(audio, s)
         if turns:
             label_map = diarize_labels.build_label_map(
                 audio, turns,

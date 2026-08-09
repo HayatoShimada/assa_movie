@@ -96,14 +96,13 @@ CP932_TEXT = "ここにAPIキーを貼り付けてください\n"
     [
         ("backend.engines.llm.gemini", "load_api_key"),
         ("backend.engines.llm.claude", "load_api_key"),
-        ("backend.engines.diarize.pyannote", "load_hf_token"),
     ],
 )
 def test_cp932のキーファイルでも例外を漏らさない(tmp_path, monkeypatch, module_path, func_name):
     import importlib
 
     # 環境変数が入っているとファイルを読まないので必ず消す
-    for var in ("GEMINI_API_KEY", "ANTHROPIC_API_KEY", "HF_TOKEN"):
+    for var in ("GEMINI_API_KEY", "ANTHROPIC_API_KEY"):
         monkeypatch.delenv(var, raising=False)
 
     path = tmp_path / "key.txt"
@@ -118,13 +117,12 @@ def test_cp932のキーファイルでも例外を漏らさない(tmp_path, monk
     [
         ("backend.engines.llm.gemini", "load_api_key", "AIzaSyTESTKEY0123456789"),
         ("backend.engines.llm.claude", "load_api_key", "sk-ant-api03-testkey"),
-        ("backend.engines.diarize.pyannote", "load_hf_token", "hf_testtoken"),
     ],
 )
 def test_正しいキーは今までどおり読める(tmp_path, monkeypatch, module_path, func_name, valid):
     import importlib
 
-    for var in ("GEMINI_API_KEY", "ANTHROPIC_API_KEY", "HF_TOKEN"):
+    for var in ("GEMINI_API_KEY", "ANTHROPIC_API_KEY"):
         monkeypatch.delenv(var, raising=False)
 
     path = tmp_path / "key.txt"

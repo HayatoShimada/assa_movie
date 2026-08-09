@@ -190,13 +190,6 @@ export function SettingsFields({
 
       <div className="py-2">
         <h3 className="mb-1 text-sm font-semibold">指示語置換</h3>
-        <Row label="有効">
-          <input
-            type="checkbox"
-            checked={Boolean(v.pronoun_enabled)}
-            onChange={(e) => set('pronoun_enabled')(e.target.checked)}
-          />
-        </Row>
         <Row label="積極性">
           <select
             className={selectCls}
@@ -235,31 +228,20 @@ export function SettingsFields({
 
       <div className="py-2">
         <h3 className="mb-1 text-sm font-semibold">字幕</h3>
-        <Row label="字幕モード">
-          <select
-            data-testid={`${idPrefix}-subtitle-mode`}
-            className={selectCls}
-            value={String(v.subtitle_mode)}
-            onChange={(e) => set('subtitle_mode')(e.target.value)}
-          >
-            <option value="all">全文字幕(全セグメントを表示)</option>
-            <option value="selective">選択字幕(必要なものだけ)</option>
-          </select>
+        {/* 採否は「字幕の取捨選択」ジョブが決める。ここはその採用率の閾値 */}
+        <Row label={`採用率 ${Math.round(Number(v.subtitle_adoption_rate) * 100)}%`}>
+          <input
+            data-testid={`${idPrefix}-subtitle-adoption-rate`}
+            type="range"
+            min={0.1}
+            max={1}
+            step={0.05}
+            defaultValue={Number(v.subtitle_adoption_rate)}
+            onMouseUp={(e) =>
+              set('subtitle_adoption_rate')(Number((e.target as HTMLInputElement).value))
+            }
+          />
         </Row>
-        {v.subtitle_mode === 'selective' && (
-          <Row label={`採用率 ${Math.round(Number(v.subtitle_adoption_rate) * 100)}%`}>
-            <input
-              type="range"
-              min={0.1}
-              max={1}
-              step={0.05}
-              defaultValue={Number(v.subtitle_adoption_rate)}
-              onMouseUp={(e) =>
-                set('subtitle_adoption_rate')(Number((e.target as HTMLInputElement).value))
-              }
-            />
-          </Row>
-        )}
         <Row label="フォント">
           <span>
             <select

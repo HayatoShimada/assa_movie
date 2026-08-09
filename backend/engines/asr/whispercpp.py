@@ -15,7 +15,6 @@ import json
 import logging
 import os
 import platform
-import sys
 import subprocess
 import tempfile
 import wave
@@ -24,10 +23,11 @@ from pathlib import Path
 import numpy as np
 
 from backend.engines.asr.base import ProgressFn, Segment, TranscribeResult, Word
+from backend.core.bundled import bundled_dir
 from backend.core.cancellation import register_process
 from backend.core.console import SUBPROCESS_TEXT
 from backend.core.paths import cache_dir
-from backend.engines.asr.transformers_whisper import words_to_segments
+from backend.engines.asr.segmenting import words_to_segments
 
 logger = logging.getLogger(__name__)
 
@@ -40,18 +40,6 @@ MODEL_NAME = "ggml-large-v3.bin"
 BINARY_NAME = "whisper-cli.exe" if platform.system() == "Windows" else "whisper-cli"
 # 長さ0のトークン(句読点など)に与える最小表示時間(秒)
 MIN_TOKEN_DURATION = 0.02
-
-
-def bundled_dir() -> Path:
-    """配布版に同梱したバイナリの置き場所。
-
-    同梱物の実際の場所はパッケージ形式で変わる(.debなら
-    /usr/lib/KirinukiStudio、AppImageなら展開先)。自分で組み立てず、
-    Tauriシェルが KS_RESOURCE_DIR で教えてくれた場所を使う
-    (frontend/src-tauri/src/lib.rs)。開発中は実行ファイルの隣を見る。
-    """
-    resource_dir = os.environ.get("KS_RESOURCE_DIR", "").strip()
-    return Path(resource_dir) if resource_dir else Path(sys.executable).parent
 
 
 def resolve_model() -> Path:

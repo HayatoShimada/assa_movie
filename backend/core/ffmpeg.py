@@ -16,18 +16,13 @@ Tauriシェルが KS_RESOURCE_DIR で教えてくれた場所を使う。
 import os
 import platform
 import shutil
-import sys
 from pathlib import Path
 from typing import Callable
 
+from backend.core.bundled import bundled_dir
+
 # 同梱物の中での置き場所(tauri.windows.conf.json の resources と対応)
 BUNDLED_SUBDIR = "bin"
-
-
-def bundled_dir() -> Path:
-    """同梱物の置き場所。開発中は実行ファイルの隣を見る"""
-    resource_dir = os.environ.get("KS_RESOURCE_DIR", "").strip()
-    return Path(resource_dir) if resource_dir else Path(sys.executable).parent
 
 
 def exe_name(name: str, os_name: str | None = None) -> str:

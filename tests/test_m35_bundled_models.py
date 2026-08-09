@@ -81,39 +81,21 @@ def test_セットアップ画面は同梱を数に入れる(bundled, tmp_path, 
     assert setup_job.status()["diarization"]["ready"] is True
 
 
-# ---- pyannoteは配布版では選べない ----
-def test_torchが無ければpyannoteは選べない(monkeypatch):
-    """トークンだけ見て「使える」と出すと、選んだ瞬間にImportErrorで落ちる。
+# ---- 話者分離はONNXだけ ----
+def test_モデルが無ければ話者分離は使えない(monkeypatch):
+    """torchを使うpyannoteはM41で削除した。落とし先はもう無い"""
+    from backend.engines.diarize import registry
 
-    配布物にtorchは入っていない(11.5GBあるため)ので、インストール版では
-    常にこの状態になる。
-    """
-    from backend.engines.diarize import pyannote, registry
-
-    monkeypatch.setattr(pyannote, "is_available", lambda: False)
     monkeypatch.setattr(onnx, "is_available", lambda *a, **k: False)
-
-    assert registry.resolve_engine("pyannote", has_token=True) is None
-    assert registry.resolve_engine("auto", has_token=True) is None
+    assert registry.resolve_engine("auto") is None
 
 
-def test_torchがあればpyannoteを選べる(monkeypatch):
-    """ソースから動かす開発環境では従来どおり使える"""
-    from backend.engines.diarize import pyannote, registry
-
-    monkeypatch.setattr(pyannote, "is_available", lambda: True)
-    monkeypatch.setattr(onnx, "is_available", lambda *a, **k: False)
-
-    assert registry.resolve_engine("pyannote", has_token=True) == "pyannote"
-    assert registry.resolve_engine("auto", has_token=True) == "pyannote"
-
-
-def test_ONNXがあればトークン無しでも動く(monkeypatch):
-    """同梱モデルがある配布版の状態"""
+def test_同梱モデルがあればトークン無しで動く(monkeypatch):
+    """配布版の状態。HFトークンはもうどこでも要らない"""
     from backend.engines.diarize import registry
 
     monkeypatch.setattr(onnx, "is_available", lambda *a, **k: True)
-    assert registry.resolve_engine("auto", has_token=False) == "onnx"
+    assert registry.resolve_engine("auto") == "onnx"
 
 
 # ---- CUDA/ROCmが無いGPU機でwhisper.cppを選ぶ ----
