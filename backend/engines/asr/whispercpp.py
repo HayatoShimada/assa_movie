@@ -24,6 +24,7 @@ from pathlib import Path
 import numpy as np
 
 from backend.engines.asr.base import ProgressFn, Segment, TranscribeResult, Word
+from backend.core.cancellation import register_process
 from backend.core.console import SUBPROCESS_TEXT
 from backend.core.paths import cache_dir
 from backend.engines.asr.transformers_whisper import words_to_segments
@@ -167,10 +168,16 @@ class WhisperCppEngine:
         return self
 
     def _run(self, cmd: list[str], out_base: Path) -> None:
-        proc = subprocess.run(cmd, capture_output=True, timeout=7200, **SUBPROCESS_TEXT)
+        # Popenで起動して登録する。走っている間こちらへ制御が戻らないので、
+        # 中止できるようにするには外から止めるしかない
+        proc = subprocess.Popen(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **SUBPROCESS_TEXT
+        )
+        register_process(proc)
+        _, stderr = proc.communicate(timeout=7200)
         if proc.returncode != 0:
             raise RuntimeError(
-                f"whisper.cppが失敗しました(exit {proc.returncode}): {proc.stderr[-1500:]}"
+                f"whisper.cppが失敗しました(exit {proc.returncode}): {(stderr or '')[-1500:]}"
             )
 
     def transcribe(

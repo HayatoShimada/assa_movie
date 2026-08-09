@@ -22,6 +22,10 @@ function MediaRow({ media }: { media: Media }) {
     onSuccess: (job) => setJobId(job.id),
   })
 
+  const cancel = useMutation({
+    mutationFn: () => api.cancelJob(jobId as number),
+  })
+
   const running = progress.status === 'running' || progress.status === 'queued'
   const name = media.path.split('/').pop()
 
@@ -42,15 +46,29 @@ function MediaRow({ media }: { media: Media }) {
               label={
                 progress.status === 'failed'
                   ? `失敗: ${progress.error?.split('\n')[0] ?? ''}`
-                  : progress.status === 'completed'
-                    ? '文字起こし完了'
-                    : `文字起こし中... ${Math.round(progress.progress * 100)}%`
+                  : progress.status === 'cancelled'
+                    ? '中止しました'
+                    : progress.status === 'completed'
+                      ? '文字起こし完了'
+                      : `文字起こし中... ${Math.round(progress.progress * 100)}%`
               }
             />
           </div>
         )}
       </div>
+      {/* 文字起こしは長いと数十分かかる。間違えて始めたら待つしかない状態にしない */}
+      {running && (
+        <Button
+          data-testid={`media-cancel-${media.id}`}
+          variant="ghost"
+          disabled={cancel.isPending}
+          onClick={() => cancel.mutate()}
+        >
+          中止
+        </Button>
+      )}
       <Button
+        data-testid={`media-transcribe-${media.id}`}
         variant="ghost"
         disabled={running || transcribe.isPending}
         onClick={() => transcribe.mutate()}
@@ -79,9 +97,13 @@ function ProjectCard({ project }: { project: Project }) {
       (query.state.data ?? []).some((m) => m.status !== 'transcribed') ? 30000 : false,
   })
   const [showSettings, setShowSettings] = useState(false)
+  const [confirming, setConfirming] = useState(false)
   const remove = useMutation({
     mutationFn: () => api.deleteProject(project.id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['projects'] }),
+    onSuccess: () => {
+      setConfirming(false)
+      queryClient.invalidateQueries({ queryKey: ['projects'] })
+    },
   })
   const templateLabel = templateFor(project)?.label
   const [path, setPath] = useState('')
@@ -122,22 +144,39 @@ function ProjectCard({ project }: { project: Project }) {
         >
           設定
         </Button>
-        <Button
-          data-testid={`project-delete-${project.id}`}
-          variant="ghost"
-          disabled={remove.isPending}
-          onClick={() => {
-            if (
-              window.confirm(
-                `プロジェクト「${project.name}」を削除します。動画の文字起こし・クリップも全て消えます。よろしいですか?`,
-              )
-            )
-              remove.mutate()
-          }}
-        >
-          削除
-        </Button>
+        {/* window.confirm はwebviewによって出方が変わる(Tauriのデスクトップ版で
+            押しても何も起きない事象があった)。画面内で確認する */}
+        {confirming ? (
+          <span className="flex items-center gap-2">
+            <span className="text-xs text-red-600 dark:text-red-400">
+              文字起こし・クリップも消えます
+            </span>
+            <Button
+              data-testid={`project-delete-confirm-${project.id}`}
+              disabled={remove.isPending}
+              onClick={() => remove.mutate()}
+            >
+              {remove.isPending ? '削除中…' : '削除する'}
+            </Button>
+            <Button variant="ghost" onClick={() => setConfirming(false)}>
+              やめる
+            </Button>
+          </span>
+        ) : (
+          <Button
+            data-testid={`project-delete-${project.id}`}
+            variant="ghost"
+            onClick={() => setConfirming(true)}
+          >
+            削除
+          </Button>
+        )}
       </div>
+      {remove.isError && (
+        <p data-testid={`project-delete-error-${project.id}`} className="text-xs text-red-600">
+          削除できませんでした: {(remove.error as Error).message}
+        </p>
+      )}
       {showSettings && <ProjectSettingsPanel project={project} />}
       {media.data?.length ? (
         <ul>

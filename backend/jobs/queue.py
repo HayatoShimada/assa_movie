@@ -11,6 +11,8 @@ import threading
 import traceback
 from typing import Callable
 
+from backend.core.cancellation import JobCancelled, bind, unbind
+
 Handler = Callable[[sqlite3.Connection, int | None, dict, Callable[[float], None]], None]
 
 _HANDLERS: dict[str, Handler] = {}
@@ -37,6 +39,11 @@ class JobQueue:
         # 実行中ジョブの進捗はメモリ保持(ハンドラのトランザクション中に
         # DBへ書くとロック競合するため。終端状態の書き込み時に確定させる)
         self._progress: dict[int, float] = {}
+        # 中止を要求されたジョブ。進捗通知の時点で JobCancelled にする
+        self._cancelled: set[int] = set()
+        # 実行中ジョブが持つ子プロセス。中止時に直接止める
+        # (whisper-cli等は走っている間こちらへ制御を返さない)
+        self._procs: dict[int, list] = {}
 
     def recover_orphans(self) -> int:
         """前回プロセスの中断(--reload・強制終了)で残ったジョブを整理する。
@@ -75,6 +82,72 @@ class JobQueue:
         self._q.put(job_id)
         return job_id
 
+    def cancel(self, job_id: int) -> bool:
+        """待機中・実行中のジョブを中止する。終わっているジョブにはFalseを返す。
+
+        子プロセスはその場で止める。フラグだけでは、次に進捗が通知されるまで
+        止まらない(whisper-cliは数十分返ってこないことがある)。
+        """
+        with self.lock:
+            row = self.conn.execute(
+                "SELECT status FROM jobs WHERE id=?", (job_id,)
+            ).fetchone()
+            if row is None or row["status"] not in ("queued", "running"):
+                return False
+            self._cancelled.add(job_id)
+            procs = list(self._procs.get(job_id, []))
+            was_queued = row["status"] == "queued"
+
+        for proc in procs:
+            try:
+                proc.kill()
+            except Exception:
+                pass  # 既に終わっている場合など。中止処理は止めない
+        if was_queued:
+            # まだ動いていないのでワーカーを待たずに確定させる
+            self._update(job_id, status="cancelled", progress=0.0)
+        return True
+
+    def cancel_for_media(self, media_ids: list[int]) -> int:
+        """指定メディアの未終了ジョブをまとめて中止する(削除の前処理)"""
+        if not media_ids:
+            return 0
+        placeholders = ",".join("?" * len(media_ids))
+        with self.lock:
+            ids = [
+                r["id"] for r in self.conn.execute(
+                    f"SELECT id FROM jobs WHERE media_id IN ({placeholders})"
+                    " AND status IN ('queued','running')",
+                    media_ids,
+                )
+            ]
+        return sum(1 for job_id in ids if self.cancel(job_id))
+
+    def attach_process(self, job_id: int, proc) -> None:
+        """実行中ジョブの子プロセスを登録する(backend/core/cancellation.py から)"""
+        with self.lock:
+            already_cancelled = job_id in self._cancelled
+            self._procs.setdefault(job_id, []).append(proc)
+        # 登録前に中止されていた場合を取りこぼさない
+        if already_cancelled:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+
+    def wait_idle(self, timeout: float = 10.0) -> bool:
+        """実行中のジョブが無くなるまで待つ。時間内に空になればTrue"""
+        import time
+
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            with self.lock:
+                busy = bool(self._progress)
+            if not busy:
+                return True
+            time.sleep(0.1)
+        return False
+
     def get(self, job_id: int) -> dict | None:
         with self.lock:
             row = self.conn.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
@@ -101,7 +174,11 @@ class JobQueue:
 
     def _set_progress(self, job_id: int, p: float) -> None:
         with self.lock:
+            cancelled = job_id in self._cancelled
             self._progress[job_id] = round(p, 4)
+        # ハンドラ側に中止の分岐を書かせない。ここで送出すればfinallyが走る
+        if cancelled:
+            raise JobCancelled()
 
     def _update(self, job_id: int, **fields) -> None:
         sets = ", ".join(f"{k}=?" for k in fields)
@@ -137,8 +214,14 @@ class JobQueue:
                 job = self.get(job_id)
                 if not job or job["status"] != "queued":
                     continue
+                with self.lock:
+                    cancelled_before_start = job_id in self._cancelled
+                if cancelled_before_start:
+                    # 待機中に中止された。cancel()が既に確定させている
+                    continue
 
                 self._update(job_id, status="running", progress=0.0)
+                bind(self, job_id)  # ハンドラから子プロセスを登録できるようにする
                 try:
                     handler = _HANDLERS[job["type"]]
                     params = json.loads(job["params_json"] or "{}")
@@ -156,13 +239,23 @@ class JobQueue:
                         conn.rollback()
                     except sqlite3.Error:
                         pass
-                    self._update(
-                        job_id, status="failed",
-                        error=f"{type(e).__name__}: {e}\n{traceback.format_exc()[-2000:]}",
-                    )
+                    with self.lock:
+                        cancelled = job_id in self._cancelled
+                    # 子プロセスを殺した結果ハンドラが別の例外を出すことがある。
+                    # 中止を要求されていたなら失敗ではなく中止として扱う
+                    if cancelled or isinstance(e, JobCancelled):
+                        self._update(job_id, status="cancelled")
+                    else:
+                        self._update(
+                            job_id, status="failed",
+                            error=f"{type(e).__name__}: {e}\n{traceback.format_exc()[-2000:]}",
+                        )
                 finally:
+                    unbind()
                     with self.lock:
                         self._progress.pop(job_id, None)
+                        self._cancelled.discard(job_id)
+                        self._procs.pop(job_id, None)
         finally:
             if conn is not self.conn:
                 conn.close()

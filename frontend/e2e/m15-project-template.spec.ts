@@ -63,14 +63,15 @@ test('プロジェクト設定: 編集パネルで上書き→既定に戻す', 
     .toBe('なし')
 })
 
-test('プロジェクト削除: 確認ダイアログ→カードが消える', async ({ page, request }) => {
+test('プロジェクト削除: 確認してからカードが消える', async ({ page, request }) => {
   await reset(request)
   const seed = await (await request.post(`${API}/api/e2e/seed`)).json()
   await page.goto('/')
   await expect(page.getByText('E2Eテスト対談')).toBeVisible()
 
-  page.on('dialog', (d) => d.accept())
+  // 確認は画面内で行う(window.confirm はwebviewによって出方が変わるため)
   await page.getByTestId(`project-delete-${seed.project_id}`).click()
+  await page.getByTestId(`project-delete-confirm-${seed.project_id}`).click()
 
   await expect(page.getByText('E2Eテスト対談')).not.toBeVisible()
   const projects = await (await request.get(`${API}/api/projects`)).json()

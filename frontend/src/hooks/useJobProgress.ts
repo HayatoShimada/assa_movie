@@ -24,7 +24,7 @@ export function useJobProgress(jobId: number | null, onDone?: (job: Job) => void
     }
     const stop = subscribeJob(jobId, (job) => {
       setState({ status: job.status, progress: job.progress, error: job.error ?? null })
-      if (job.status === 'completed' || job.status === 'failed') {
+      if (['completed', 'failed', 'cancelled'].includes(job.status)) {
         onDoneRef.current?.(job)
       }
     })

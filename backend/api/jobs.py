@@ -29,6 +29,21 @@ def create_job(
     return _to_job(jobs.get(job_id))
 
 
+@router.post("/jobs/{job_id}/cancel", response_model=Job)
+def cancel_job(job_id: int, jobs: JobQueue = Depends(get_jobs)):
+    """実行中・待機中のジョブを中止する。
+
+    文字起こしは数十分かかることがあるので、間違えて始めたときに
+    待つしかない状態にしない。既に終わっているジョブは404にせず、
+    現在の状態をそのまま返す(利用者の操作は「もう止まっている」で足りる)。
+    """
+    job = jobs.get(job_id)
+    if job is None:
+        raise HTTPException(404, "ジョブが見つかりません")
+    jobs.cancel(job_id)
+    return _to_job(jobs.get(job_id))
+
+
 def _to_job(job: dict) -> Job:
     import json
 

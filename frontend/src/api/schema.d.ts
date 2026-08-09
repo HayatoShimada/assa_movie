@@ -30,7 +30,11 @@ export interface paths {
         post?: never;
         /**
          * Delete Project
-         * @description プロジェクトを削除する(メディア・セグメント等はFKのCASCADEで連鎖削除)
+         * @description プロジェクトを削除する(メディア・セグメント等はFKのCASCADEで連鎖削除)。
+         *
+         *     先に実行中のジョブを止める。止めずに消すと、whisper-cliやffmpegが
+         *     走り続けて動画ファイルを掴んだままになり、uploadsの削除が黙って失敗する
+         *     (rmtreeはignore_errors=True)。CPUとGPUも取られたままになる。
          */
         delete: operations["delete_project_api_projects__project_id__delete"];
         options?: never;
@@ -144,6 +148,30 @@ export interface paths {
         put?: never;
         /** Create Job */
         post: operations["create_job_api_media__media_id__jobs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/{job_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel Job
+         * @description 実行中・待機中のジョブを中止する。
+         *
+         *     文字起こしは数十分かかることがあるので、間違えて始めたときに
+         *     待つしかない状態にしない。既に終わっているジョブは404にせず、
+         *     現在の状態をそのまま返す(利用者の操作は「もう止まっている」で足りる)。
+         */
+        post: operations["cancel_job_api_jobs__job_id__cancel_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1588,6 +1616,37 @@ export interface operations {
                 "application/json": components["schemas"]["JobCreate"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Job"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_job_api_jobs__job_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

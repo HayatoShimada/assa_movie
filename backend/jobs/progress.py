@@ -34,6 +34,6 @@ async def job_events(jobs: JobQueue, job_id: int) -> AsyncIterator[dict]:
                 ),
             }
 
-        if job["status"] in ("completed", "failed"):
+        if job["status"] in ("completed", "failed", "cancelled"):
             return
         await asyncio.sleep(POLL_INTERVAL)

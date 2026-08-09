@@ -80,7 +80,10 @@ function EnvironmentStep() {
         <Button
           data-testid="wizard-apply-recommended"
           type="button"
-          onClick={() => apply.mutate({ asr_model: rec.asr_model, asr_engine: rec.asr_engine })}
+          // エンジンは固定しない。autoのままにしておくと、GPUや同梱物が変わったとき
+          // 実行時に選び直される。以前ここで固定していたため、あとから
+          // whisper.cppを同梱してもfaster-whisperのまま使われ続けていた
+          onClick={() => apply.mutate({ asr_model: rec.asr_model, asr_engine: 'auto' })}
           disabled={apply.isPending}
         >
           {apply.isSuccess ? '適用しました' : '推奨設定を適用'}

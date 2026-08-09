@@ -97,6 +97,7 @@ export const api = {
   createJob: (mediaId: number, type: string, params: Record<string, unknown> = {}) =>
     post<Job>(`/api/media/${mediaId}/jobs`, { type, params }),
   getJob: (jobId: number) => request<Job>(`/api/jobs/${jobId}`),
+  cancelJob: (jobId: number) => post<Job>(`/api/jobs/${jobId}/cancel`),
 
   listSegments: (mediaId: number, includeAizuchi = true) =>
     request<Segment[]>(
@@ -232,7 +233,7 @@ export function subscribeJob(jobId: number, onProgress: (job: Job) => void): () 
   source.addEventListener('progress', (e) => {
     const job = JSON.parse((e as MessageEvent).data) as Job & { job_id: number }
     onProgress(job)
-    if (job.status === 'completed' || job.status === 'failed') source.close()
+    if (['completed', 'failed', 'cancelled'].includes(job.status)) source.close()
   })
   source.onerror = () => source.close()
   return () => source.close()

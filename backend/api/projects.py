@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from backend.api.deps import get_db
+from backend.api.deps import get_db, get_jobs
 from backend.core.config import settings
 from backend.core.project_settings import PROJECT_OVERRIDABLE
 from backend.models.dto import Media, MediaCreate, Project, ProjectCreate, ProjectUpdate
@@ -94,10 +94,30 @@ def update_project(
 
 
 @router.delete("/projects/{project_id}")
-def delete_project(project_id: int, db: sqlite3.Connection = Depends(get_db)):
-    """プロジェクトを削除する(メディア・セグメント等はFKのCASCADEで連鎖削除)"""
+def delete_project(
+    project_id: int,
+    db: sqlite3.Connection = Depends(get_db),
+    jobs=Depends(get_jobs),
+):
+    """プロジェクトを削除する(メディア・セグメント等はFKのCASCADEで連鎖削除)。
+
+    先に実行中のジョブを止める。止めずに消すと、whisper-cliやffmpegが
+    走り続けて動画ファイルを掴んだままになり、uploadsの削除が黙って失敗する
+    (rmtreeはignore_errors=True)。CPUとGPUも取られたままになる。
+    """
     if db.execute("SELECT 1 FROM projects WHERE id=?", (project_id,)).fetchone() is None:
         raise HTTPException(404, "プロジェクトが見つかりません")
+
+    media_ids = [
+        r["id"] for r in db.execute(
+            "SELECT id FROM media WHERE project_id=?", (project_id,)
+        )
+    ]
+    if jobs is not None and media_ids:
+        jobs.cancel_for_media(media_ids)
+        # 子プロセスがファイルを離すのを待つ。待てなくても削除自体は続ける
+        jobs.wait_idle(timeout=10.0)
+
     db.execute("DELETE FROM projects WHERE id=?", (project_id,))
     db.commit()
     # アップロードされた実ファイルも掃除する(外部パス登録のメディアは消さない)

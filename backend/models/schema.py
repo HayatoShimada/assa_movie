@@ -195,5 +195,33 @@ def init_db(db_path: Path) -> sqlite3.Connection:
         cols = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})")}
         if column not in cols:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {coltype}")
+    _release_pinned_asr_engine(conn)
     conn.commit()
     return conn
+
+
+# 一度だけ行う移行の記録に使うキー(app_settingsに置く)
+_ASR_ENGINE_MIGRATION = "_migrated_asr_engine_auto"
+
+
+def _release_pinned_asr_engine(conn: sqlite3.Connection) -> None:
+    """初回セットアップが固定した asr_engine を外し、autoに戻す(一度だけ)。
+
+    v0.9.5のウィザードは「推奨設定を適用」で asr_engine を具体名で保存していた。
+    その後 whisper.cpp を同梱してもエンジンの選択がその値に固定されたままになり、
+    GPUがあっても遅いエンジンが使われ続ける(実機で確認)。
+    利用者が選んだ値ではなくこちらが書いた値なので、一度だけ解除する。
+
+    以降に利用者が明示的に選んだ値は残る(記録キーがあるので再実行しない)。
+    """
+    done = conn.execute(
+        "SELECT 1 FROM app_settings WHERE key=?", (_ASR_ENGINE_MIGRATION,)
+    ).fetchone()
+    if done:
+        return
+    conn.execute("DELETE FROM app_settings WHERE key='asr_engine'")
+    conn.execute(
+        "INSERT INTO app_settings (key, value_json) VALUES (?, 'true')"
+        " ON CONFLICT(key) DO NOTHING",
+        (_ASR_ENGINE_MIGRATION,),
+    )

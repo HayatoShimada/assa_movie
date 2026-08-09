@@ -10,6 +10,7 @@ from functools import lru_cache
 from pathlib import Path
 
 
+from backend.core.cancellation import register_process
 from backend.core.console import SUBPROCESS_TEXT
 from backend.core.ffmpeg import ffmpeg_path, ffprobe_path, missing_message
 
@@ -251,6 +252,7 @@ def run_export(
 ) -> None:
     """ffmpegを実行し、-progress pipe:1 の out_time_ms から進捗を報告する"""
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **SUBPROCESS_TEXT)
+    register_process(proc)  # 中止要求で止められるようにする
     try:
         assert proc.stdout is not None
         for line in proc.stdout:

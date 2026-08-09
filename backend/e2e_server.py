@@ -205,6 +205,12 @@ def build_app():
     from backend.app import app
     from backend.core import license as lic
 
+    # 画面の「文字起こし」ボタンは transcribe を投げる。E2Eのメディアは実ファイルが
+    # 無いので本物はデコードで失敗する。同じ疑似処理に差し替え、中止のE2Eが
+    # 「本当に中止できた」のか「単に失敗した」のかを区別できるようにする。
+    # backend.app が本物を登録した後に上書きする必要があるのでここで行う
+    job_queue.register("transcribe")(_fake_transcribe)
+
     # ライセンスは使い捨ての鍵ペアで検証し、保存先も一時ディレクトリにする
     license_api.PUBLIC_KEY = lic.public_key_to_text(_E2E_ISSUER.public_key())
     license_dir = Path(tempfile.mkdtemp(prefix="ks-e2e-license-"))
