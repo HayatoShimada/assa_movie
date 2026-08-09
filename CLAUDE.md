@@ -2,12 +2,12 @@
 
 このリポジトリでAIがコードを書くときの規約。設計書は [DESIGN.md](docs/DESIGN.md) /
 [BACKEND_DESIGN.md](docs/BACKEND_DESIGN.md) / [FRONTEND_DESIGN.md](docs/FRONTEND_DESIGN.md) /
-[IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md)。**迷ったら設計書が正**。
+[V1_PLAN.md](docs/V1_PLAN.md)。**迷ったら設計書が正**。
 
 ## これは何か
 
 対談動画から文字起こし・話者分離・字幕生成を行い、切り抜き動画を作るローカルアプリ。
-バックエンド(Python/FastAPI)は実装済み、フロント(React)はこれから。
+Tauri(Rust)+ React + Python/FastAPI で、3OS向けのインストーラを配布している。
 
 ## よく使うコマンド
 
@@ -22,8 +22,11 @@
 # Windows
 ./scripts/build_ffmpeg.sh                         # 同梱ffmpegをビルド(MSYS2のmingw64シェル)
 ./scripts/build_whispercpp.ps1                    # 同梱whisper.cpp(Vulkan)をビルド
-./scripts/fetch_diarization_models.ps1            # 同梱する話者分離モデルを取得
+./scripts/package_windows.ps1                     # Windows版を手元で梱包する
 ./scripts/verify_windows.ps1 -Installer <path>    # 入れて・起動して・閉じるまで検証
+
+uv run --no-project python scripts/fetch_diarization_models.py   # 話者分離モデル(3OS共通)
+./scripts/verify_unix.sh <.deb|.AppImage|.dmg>    # Linux/macOS版の実機検証
 
 uv run pytest -q                  # バックエンドのテスト
 uv run pytest -q --run-gpu        # GPUを使うgolden検証も含める(約10秒)
@@ -42,7 +45,13 @@ cd frontend && npm run gen:api    # バックエンドのAPIを変えたら必�
 6. **日本語を出力するPythonは標準出力をUTF-8に固定する**(`backend/core/console.py` の
    `force_utf8_stdio()`)。Windowsの既定は日本語環境がcp932・CIの英語環境がcp1252で、
    どちらも「⚠」や日本語でUnicodeEncodeErrorになりプロセスごと落ちる。
-   これで2回落としている(v0.9.2のアプリ起動と、v0.9.3のCIビルド)。
+   **入力側も同じ**。子プロセスの出力は `SUBPROCESS_TEXT` を展開して渡し、
+   ファイルは `encoding="utf-8"` を必ず明示する。
+   同じ根で5回落としている(v0.9.2の起動 / v0.9.3のCIビルド / v0.9.6のwhisper-cli /
+   CIの英語Windowsで日本語が**書けない**件)。ASTのガードテストで見張っている
+   (`tests/core/test_encoding.py`)。
+7. **CIの緑をもってマージ可能とする。** `.github/workflows/ci.yml` が3OSで
+   pytest・フロント・cargo test・E2Eを回す。「手元で流したから大丈夫」で進めない。
 
 ## 設計上の重要な決定(変えるときは相談)
 
@@ -50,13 +59,15 @@ cd frontend && npm run gen:api    # バックエンドのAPIを変えたら必�
   ROCm→whisper.cpp(ビルド済みなら。無ければ公式Whisper)/ GPUなし→faster-whisper CPU。
   CTranslate2はCUDA専用ビルドなのでROCmでは使えない。モデルは large-v3 が既定
   (精度優先・単語タイムスタンプ必須。BACKEND_DESIGN.md)。
-  transformers版も選べるが**単語確率とinitial_promptが取れない**ので既定にしない。
+  GPUはあるがCUDA/ROCmでない機体(AMDのWindows等)では同梱のwhisper.cpp(Vulkan)を選ぶ。
 - **whisper.cppは `--output-json-full` で呼ぶ(`-ml` を付けない)。**
   句読点・トークンのタイムスタンプ・確率が一度に取れる。`-ml` を付けると
-  句読点が落ちる(実測)。セグメント分割は `words_to_segments` で自前に行う。
+  句読点が落ちる(実測)。セグメント分割は `engines/asr/segmenting.py` で自前に行う。
 - **torchはdependency-groupsで切替。** 既定は rocm(RX 7900系)。NVIDIA機は
   `KS_TORCH_GROUP=cu128 ./dev.sh sync`。依存バージョンは固定
-  (torch 2.8 / pyannote 3.x / huggingface_hub 0.x / TypeScript 5.9)。上げない。
+  (torch 2.8 / TypeScript 5.9)。上げない。
+  **ROCmのwheelはLinuxにしか無い**ので、グループにはプラットフォームマーカーを付ける
+  (付けないとWindows/macOSで `uv sync` 自体が失敗する)。
 - **Blackwell GPUでは compute_type="float16" 固定。** int8はクラッシュする(CPUのint8は安全)。
 - **設定は3層(グローバル→プロジェクト→クリップ)。** ジョブ・APIは
   `resolve_settings()`(backend/core/project_settings.py)経由で読む。
@@ -69,8 +80,16 @@ cd frontend && npm run gen:api    # バックエンドのAPIを変えたら必�
 - **配布物にtorchを入れない。** torchだけで11.5GB、入れないと644MB。
   `[project.dependencies]` はtorch非依存のものだけにし、torch系は
   `[dependency-groups] torch-engines`(開発専用)に置く。
-  GPU検出もtorchではなく `rocm-smi`/`nvidia-smi` から読む
+  GPU検出もtorchではなく `rocm-smi`/`nvidia-smi`(Windowsはレジストリ)から読む
   (torchに聞くと5秒、CLIなら120ms。`backend/core/device.py`)。
+  **配布版で動かないエンジンは選択肢に置かない。** 「選べるのに選ぶと落ちる」に
+  なるため、transformers版Whisperとpyannoteは削除した(2026-08-09)。
+- **効いていない設定をUIに出さない。** Settings に無い項目、バックエンドが読んで
+  いない項目は消す。「切ったのに効かない」は利用者にも実装にも嘘をつくことになる。
+- **同梱物の場所は `backend/core/bundled.py` だけが決める。** パッケージ形式で
+  変わるので自分で組み立てず、Tauriシェルが `KS_RESOURCE_DIR` で教えてくれた場所を使う。
+- **バイナリを同梱したら、同じOSのconfにライセンス表記も足す。**
+  `frontend/src-tauri/tauri.<os>.conf.json` が対応表。欠けたら再配布の条件を満たさない。
 - **`original_text` は常に原文を保持。** 置換もユーザー編集も非破壊で、いつでも戻せる。
 - **指示語置換の既定は `annotate`(カッコ注釈)。** 発言を改変しないため最も安全。
 
@@ -89,7 +108,14 @@ frontend/
   src/api/    型付きクライアント(schema.d.tsは自動生成物なので手で編集しない)
   src-tauri/  デスクトップシェル(Rust)。Pythonを子プロセスで起動するだけで画面は持たない
   e2e/        Playwright
-tests/        pytest(golden/ に移植前の出力を保存し回帰検証)
+scripts/      同梱物のビルド・取得・実機検証
+tests/
+  core/       設定・パス・デバイス検出・ライセンス
+  engines/    ASR / 話者分離 / LLM
+  pipeline/   純関数(golden/ に移植前の出力を保存し回帰検証)
+  api/        HTTP経由の振る舞い
+  fixtures/   PythonとTypeScriptで共有するケース表
+  helpers.py  下準備の集約(プロジェクト作成・FakeLLMの差し替え)
 ```
 
 ## 日本語UI・日本語コード

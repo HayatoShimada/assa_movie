@@ -2,9 +2,9 @@
 
 [DESIGN.md](DESIGN.md) のフロントエンド部分の詳細設計。[BACKEND_DESIGN.md](BACKEND_DESIGN.md) のAPI・データモデルと1対1で対応する。
 
-## 開発基盤(構築済み・2026-08-07)
+## 開発基盤
 
-UI実装前に土台を固めてある。詳しい規約は [CLAUDE.md](CLAUDE.md)。
+詳しい規約は [CLAUDE.md](../CLAUDE.md)。
 
 ```bash
 ./dev.sh          # バックエンド(8000)+フロント(5173)を起動
@@ -25,11 +25,11 @@ cd frontend && npm run gen:api   # APIを変えたら型を再生成
 | 項目 | 採用 | 理由 |
 |---|---|---|
 | フレームワーク | React 19 + TypeScript + Vite | 部品の豊富さ・Tauri移行時もそのまま使える |
-| UI部品 | shadcn/ui + Tailwind CSS | 設定パネル・ダイアログ類を高速に構築。日本語UIと相性の良いRadixベース |
+| UI部品 | Tailwind CSS + 自前の薄い部品(`components/ui.tsx`) | 部品ライブラリを足すほどの画面数ではなかった。shadcn/uiは採用していない |
 | サーバー状態 | TanStack Query | ジョブ・セグメント等のAPI状態のキャッシュ・再取得を宣言的に管理 |
 | UI状態 | Zustand | 再生位置・選択セグメント・タイムラインズーム等の高頻度更新をReact外で保持 |
 | 動画再生 | HTML5 `<video>` | ブラウザネイティブ。mov/mp4はそのまま、非対応コーデックはバックエンドでプロキシ変換 |
-| 波形・タイムライン | wavesurfer.js (regions/zoom plugin) | 波形描画+範囲ドラッグの実績ライブラリ。不足したらcanvas自作に切替可能な薄いラッパを挟む |
+| タイムライン | 自前(`clips/ClipTimeline.tsx`) | クリップ範囲の調整に波形は要らなかった。wavesurfer.jsは採用していない |
 | 長リスト | TanStack Virtual | セグメント1,400行超(実測: aiイベント本編)でも滑らかに表示 |
 | 進捗受信 | SSE (EventSource) | バックエンドの `GET /api/jobs/{id}/events` に対応 |
 
@@ -108,15 +108,33 @@ cd frontend && npm run gen:api   # APIを変えたら型を再生成
 - 書き出しダイアログ: 解像度・字幕焼き込み有無・出力先・ファイル名パターン(連番/タイトル)
 
 #### 設定タブ
-バックエンドの `core/config.py` と対応するフォーム:
-- ASRエンジン(kotoba-whisper / faster-whisper)・言語
-- 話者分離: 人数、話者名(男女自動判定の名前設定)、相槌除外の有効/無効
-- 指示語置換: 有効/無効・積極性(強/中/弱)・表現形式(かっこ注釈/置換/ニュアンス補完)・使用LLM(ローカル/クラウド)・適用モード(全自動/auto適用+reviewのみ確認/全件レビュー)
-- フィラー排除: 無効/弱/強・対象語リストの編集
-- 字幕モード: 全文字幕/選択字幕・採用率スライダー
-- カスタム指示・用語集エディタ: プロジェクト/メディア単位の指示一覧(有効/無効切替)と用語集(人名・製品名。ASRの認識精度改善にも共用されることを説明表示)
-- 字幕スタイル: フォント(Noto Sans JP等)・サイズ自動調整・1行最大文字数(10〜20)・色・背景・表示位置(9分割グリッド)・話者別色
-- 「おすすめモード」トグル: 上記を推奨プリセットで一括設定し、詳細項目を折りたたむ
+バックエンドの `core/config.py` と1対1で対応するフォーム(`settings/SettingsFields.tsx`)。
+**Settings に無い項目はUIにも出さない。** 出したままにすると「切ったのに効かない」になる
+(実際に4項目がそうなっていて、2026-08-09に消した)。
+
+- ASR: エンジン(自動/faster-whisper/whisper.cpp/公式Whisper)・モデル・言語・ビーム幅・VAD
+- 話者分離: 有効/無効・エンジン・人数・話者名(男女自動判定の表示名)
+- 相槌: 相槌とみなす最大の長さ(除外は常に行う)
+- フィラー排除: 無効/弱/強
+- 指示語置換: 積極性(強/中/弱)・表現形式(注釈/置換/補完)・適用モード
+- 字幕: 採用率・フォント・サイズ・色・背景・表示位置・上下微調整・話者別色・1行最大文字数
+- 向き変換: 中央クロップ/ぼかし余白/顔検出
+- LLM: プロバイダ(Ollama/Gemini/Claude)とモデル。APIキーは `ApiKeysPanel` から登録する
+- リソース: VRAM割当(0=無制限)
+
+設定は3層(グローバル → プロジェクト → クリップ)。プロジェクトはグローバルとの
+**差分だけ**を持つので、上書きしていない項目はグローバルの変更に自動で追従する。
+
+同じフォームをプロジェクト設定パネルからも使う(`idPrefix` で testid を分ける)。
+
+#### 設定タブのその他のパネル
+- `EnvironmentPanel`: GPU・VRAM・エンコーダ・Ollamaのスキャン結果と推奨設定。
+  「おすすめ設定を適用」はモデルだけを保存し、**エンジンは `auto` のままにする**
+  (具体名で固定すると、同梱物が増えて推奨が変わっても追従しない)
+- `SetupPanel`: 足りていないモデルの案内とその場での取得(進捗はSSE)
+- `ApiKeysPanel`: Gemini / Claude のAPIキー登録。平文ファイル+0600で保存する
+- `LicensePanel`: ライセンスキーの登録と状態
+- `OpenSourcePanel`: 同梱物のライセンス表記(LGPLのFFmpegはここに出す義務がある)
 
 ### 3. 字幕プレビューの方式
 - 編集中のプレビューは **CSSオーバーレイ**で近似(位置・フォント・色・背景・最大文字数での折返し・禁則はフロントで再現)
@@ -124,24 +142,37 @@ cd frontend && npm run gen:api   # APIを変えたら型を再生成
 
 ## ディレクトリ構成
 
+**実際にあるものだけを挙げる。** 以前はここに構想段階の名前が十数個並んでおり、
+どれが実在するのか読んでも分からなかった。
+
 ```
 frontend/
 ├── src/
-│   ├── api/            # 型付きAPIクライアント(バックエンドと型共有: OpenAPIから生成)
-│   ├── stores/         # Zustand(playback, selection, timeline)
+│   ├── api/            client.ts(型付きクライアント)+ schema.d.ts(自動生成物)
+│   ├── stores/         Zustand(再生位置・選択セグメント)
 │   ├── components/
-│   │   ├── player/     # VideoPlayer, SubtitleOverlay, Controls
-│   │   ├── timeline/   # Waveform, SegmentTrack, ClipTrack, ZoomControl
-│   │   ├── transcript/ # SegmentList, SegmentRow, SpeakerBadge
-│   │   ├── edits/      # ReviewList, DiffRow, RerunBar, AssistChat
-│   │   ├── clips/      # ClipCard, ClipEditor, JetcutTrack, HookPicker,
-│   │   │               # LayoutSwitch, ExportQueue, ExportDialog
-│   │   └── settings/   # SettingsForm, PresetToggle
-│   ├── hooks/          # useJobProgress(SSE), useSubtitleLayout(禁則・折返し)
-│   └── pages/          # Home, Editor
+│   │   ├── player/     VideoPlayer(字幕オーバーレイを含む)
+│   │   ├── transcript/ SegmentList, AssistChat
+│   │   ├── edits/      ReviewTab
+│   │   ├── questions/  QuestionsTab
+│   │   ├── clips/      ClipsTab, ClipTimeline
+│   │   ├── export/     ExportTab
+│   │   ├── project/    CreateProjectForm, ProjectSettingsPanel
+│   │   ├── settings/   SettingsForm, SettingsFields, SaveBar,
+│   │   │               EnvironmentPanel, SetupPanel, ApiKeysPanel,
+│   │   │               LicensePanel, OpenSourcePanel
+│   │   ├── setup/      SetupWizard(初回セットアップ)
+│   │   ├── ui.tsx      Button など最小限の共通部品
+│   │   └── icons.tsx
+│   ├── hooks/          useHashRoute, useSplitPane, useJobProgress
+│   ├── lib/            subtitle.ts(折返し・禁則), subtitleLayout.ts
+│   └── pages/          Home, Editor
+├── e2e/                Playwright
+└── src-tauri/          デスクトップシェル(Rust)。画面は持たない
 ```
 
-- API型は FastAPI の OpenAPI スキーマから `openapi-typescript` で自動生成し、手書きの型ズレを排除する
+- API型は FastAPI の OpenAPI スキーマから `openapi-typescript` で自動生成する。
+  `schema.d.ts` は自動生成物なので手で編集しない
 
 ## 状態管理の設計
 
@@ -155,11 +186,15 @@ frontend/
 - フォントは Noto Sans JP / M PLUS 等の日本語Webフォントを同梱(オフライン動作のためローカル配信)
 - セグメント検索は正規化(全half/角・かな/カナ)を吸収したあいまい検索
 
-## 実装フェーズ(バックエンドと同期)
+## 実装状況
 
-1. **Phase 1**: ホーム+編集画面の骨格(プレビュー・トランスクリプト・設定・置換ログ・進捗表示)— バックエンドPhase 1のAPIで動く最小構成
-2. **Phase 2**: タイムライン(波形・範囲ドラッグ)+ 切り抜き候補 + 書き出しキュー
-3. **Phase 3**: Tauriパッケージング(Windows配布)・ショートカットキー・多言語UI
+Phase 1〜3はすべて実装済み(ホーム・編集画面・切り抜き・書き出し・Tauri配布)。
+経緯とマイルストーン単位の受け入れ基準は [V1_PLAN.md](V1_PLAN.md) にある。
+
+**採らなかったもの**(構想には挙げたが実装していない):
+- 波形表示。クリップ範囲の調整に必要なかった
+- 多言語UI。日本語の対談動画に特化しているため
+- ショートカットキーは置換レビュー(a/x)だけに絞った
 
 ## 非機能
 

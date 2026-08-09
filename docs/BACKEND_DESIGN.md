@@ -11,8 +11,8 @@ ASRは **faster-whisper large-v3 を既定**とする(2026-08-07決定: 精度�
 | ASR(既定) | faster-whisper large-v3 (現行) | 実測で品質最良(方言保持・取りこぼし最少)+単語タイムスタンプ健全。RTF25倍で75分動画も約3分 |
 | ASR(速度モード) | faster-whisper large-v3-turbo | 単語TS付きでRTF111倍。発話を標準語化する癖があるため既定にはしない |
 | ASR(不採用) | kotoba-whisper v2.0/v2.2 | 単語タイムスタンプ取得不可のため要件(単語TS必須)を満たさない。CT2変換版はセグフォルト |
-| ASR(フォールバック) | whisper.cpp | CPU・省VRAM・Vulkan環境用(Phase 3) |
-| 話者分離 | pyannote.audio 3.1 + ピッチ話者名判定(現行実装を移植) | 実データ検証済み。kotoba-whisper v2.2同梱のdiarizersは代替オプションとして保持 |
+| ASR(GPUがCUDA/ROCmでない場合) | whisper.cpp (Vulkan / Metal) | 配布物に同梱。AMDのWindows機で実測11倍速。ROCm機でも最速 |
+| 話者分離 | sherpa-onnx(ONNX)+ ピッチ話者名判定 | torch不要・HFトークン不要で76MB。pyannoteの4倍速く一致率94.8%。**pyannoteは2026-08-09に削除**(配布物にtorchが無く一度も動かなかった) |
 | 指示語解決LLM | Ollama (qwen3:32b) / Gemini API 切替 | ローカル/クラウド選択可能の要件。どちらもJSON Schema構造化出力に対応 |
 | ジョブ管理 | SQLite + 単一ワーカー | GPUジョブは直列実行が前提なので分散キュー不要 |
 | 動画処理 | ffmpeg (デコード・切り出し・NVENC書き出し・libass字幕焼き込み) | |
@@ -35,9 +35,15 @@ backend/
 ├── engines/
 │   ├── asr/
 │   │   ├── base.py         # ASREngine抽象クラス
-│   │   └── fasterwhisper.py# 現行transcribe.pyの移植(large-v3既定/turboは設定切替)
+│   │   ├── fasterwhisper.py# CUDA/CPU(large-v3既定/turboは設定切替)
+│   │   ├── whispercpp.py   # 同梱バイナリ(Vulkan/Metal)をCLIとして呼ぶ
+│   │   ├── openai_whisper.py # ROCm開発機向け(torch依存・配布物には入らない)
+│   │   ├── segmenting.py   # Word列→セグメント(エンジン非依存の純関数)
+│   │   └── registry.py     # GPUに合わせた自動選択
 │   ├── diarize/
-│   │   └── pyannote.py     # 現行の話者分離+ピッチ判定を移植
+│   │   ├── onnx.py         # sherpa-onnx(既定)
+│   │   ├── labels.py       # ピッチによる話者名割り当て
+│   │   └── model_sources.py# モデルの取得元(取得スクリプトと共有)
 │   └── llm/
 │       ├── base.py         # LLMClient抽象 + FakeLLMClient(テスト用)
 │       ├── ollama.py       # ローカル(qwen3:32b等)
@@ -92,8 +98,8 @@ class ASREngine(Protocol):
 
 ```
 メディア登録
-  → [job:transcribe] デコード → VAD → ASR(kotoba) → 句読点付与
-       → 話者分離(pyannote) → ピッチで話者名割り当て → 相槌フラグ付け
+  → [job:transcribe] デコード → VAD → ASR(GPUで自動選択)→ 句読点付与
+       → 話者分離(ONNX)→ ピッチで話者名割り当て → 相槌フラグ付け
   → [job:resolve]   指示語置換(3段階) ※有効時のみ
   → [job:attention] 切り抜き候補スコアリング(Phase 2)
   → [job:export]    範囲確定 → ffmpeg切り出し → 字幕焼き込み → NVENC書き出し

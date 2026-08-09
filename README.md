@@ -9,7 +9,7 @@
 
 - **文字起こし**: Whisper large-v3 による高精度な日本語文字起こし。単語タイムスタンプ・単語確率付き
   (GPUに応じて faster-whisper / whisper.cpp / 公式Whisper を自動選択)
-- **話者分離**: pyannote.audio + 声の高さによる話者名の自動割り当て(男女2人の対談に最適化)
+- **話者分離**: sherpa-onnx(ONNX)+ 声の高さによる話者名の自動割り当て(男女2人の対談に最適化。torchもHFトークンも要りません)
 - **相槌・フィラー処理**: 「うん」「なるほど」等の相槌除外、「あのー」「なんか」等の言い淀みを
   字幕からだけ除去(原文は常に保持)。曖昧なものはAIがユーザーに質問する
 - **指示語の解決**: 「それ」「あれ」が指す内容をLLMが補足(`それ(先月のイベント)` 形式)。
@@ -117,12 +117,8 @@ git clone https://github.com/HayatoShimada/assa_movie && cd assa_movie
 # 2. フロントエンド依存
 cd frontend && npm install && cd ..
 
-# 3. 話者分離用の HuggingFace トークン(無料)
-#    - https://huggingface.co/join でアカウント作成
-#    - https://huggingface.co/pyannote/speaker-diarization-3.1 の規約に同意
-#    - https://huggingface.co/pyannote/segmentation-3.0 の規約に同意
-#    - https://huggingface.co/settings/tokens でトークン発行(Read権限)
-echo "hf_あなたのトークン" > hf_token.txt
+# 3. 話者分離モデル(76MB。トークンも規約同意も不要)
+./dev.sh diarize-models
 
 # 4a. ローカルLLM(推奨: プライバシー重視)
 curl -fsSL https://ollama.com/install.sh | sh
@@ -133,7 +129,7 @@ ollama pull qwen3:32b
 echo "あなたのAPIキー" > gemini_api_key.txt
 ```
 
-`hf_token.txt` / `gemini_api_key.txt` は `.gitignore` 済みでコミットされません。
+`gemini_api_key.txt` / `claude_api_key.txt` は `.gitignore` 済みでコミットされません(アプリの設定画面からも登録できます)。
 
 ## 起動と使い方
 
@@ -165,9 +161,7 @@ uv run python resolve_pronouns.py 動画 --form annotate  # 指示語の注釈�
 
 | ライブラリ | 制約 | 理由 |
 |---|---|---|
-| torch / torchaudio | `==2.8.*` (cu128) | pyannote 3.x が torchaudio 2.9+ の削除APIに依存。2.8はBlackwell(sm_120)対応済み |
-| pyannote-audio | `>=3.3,<4` | 4.x は規約同意が別途必要な新モデル(community-1)を強制する |
-| huggingface-hub | `<1.0` | pyannote 3.x が 1.0 で削除された `use_auth_token` 引数を使う |
+| torch / torchaudio | `==2.8.*` | 開発グループのみ(配布物には入れない)。2.8はBlackwell(sm_120)とgfx1100の両方に対応済み。**ROCm版はLinuxにしかwheelが無い**ためプラットフォームマーカー必須 |
 | faster-whisper | `>=1.1.0` | torch非依存(CTranslate2)。CUDA 12系で動作 |
 | TypeScript | `~5.9` | 6系は openapi-typescript(API型自動生成)と非互換 |
 | ffmpeg | 6.x で検証 | select式フィルタに不具合があるため trim+concat 方式を採用済み(対応不要) |
@@ -178,13 +172,13 @@ uv run python resolve_pronouns.py 動画 --form annotate  # 指示語の注釈�
 ## 開発
 
 ```bash
-./dev.sh check    # 全テスト+型チェック+ビルド(backend 407 / frontend 48 / E2E 30)
+./dev.sh check    # 全テスト+型チェック+ビルド(pytest 877 / vitest 64 / cargo 10 / E2E 54)
 ./dev.sh e2e      # E2Eテスト(FakeLLM+一時DBなのでGPUもLLMも不要)
 cd frontend && npm run gen:api   # バックエンドAPIを変えたら型を再生成
 ```
 
 設計ドキュメント: [DESIGN.md](docs/DESIGN.md)(概要)/ [BACKEND_DESIGN.md](docs/BACKEND_DESIGN.md) /
-[FRONTEND_DESIGN.md](docs/FRONTEND_DESIGN.md) / [IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md)(進捗)。
+[FRONTEND_DESIGN.md](docs/FRONTEND_DESIGN.md) / [V1_PLAN.md](docs/V1_PLAN.md)(経緯と進捗)。
 AIで開発を続ける場合の規約は [CLAUDE.md](CLAUDE.md)。
 
 ## 既知の制限(今後の予定)
@@ -193,10 +187,9 @@ AIで開発を続ける場合の規約は [CLAUDE.md](CLAUDE.md)。
   検出失敗時はぼかし背景に自動フォールバック
 - 複数クリップの一括書き出しUIは未実装
 - 話者分離は2人の対談に最適化(3人以上は「話者N」表示)
-- ROCm環境ではfaster-whisper(CUDA専用ビルド)が使えないため、
-  whisper.cpp(`./dev.sh whispercpp` でビルド。実時間比約11.6倍)か、
-  未ビルドなら公式Whisper(約4.4倍)を自動で使う
-  (機能は同等。実測値は docs/verify_rocm.md 参照)
+- ROCm環境ではfaster-whisper(CUDA専用ビルド)が使えないため、同梱のwhisper.cpp
+  (Vulkan)を使う。自分でHIPビルドすると13%速い(`./dev.sh whispercpp`。
+  実測値は docs/verify_rocm.md 参照)
 
 ## ライセンス
 
@@ -205,6 +198,6 @@ AIで開発を続ける場合の規約は [CLAUDE.md](CLAUDE.md)。
 そのほか使用しているモデル・ライブラリには各自のライセンスがあります:
 
 - Whisper / faster-whisper: MIT
-- pyannote.audio: MIT(モデル利用にはHuggingFaceでの規約同意が必要)
+- 話者分離モデル: MIT(発話区間 / CNRS)・Apache-2.0(声の特徴量 / 3D-Speaker)
 - Qwen3 (Ollama経由): Apache 2.0
 - 文字起こし対象の動画・音声の権利はユーザーに帰属します
