@@ -160,6 +160,14 @@ else
       *) ng "話者分離が未準備: $setup" ;;
     esac
 
+    # whisper.cppは**本体だけ同梱**する(ggmlモデル3.1GBは利用者が取得する)。
+    # 見るのは「同梱した本体をバックエンドが見つけられるか」。
+    # ready(本体+モデル)を条件にすると、入れた直後は必ず落ちてしまう
+    case "$setup" in
+      *'"whispercpp"'*'"installable":true'*) ok "whisper.cpp 本体を見つけている" ;;
+      *) ng "whisper.cpp 本体が見つからない: $setup" ;;
+    esac
+
     env_json="$(curl -s --max-time 60 "$BASE/api/environment")"
     info "環境: $(echo "$env_json" | head -c 400)"
 

@@ -197,9 +197,15 @@ if (-not $app.HasExited) {
             if ($env_.ffmpeg) { Ok "ffmpeg を見つけている" } else { Ng "ffmpeg が見つからない" }
             if ($env_.encoder) { Ok "動画エンコーダ: $($env_.encoder)" } else { Ng "エンコーダを決められない" }
 
-            # GPUが載っているのにwhisper.cppが選ばれないなら、同梱した意味がない
-            if ($env_.gpu.name -and $env_.recommendations.asr_engine -ne "whispercpp") {
-                Ng "GPUがあるのに推奨が $($env_.recommendations.asr_engine)(同梱のwhisper.cppが選ばれていない)"
+            # 同梱したwhisper.cppが選ばれないなら、同梱した意味がない(v0.9.6の退行)。
+            # ただし**入れた直後は選ばれないのが正しい**。whisper.cppは3.1GBのggmlモデルを
+            # 別途必要とし、それは同梱していない(セットアップ画面から利用者が取得する)。
+            # 「本体もモデルも揃っているのに選ばれない」ときだけNGにする
+            if ($env_.gpu.name -and $setup.whispercpp.ready -and
+                $env_.recommendations.asr_engine -ne "whispercpp") {
+                Ng "モデルまで揃っているのに推奨が $($env_.recommendations.asr_engine)(同梱のwhisper.cppが選ばれていない)"
+            } elseif ($env_.gpu.name -and -not $setup.whispercpp.ready) {
+                Info "推奨は $($env_.recommendations.asr_engine)(ggmlモデル未取得なので正しい)"
             }
         } catch {
             Ng "/api/environment が叩けない: $_"
