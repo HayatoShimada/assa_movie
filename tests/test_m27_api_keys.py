@@ -55,7 +55,7 @@ def test_空のキーは弾く(client):
 def test_前後の空白は落として保存する(client, key_dir):
     """コピペで空白や改行が混ざることを想定する"""
     client.put("/api/keys/claude", json={"key": "  sk-ant-api03-xxxxx \n"})
-    assert (key_dir / "claude.txt").read_text().strip() == "sk-ant-api03-xxxxx"
+    assert (key_dir / "claude.txt").read_text(encoding="utf-8").strip() == "sk-ant-api03-xxxxx"
 
 
 def test_削除できる(client):

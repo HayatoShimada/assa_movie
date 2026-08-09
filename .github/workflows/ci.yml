@@ -52,13 +52,15 @@ jobs:
         run: uv sync --no-default-groups --group dev
 
       # 失敗の要約をアノテーションに出す。ログのダウンロードにはリポジトリの
-      # 管理者権限が要るため、それが無い人には「exit code 1」しか見えない
+      # 管理者権限が要るため、それが無い人には「exit code 1」しか見えない。
+      # アノテーションは長いと**末尾から切られる**ので、要約だけを短く出す
       - name: pytest
         shell: bash
         run: |
           set -o pipefail
-          uv run --no-sync pytest -q --tb=short 2>&1 | tee pytest.log || {
-            echo "::error title=pytest (${{ matrix.os }})::$(tail -40 pytest.log | tr '\n' '％')"
+          uv run --no-sync pytest -q --tb=line 2>&1 | tee pytest.log || {
+            summary=$(sed -n '/short test summary info/,$p' pytest.log | head -25)
+            echo "::error title=pytest (${{ matrix.os }})::$(echo "$summary" | tr '\n' '％')"
             exit 1
           }
 
@@ -176,7 +178,8 @@ jobs:
         run: |
           set -o pipefail
           cargo test --manifest-path frontend/src-tauri/Cargo.toml 2>&1 | tee cargo.log || {
-            echo "::error title=cargo test (${{ matrix.os }})::$(tail -40 cargo.log | tr '\n' '％')"
+            summary=$(grep -E "^(error|warning: unused|test .* FAILED)" cargo.log | head -20)
+            echo "::error title=cargo test (${{ matrix.os }})::$(echo "$summary" | tr '\n' '％')"
             exit 1
           }
 

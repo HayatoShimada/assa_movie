@@ -26,7 +26,7 @@ def dirs(tmp_path, monkeypatch):
 def place_binary(directory):
     path = directory / "bin" / whispercpp.BINARY_NAME
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("#!/bin/sh\n")
+    path.write_text("#!/bin/sh\n", encoding="utf-8")
     path.chmod(0o755)
     return path
 
@@ -111,7 +111,7 @@ def test_教えられていなければ実行ファイルの隣を見る(monkeyp
     monkeypatch.delenv("KS_RESOURCE_DIR", raising=False)
     exe = tmp_path / "usr" / "bin" / "kirinuki-studio-backend"
     exe.parent.mkdir(parents=True)
-    exe.write_text("")
+    exe.write_text("", encoding="utf-8")
     monkeypatch.setattr(bundled.sys, "executable", str(exe))
     assert bundled.bundled_dir() == exe.parent
 

@@ -182,7 +182,7 @@ def test_環境変数からキーを読む(monkeypatch):
 def test_ファイルからキーを読む(monkeypatch, tmp_path):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     path = tmp_path / "claude_api_key.txt"
-    path.write_text("sk-ant-api03-file\n")
+    path.write_text("sk-ant-api03-file\n", encoding="utf-8")
     assert load_api_key(path) == "sk-ant-api03-file"
 
 
@@ -199,7 +199,7 @@ def test_キーの形をしていないファイルは使わない(monkeypatch, 
     """雛形や書き間違いをそのままAPIに送らないため"""
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     path = tmp_path / "claude_api_key.txt"
-    path.write_text(content + "\n")
+    path.write_text(content + "\n", encoding="utf-8")
     assert load_api_key(path) is None
 
 

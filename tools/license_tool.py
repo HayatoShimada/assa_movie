@@ -39,7 +39,7 @@ PRIVATE_NAME = "issuer_private.key"
 
 
 def load_private(path: Path) -> Ed25519PrivateKey:
-    return Ed25519PrivateKey.from_private_bytes(bytes.fromhex(path.read_text().strip()))
+    return Ed25519PrivateKey.from_private_bytes(bytes.fromhex(path.read_text(encoding="utf-8").strip()))
 
 
 def cmd_keygen(args) -> int:
@@ -52,7 +52,7 @@ def cmd_keygen(args) -> int:
 
     private = Ed25519PrivateKey.generate()
     raw = private.private_bytes(Encoding.Raw, PrivateFormat.Raw, NoEncryption())
-    private_path.write_text(raw.hex() + "\n")
+    private_path.write_text(raw.hex() + "\n", encoding="utf-8")
     private_path.chmod(0o600)
 
     print(f"秘密鍵を書き出しました: {private_path}")

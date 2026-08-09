@@ -55,7 +55,7 @@ def test_load_api_key_from_env(monkeypatch, tmp_path):
 def test_load_api_key_from_file(monkeypatch, tmp_path):
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     f = tmp_path / "k.txt"
-    f.write_text("AIzaSyFake\n")
+    f.write_text("AIzaSyFake\n", encoding="utf-8")
     assert load_api_key(f) == "AIzaSyFake"
 
 
@@ -63,7 +63,10 @@ def test_load_api_key_rejects_placeholder_text(monkeypatch, tmp_path):
     """説明文が残ったままのファイルを鍵として使わない"""
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     f = tmp_path / "k.txt"
-    f.write_text("ここにAPIキーを貼り付けてください\n取得: https://aistudio.google.com\n")
+    f.write_text(
+        "ここにAPIキーを貼り付けてください\n取得: https://aistudio.google.com\n",
+        encoding="utf-8",
+    )
     assert load_api_key(f) is None
 
 

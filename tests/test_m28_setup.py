@@ -134,7 +134,7 @@ def whispercpp(monkeypatch, tmp_path):
 def place_whispercpp_binary(wc):
     path = wc.bundled_dir() / "bin" / wc.BINARY_NAME
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("#!/bin/sh\n")
+    path.write_text("#!/bin/sh\n", encoding="utf-8")
     path.chmod(0o755)
     return path
 

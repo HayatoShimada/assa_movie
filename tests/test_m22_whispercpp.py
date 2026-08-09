@@ -99,7 +99,7 @@ def test_build_command_without_prompt():
 def test_is_available_requires_binary_and_model(tmp_path):
     binary, model = tmp_path / "whisper-cli", tmp_path / "ggml.bin"
     assert is_available(binary, model) is False
-    binary.write_text("#!/bin/sh")
+    binary.write_text("#!/bin/sh", encoding="utf-8")
     binary.chmod(0o755)
     assert is_available(binary, model) is False  # モデルが無い
     model.write_bytes(b"x")

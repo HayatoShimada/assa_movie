@@ -156,7 +156,7 @@ def test_設定ファイルはリポジトリ直下にあればそれを使う(h
     assert paths.config_file("hf_token.txt", home=home, repo=repo, os_name="Linux") == (
         home / ".config/kirinuki-studio/hf_token.txt"
     )
-    (repo / "hf_token.txt").write_text("hf_x")
+    (repo / "hf_token.txt").write_text("hf_x", encoding="utf-8")
     assert paths.config_file("hf_token.txt", home=home, repo=repo, os_name="Linux") == (
         repo / "hf_token.txt"
     )

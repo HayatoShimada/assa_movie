@@ -86,3 +86,75 @@ def test_bytesで読むなら対象外():
     """text=Trueでなければ復号しないので問題にならない"""
     ok = ast.parse("import subprocess\nsubprocess.run(['x'], capture_output=True)\n")
     assert _text_mode_calls_without_encoding(ok) == []
+
+
+# ---- ファイルの読み書きも同じ根 ----
+#
+# Path.read_text / write_text / open() も encoding を省くとロケール依存になる。
+# CIの英語Windows(cp1252)では日本語を **書けない**(UnicodeEncodeError)。
+# 実際にテスト3件がそれで落ちた(v0.9.8以降のCI)。
+# バイナリ(read_bytes/write_bytes)は対象外。
+REPO = Path(__file__).resolve().parents[1]
+TEXT_IO_METHODS = {"read_text", "write_text"}
+# 生成物・外部コードは見ない
+SKIP_DIRS = {".venv", "build", "node_modules", "__pycache__", ".git", "frontend"}
+
+
+def _text_io_without_encoding(tree: ast.AST) -> list[int]:
+    """read_text / write_text / open() を encoding 無しで呼んでいる行"""
+    bad = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        kwargs = {kw.arg for kw in node.keywords if kw.arg}
+        if any(kw.arg is None for kw in node.keywords):
+            continue  # 展開して渡している
+
+        if isinstance(node.func, ast.Attribute) and node.func.attr in TEXT_IO_METHODS:
+            if "encoding" not in kwargs:
+                bad.append(node.lineno)
+        elif isinstance(node.func, ast.Name) and node.func.id == "open":
+            # バイナリモードは復号しないので対象外
+            mode = next(
+                (a.value for a in node.args[1:2] if isinstance(a, ast.Constant)), ""
+            )
+            mode_kw = next(
+                (kw.value.value for kw in node.keywords
+                 if kw.arg == "mode" and isinstance(kw.value, ast.Constant)), ""
+            )
+            if "b" not in f"{mode}{mode_kw}" and "encoding" not in kwargs:
+                bad.append(node.lineno)
+    return bad
+
+
+def _python_files():
+    for path in sorted(REPO.rglob("*.py")):
+        if SKIP_DIRS & set(path.relative_to(REPO).parts):
+            continue
+        yield path
+
+
+@pytest.mark.parametrize("path", sorted(_python_files()), ids=lambda p: p.name)
+def test_テキストファイルはエンコーディングを明示して読み書きする(path):
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    bad = _text_io_without_encoding(tree)
+    assert not bad, (
+        f"{path.relative_to(REPO)} の {bad} 行目: "
+        'encoding="utf-8" を明示すること。省くとロケール依存になり、'
+        "英語Windows(cp1252)では日本語が書けずCIだけが落ちる"
+    )
+
+
+def test_ファイル読み書きの検出が効いている():
+    bad = ast.parse('from pathlib import Path\nPath("a").write_text("あ")\n')
+    assert _text_io_without_encoding(bad) == [2]
+
+
+def test_encoding付きなら通す():
+    ok = ast.parse('from pathlib import Path\nPath("a").write_text("あ", encoding="utf-8")\n')
+    assert _text_io_without_encoding(ok) == []
+
+
+def test_バイナリは対象外():
+    ok = ast.parse('from pathlib import Path\nPath("a").write_bytes(b"x")\nopen("a", "rb")\n')
+    assert _text_io_without_encoding(ok) == []
