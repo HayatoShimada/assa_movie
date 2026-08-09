@@ -60,6 +60,30 @@ if (Test-Path $AppExe) { Ok "アプリ本体: kirinuki-studio.exe" } else { Ng "
 $sidecar = "$InstallDir\kirinuki-studio-backend.exe"
 if (Test-Path $sidecar) { Ok "同梱バックエンド: $([int]((Get-Item $sidecar).Length / 1MB))MB" } else { Ng "同梱バックエンドが無い: $sidecar" }
 
+# 同梱物は tauri.windows.conf.json の resources と1対1で対応する。
+# 「同梱したつもり」を防ぐため、実パスで並べて確かめる。
+# ライセンス表記は再配布の条件そのものなので、欠けたら配ってはいけない
+$bundled = @(
+    "bin\ffmpeg.exe", "bin\ffprobe.exe", "bin\whisper-cli.exe",
+    "models\sherpa-onnx-pyannote-segmentation-3-0\model.onnx",
+    "models\speaker-embedding.onnx",
+    "licenses\ffmpeg\LICENSE.txt", "licenses\ffmpeg\NOTICE.md",
+    "licenses\ffmpeg\THIRD-PARTY-NOTICES.txt", "licenses\ffmpeg\VERSION.txt",
+    "licenses\whispercpp\LICENSE.txt", "licenses\whispercpp\VERSION.txt",
+    "licenses\diarization\LICENSE-segmentation.txt",
+    "licenses\diarization\LICENSE-embedding-Apache-2.0.txt",
+    "licenses\diarization\NOTICE.md",
+    "licenses\python\THIRD-PARTY-NOTICES.txt"
+)
+foreach ($rel in $bundled) {
+    $path = Join-Path $InstallDir $rel
+    if (Test-Path $path) {
+        Ok "同梱: $rel ($([int]((Get-Item $path).Length / 1KB))KB)"
+    } else {
+        Ng "同梱物が無い: $rel"
+    }
+}
+
 Get-ChildItem $InstallDir -ErrorAction SilentlyContinue |
     Select-Object Name, Length | Format-Table -AutoSize | Out-String -Width 100 | Write-Host
 
@@ -140,6 +164,45 @@ if (-not $app.HasExited) {
             Ok "GET $base/api/health => $($r.StatusCode) $($r.Content)"
         } catch {
             Ng "health が叩けない: $_"
+        }
+
+        # ---- 同梱物が「使えるか」をバックエンドに解決させる ----
+        #
+        # ファイルの存在検査では足りない。v0.9.6はwhisper.cppを同梱したのに
+        # エンジン選択がそれを選ばず、同梱した意味がまったく無かった。
+        # 探索と選択はバックエンドが持っているので、そこに聞く
+        try {
+            $setup = Invoke-RestMethod "$base/api/setup" -TimeoutSec 15
+            if ($setup.diarization.ready) {
+                Ok "話者分離モデルが使える(同梱物から解決できている)"
+            } else {
+                Ng "話者分離が未準備: $($setup.diarization.note)"
+            }
+            if ($setup.whispercpp.installable) {
+                Ok "whisper.cpp 本体を見つけている"
+            } else {
+                Ng "whisper.cpp 本体が見つからない: $($setup.whispercpp.note)"
+            }
+        } catch {
+            Ng "/api/setup が叩けない: $_"
+        }
+
+        try {
+            # 環境スキャンはGPU検出に子プロセスを使うので少し待つ
+            $env_ = Invoke-RestMethod "$base/api/environment" -TimeoutSec 60
+            $gpu = if ($env_.gpu.name) { $env_.gpu.name } else { "(検出なし)" }
+            Info "GPU: $gpu / accel: $($env_.accel)"
+            Info "推奨ASR: $($env_.recommendations.asr_engine) / $($env_.recommendations.asr_model)"
+
+            if ($env_.ffmpeg) { Ok "ffmpeg を見つけている" } else { Ng "ffmpeg が見つからない" }
+            if ($env_.encoder) { Ok "動画エンコーダ: $($env_.encoder)" } else { Ng "エンコーダを決められない" }
+
+            # GPUが載っているのにwhisper.cppが選ばれないなら、同梱した意味がない
+            if ($env_.gpu.name -and $env_.recommendations.asr_engine -ne "whispercpp") {
+                Ng "GPUがあるのに推奨が $($env_.recommendations.asr_engine)(同梱のwhisper.cppが選ばれていない)"
+            }
+        } catch {
+            Ng "/api/environment が叩けない: $_"
         }
     }
 } else {

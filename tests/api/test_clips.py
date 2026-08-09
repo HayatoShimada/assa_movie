@@ -6,8 +6,6 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from backend.engines.llm.base import FakeLLMClient
-from backend.jobs import resolve_job
 from backend.pipeline.attention import (
     ClipFeatures,
     clip_features,
@@ -15,6 +13,7 @@ from backend.pipeline.attention import (
     parse_silences,
 )
 from backend.pipeline.export import build_export_cmd
+from tests.helpers import create_media, insert_segments, use_fake
 
 
 # ---- 機械特徴(純関数) ----
@@ -103,11 +102,7 @@ def test_build_export_cmd_ignores_empty_cuts():
 # ---- API統合(FakeLLM) ----
 @pytest.fixture
 def media(client, tmp_path):
-    pid = client.post("/api/projects", json={"name": "p"}).json()["id"]
-    f = tmp_path / "a.wav"
-    f.write_bytes(b"x")
-    mid = client.post(f"/api/projects/{pid}/media", json={"path": str(f)}).json()["id"]
-    db = client.app.state.db
+    ids = create_media(client, tmp_path)
     texts = [
         ("はやまる", "去年ハッカソンに出たんですよ", 0),
         ("高田さん", "へえ、どんな内容だったんですか", 0),
@@ -116,21 +111,21 @@ def media(client, tmp_path):
         ("はやまる", "AIで古着屋の接客をやってみたんです", 0),
         ("高田さん", "面白い、結果はどうだったんですか", 0),
     ]
-    for idx, (speaker, text, aizuchi) in enumerate(texts):
-        db.execute(
-            "INSERT INTO segments (media_id, idx, start, end, text, original_text,"
-            " speaker, is_aizuchi) VALUES (?,?,?,?,?,?,?,?)",
-            (mid, idx, idx * 5.0, idx * 5.0 + 4.0, f"{speaker}: {text}",
-             f"{speaker}: {text}", speaker, aizuchi),
-        )
-    db.commit()
-    return {"project_id": pid, "media_id": mid}
-
-
-def use_fake(responses):
-    fake = FakeLLMClient(responses=responses)
-    resolve_job.set_client_factory(lambda: fake)
-    return fake
+    insert_segments(
+        client.app.state.db,
+        ids["media_id"],
+        [
+            {
+                "text": f"{speaker}: {text}",
+                "speaker": speaker,
+                "is_aizuchi": aizuchi,
+                "start": i * 5.0,
+                "end": i * 5.0 + 4.0,
+            }
+            for i, (speaker, text, aizuchi) in enumerate(texts)
+        ],
+    )
+    return ids
 
 
 def run_job(client, media_id, job_type, params=None):

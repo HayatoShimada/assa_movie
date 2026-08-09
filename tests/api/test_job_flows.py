@@ -5,10 +5,9 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
-from backend.engines.llm.base import FakeLLMClient
-from backend.jobs import resolve_job
 from backend.pipeline.export import build_export_cmd
 from backend.pipeline.judge import JudgeInput, score, select_subtitles
+from tests.helpers import create_media, insert_segments, use_fake
 
 
 SEGS = [
@@ -21,29 +20,27 @@ SEGS = [
 
 @pytest.fixture
 def media(client, tmp_path):
-    pid = client.post("/api/projects", json={"name": "p"}).json()["id"]
-    f = tmp_path / "a.wav"
-    f.write_bytes(b"x")
-    mid = client.post(f"/api/projects/{pid}/media", json={"path": str(f)}).json()["id"]
-    db = client.app.state.db
     from backend.pipeline.filler import analyze_line
 
-    for idx, (text, words) in enumerate(SEGS):
-        db.execute(
-            "INSERT INTO segments (media_id, idx, start, end, text, original_text,"
-            " words_json, filler_candidates_json, asr_confidence)"
-            " VALUES (?,?,?,?,?,?,?,?,?)",
-            (mid, idx, idx * 3.0, idx * 3.0 + 2.0, text, text,
-             json.dumps(words), json.dumps(analyze_line(text, words)), -0.2 - idx * 0.3),
-        )
-    db.commit()
-    return {"project_id": pid, "media_id": mid}
+    ids = create_media(client, tmp_path)
+    insert_segments(
+        client.app.state.db,
+        ids["media_id"],
+        [
+            {
+                "text": text,
+                "start": i * 3.0,
+                "end": i * 3.0 + 2.0,
+                "words_json": json.dumps(words),
+                "filler_candidates_json": json.dumps(analyze_line(text, words)),
+                "asr_confidence": -0.2 - i * 0.3,
+            }
+            for i, (text, words) in enumerate(SEGS)
+        ],
+    )
+    return ids
 
 
-def use_fake(responses):
-    fake = FakeLLMClient(responses=responses)
-    resolve_job.set_client_factory(lambda: fake)
-    return fake
 
 
 def run_job(client, media_id, job_type, params=None):

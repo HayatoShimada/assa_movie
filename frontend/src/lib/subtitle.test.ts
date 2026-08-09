@@ -1,30 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import { wrapSubtitle } from './subtitle'
 
-/** backend/tests/test_m7_subtitle.py と同一のケース(両実装の見た目を揃える) */
-const CASES: [string, number, string[]][] = [
-  ['あいうえおかきくけこ', 5, ['あいうえお', 'かきくけこ']],
-  ['あいうえお', 5, ['あいうえお']],
-  ['', 5, ['']],
-  ['あいうえお、かきくけ', 5, ['あいうえお、', 'かきくけ']],
-  ['あいうえお。かきくけ', 5, ['あいうえお。', 'かきくけ']],
-  ['ハッカソンってすごい', 4, ['ハッカソ', 'ンってす', 'ごい']],
-  ['コンピューターがすごい', 5, ['コンピュー', 'ターがすご', 'い']],
-  ['それ(去年の話)です', 7, ['それ(去年の話)', 'です']],
-  ['あいうえ「かきくけこ', 5, ['あいうえ', '「かきくけ', 'こ']],
-  ['あいうえお、。ーかきく', 5, ['あいうえ', 'お、。ーか', 'きく']],
-  ['この人(高田さん)とは多分', 8, ['この人(高田さん)', 'とは多分']],
-  ['それ(問い続けること)私あの', 10, ['それ(問い続けること)', '私あの']],
-  ['50円で作れる洋服の話', 6, ['50円で作れ', 'る洋服の話']],
-  [
-    'なんかそういうのがあってもいいのかなって思ったりするんですけど',
-    15,
-    ['なんかそういうのがあってもいい', 'のかなって思ったりするんですけ', 'ど'],
-  ],
-  ['あい、う', 2, ['あい、', 'う']],
-]
+// ケース表はバックエンドと共有する(tests/fixtures/subtitle_wrap_cases.json)。
+// 手でコピーしていた頃は Python 25件 / TS 15件と気付かないうちに乖離しており、
+// 片方だけケースを足しても、もう片方の実装がずれたことに気付けなかった。
+import fixture from '../../../tests/fixtures/subtitle_wrap_cases.json'
+
+const CASES = fixture.cases as [string, number, string[]][]
 
 describe('wrapSubtitle(バックエンドと同一ケース)', () => {
+  it('ケース表を読めている', () => {
+    expect(CASES.length).toBeGreaterThan(20)
+  })
+
   it.each(CASES)('%s (max=%d)', (text, maxChars, expected) => {
     expect(wrapSubtitle(text, maxChars)).toEqual(expected)
   })

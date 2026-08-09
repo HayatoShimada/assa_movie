@@ -206,6 +206,25 @@ jobs:
           $installer = (Get-Item frontend/src-tauri/target/release/bundle/nsis/*-setup.exe).FullName
           ./scripts/verify_windows.ps1 -Installer $installer
 
+      # .deb / .AppImage / .dmg は**一度もインストール・起動されずに配布されていた**。
+      # ここで実際に展開して、同梱物が揃っていること・バックエンドが起動すること・
+      # 同梱物をバックエンドが解決できることまで確かめる
+      - name: パッケージを実機で検証(Linux)
+        if: matrix.os == 'ubuntu-24.04'
+        shell: bash
+        run: |
+          set -e
+          for pkg in frontend/src-tauri/target/release/bundle/deb/*.deb \
+                     frontend/src-tauri/target/release/bundle/appimage/*.AppImage; do
+            echo "### $pkg"
+            ./scripts/verify_unix.sh "$pkg"
+          done
+
+      - name: パッケージを実機で検証(macOS)
+        if: matrix.os == 'macos-14'
+        shell: bash
+        run: ./scripts/verify_unix.sh frontend/src-tauri/target/release/bundle/dmg/*.dmg
+
       - name: 成果物を集める
         uses: actions/upload-artifact@v4
         with:

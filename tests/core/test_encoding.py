@@ -20,7 +20,7 @@ from pathlib import Path
 
 import pytest
 
-BACKEND = Path(__file__).resolve().parents[1] / "backend"
+BACKEND = Path(__file__).resolve().parents[2] / "backend"
 SUBPROCESS_CALLS = {"run", "Popen", "check_output", "call", "check_call"}
 
 
@@ -94,7 +94,7 @@ def test_bytesで読むなら対象外():
 # CIの英語Windows(cp1252)では日本語を **書けない**(UnicodeEncodeError)。
 # 実際にテスト3件がそれで落ちた(v0.9.8以降のCI)。
 # バイナリ(read_bytes/write_bytes)は対象外。
-REPO = Path(__file__).resolve().parents[1]
+REPO = Path(__file__).resolve().parents[2]
 TEXT_IO_METHODS = {"read_text", "write_text"}
 # 生成物・外部コードは見ない
 SKIP_DIRS = {".venv", "build", "node_modules", "__pycache__", ".git", "frontend"}

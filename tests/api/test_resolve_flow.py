@@ -3,8 +3,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from backend.engines.llm.base import FakeLLMClient
-from backend.jobs import resolve_job
+from tests.helpers import create_media, insert_segments, use_fake
 
 SEGMENT_TEXTS = [
     "はやまる: 去年ハッカソンに出たんですよ",
@@ -15,26 +14,18 @@ SEGMENT_TEXTS = [
 
 @pytest.fixture
 def media(client, tmp_path):
-    pid = client.post("/api/projects", json={"name": "p"}).json()["id"]
-    f = tmp_path / "a.wav"
-    f.write_bytes(b"x")
-    mid = client.post(f"/api/projects/{pid}/media", json={"path": str(f)}).json()["id"]
-
-    db = client.app.state.db
-    for idx, text in enumerate(SEGMENT_TEXTS):
-        db.execute(
-            "INSERT INTO segments (media_id, idx, start, end, text, original_text, speaker)"
-            " VALUES (?,?,?,?,?,?,?)",
-            (mid, idx, idx * 2.0, idx * 2.0 + 1.5, text, text, "はやまる"),
-        )
-    db.commit()
-    return {"project_id": pid, "media_id": mid}
+    ids = create_media(client, tmp_path)
+    insert_segments(
+        client.app.state.db,
+        ids["media_id"],
+        [
+            {"text": t, "speaker": "はやまる", "start": i * 2.0, "end": i * 2.0 + 1.5}
+            for i, t in enumerate(SEGMENT_TEXTS)
+        ],
+    )
+    return ids
 
 
-def use_fake(responses):
-    fake = FakeLLMClient(responses=responses)
-    resolve_job.set_client_factory(lambda: fake)
-    return fake
 
 
 def run_resolve(client, media_id, params=None):

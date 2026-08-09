@@ -3,8 +3,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from backend.engines.llm.base import FakeLLMClient
-from backend.jobs import resolve_job
+from tests.helpers import use_fake
 
 TEXTS = [
     "はやまる: 去年ハッカソンに出たんですよ",
@@ -29,10 +28,6 @@ def seg_ids(client, tmp_path):
     return {"media_id": mid, "project_id": pid, "ids": [r["id"] for r in rows]}
 
 
-def use_fake(responses):
-    fake = FakeLLMClient(responses=responses)
-    resolve_job.set_client_factory(lambda: fake)
-    return fake
 
 
 def test_assist_creates_proposed_edit(client, seg_ids):

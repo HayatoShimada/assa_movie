@@ -49,7 +49,7 @@ def test_is_available_requires_both_models(tmp_path):
 
 def test_default_paths_are_outside_the_repo():
     """モデルはリポジトリに置かない(配布物を汚さない)"""
-    repo = Path(__file__).resolve().parents[1]
+    repo = Path(__file__).resolve().parents[2]
     for p in (DEFAULT_SEGMENTATION, DEFAULT_EMBEDDING):
         assert p.is_absolute()
         assert repo not in p.parents

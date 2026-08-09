@@ -174,7 +174,7 @@ def test_global_settings_persist_across_restart(tmp_path):
 def test_jobs_do_not_import_global_settings_directly():
     from pathlib import Path
 
-    jobs_dir = Path(__file__).resolve().parents[1] / "backend" / "jobs"
+    jobs_dir = Path(__file__).resolve().parents[2] / "backend" / "jobs"
     offenders = [
         p.name for p in jobs_dir.glob("*.py")
         if "from backend.core.config import settings" in p.read_text(encoding="utf-8")
