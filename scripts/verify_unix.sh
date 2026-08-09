@@ -37,30 +37,45 @@ fi
 ROOT=""   # 同梱物(bin/ models/ licenses/)のルート
 SIDECAR=""
 
-# 同梱物の置き場所はTauriのバンドラが決める(Linuxなら /usr/lib/<製品名>)。
-# 決め打ちにすると製品名を変えたときに黙って空振りするので、サイドカーを
-# 探して、その隣を同梱物のルートとみなす
-find_root() {
-  local tree="$1"
-  local found
-  found="$(find "$tree" -name "kirinuki-studio-backend*" -type f -print -quit 2>/dev/null)"
-  [ -n "$found" ] || return 1
-  SIDECAR="$found"
-  ROOT="$(dirname "$found")"
+# 置き場所はTauriのバンドラが決める。**サイドカーと同梱物は別の場所に入る**
+# (Linuxのdebは実行ファイルが /usr/bin、リソースが /usr/lib/<製品名>)。
+# サイドカーの隣をルートとみなしていたら、同梱物が1つも見つからなかった。
+# 決め打ちもしない(製品名を変えたときに黙って空振りする)。
+# 「必ず同梱するもの」を目印にして、そこからルートを逆算する。
+ROOT_ANCHORS=(
+  "licenses/python/THIRD-PARTY-NOTICES.txt"
+  "models/speaker-embedding.onnx"
+  "bin/whisper-cli"
+)
+
+find_layout() {
+  local tree="$1" anchor hit depth
+  SIDECAR="$(find "$tree" -name "kirinuki-studio-backend*" -type f -print -quit 2>/dev/null)"
+
+  for anchor in "${ROOT_ANCHORS[@]}"; do
+    hit="$(find "$tree" -path "*/$anchor" -print -quit 2>/dev/null)"
+    [ -n "$hit" ] || continue
+    # 目印の階層ぶんだけ上がるとリソースのルートになる
+    ROOT="$hit"
+    depth=$(tr -cd '/' <<< "$anchor" | wc -c)
+    for _ in $(seq 0 "$depth"); do ROOT="$(dirname "$ROOT")"; done
+    return 0
+  done
+  return 1
 }
 
 case "$PACKAGE" in
   *.deb)
     dpkg-deb -x "$PACKAGE" "$WORK/root"
     ok "展開: $(du -sh "$WORK/root" | cut -f1)"
-    find_root "$WORK/root" || ng "サイドカーが見つからない(.deb の中身が想定と違う)"
+    find_layout "$WORK/root" || ng "同梱物が見つからない(.deb の中身が想定と違う)"
     ;;
   *.AppImage)
     chmod +x "$PACKAGE"
     PACKAGE_ABS="$(cd "$(dirname "$PACKAGE")" && pwd)/$(basename "$PACKAGE")"
     (cd "$WORK" && "$PACKAGE_ABS" --appimage-extract > /dev/null)
     ok "展開: $(du -sh "$WORK/squashfs-root" | cut -f1)"
-    find_root "$WORK/squashfs-root" || ng "サイドカーが見つからない(AppImageの中身が想定と違う)"
+    find_layout "$WORK/squashfs-root" || ng "同梱物が見つからない(AppImageの中身が想定と違う)"
     ;;
   *.dmg)
     MOUNT="$WORK/mnt"
@@ -147,9 +162,13 @@ else
 
     env_json="$(curl -s --max-time 60 "$BASE/api/environment")"
     info "環境: $(echo "$env_json" | head -c 400)"
+
+    # **ffmpegはLinux/macOSには同梱していない**(.debは依存宣言、macOSはbrew)。
+    # 検証機に入っているかどうかは配布物の問題ではないので、NGにはしない。
+    # ここで見たいのは「同梱していないものを同梱物として探していないか」だけ
     case "$env_json" in
       *'"ffmpeg":true'*) ok "ffmpeg を見つけている" ;;
-      *) ng "ffmpeg が見つからない(AppImageは同梱していないので要インストール)" ;;
+      *) info "ffmpeg はこの機体に入っていない(同梱対象外。書き出し時に案内が出る)" ;;
     esac
   else
     ng "バックエンドが応答しない"

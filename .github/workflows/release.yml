@@ -205,7 +205,10 @@ jobs:
         # ログのダウンロードにはリポジトリの管理者権限が要る。それが無いと
         # 「exit code 1」しか見えないので、NG行をアノテーションに出す
         run: |
-          $installer = (Get-Item frontend/src-tauri/target/release/bundle/nsis/*-setup.exe).FullName
+          # 古いビルドが残っていると複数一致して壊れる(手元で踏んだ)。新しい方を採る
+          $installer = (Get-Item frontend/src-tauri/target/release/bundle/nsis/*-setup.exe |
+                        Sort-Object LastWriteTime | Select-Object -Last 1).FullName
+          Write-Host "検証するインストーラ: $installer"
           # 子プロセスで走らせる。`./script.ps1` だと中の `exit 1` が
           # このステップごと終わらせてしまい、下のアノテーションに届かない
           pwsh -File ./scripts/verify_windows.ps1 -Installer $installer 2>&1 |
@@ -246,7 +249,11 @@ jobs:
             exit 1
           }
 
+      # 検証が落ちても集める。落ちた成果物を手元に落として調べられないと、
+      # 「CIでだけ落ちる」を潰せない(リリースへの添付は下の別ステップなので、
+      # 検証が落ちていればここで集めても配布はされない)
       - name: 成果物を集める
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: installer-${{ matrix.os }}
