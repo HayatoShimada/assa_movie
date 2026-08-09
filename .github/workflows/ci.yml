@@ -51,8 +51,16 @@ jobs:
       - name: 依存を入れる
         run: uv sync --no-default-groups --group dev
 
+      # 失敗の要約をアノテーションに出す。ログのダウンロードにはリポジトリの
+      # 管理者権限が要るため、それが無い人には「exit code 1」しか見えない
       - name: pytest
-        run: uv run --no-sync pytest -q
+        shell: bash
+        run: |
+          set -o pipefail
+          uv run --no-sync pytest -q --tb=short 2>&1 | tee pytest.log || {
+            echo "::error title=pytest (${{ matrix.os }})::$(tail -40 pytest.log | tr '\n' '％')"
+            exit 1
+          }
 
   # ---- torch系エンジンのテスト(Linuxのみ) ----
   #
@@ -127,8 +135,33 @@ jobs:
         shell: bash
         run: mkdir -p frontend/dist && touch frontend/dist/index.html
 
+      # tauri-buildは tauri.<os>.conf.json が挙げるリソースの実在を確かめる。
+      # 中身(ffmpeg・whisper-cli・モデル)は release.yml でしか作らないので、
+      # ここでは空ファイルを置く。cargo testはリソースの中身を使わない
+      - name: 同梱リソースの置き場所を用意する
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, pathlib, platform
+          root = pathlib.Path("frontend/src-tauri")
+          conf = {"Linux": "linux", "Windows": "windows", "Darwin": "macos"}[platform.system()]
+          data = json.loads((root / f"tauri.{conf}.conf.json").read_text(encoding="utf-8"))
+          for src in data["bundle"]["resources"]:
+              path = root / src
+              path.parent.mkdir(parents=True, exist_ok=True)
+              if not path.exists():
+                  path.write_bytes(b"")
+                  print("placeholder:", src)
+          PY
+
       - name: cargo test
-        run: cargo test --manifest-path frontend/src-tauri/Cargo.toml
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo test --manifest-path frontend/src-tauri/Cargo.toml 2>&1 | tee cargo.log || {
+            echo "::error title=cargo test (${{ matrix.os }})::$(tail -40 cargo.log | tr '\n' '％')"
+            exit 1
+          }
 
   # ---- E2E ----
   #

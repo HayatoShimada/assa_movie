@@ -38,6 +38,10 @@ case "${1:-all}" in
     export PATH="$HOME/.cargo/bin:$PATH"
     ./scripts/build_sidecar.sh
     ./scripts/build_whispercpp.sh
+    # resources/ は丸ごとgitignoreなので、クリーンチェックアウトでは
+    # モデルが存在せず tauri build がリソース不足で落ちる。
+    # CIは別経路(release.yml)で取っていたため、この穴を踏まなかった
+    uv run --no-project python scripts/fetch_diarization_models.py
     cd frontend && exec npm run app:build
     ;;
   app)
@@ -75,22 +79,9 @@ case "${1:-all}" in
   diarize-models)
     # 話者分離のONNXモデル(計76MB)。pyannote(torch 14GB・HFトークン必須)の代わりで、
     # 実測で約4倍速く一致率94.8%(docs/V1_PLAN.md M23)。取得すると自動で使われる。
-    HOME_DIR="${KS_MODELS_HOME:-$(cache_dir)}"
-    SEG_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-segmentation-models/sherpa-onnx-pyannote-segmentation-3-0.tar.bz2"
-    EMB_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_eres2netv2_sv_zh-cn_16k-common.onnx"
-    mkdir -p "$HOME_DIR/models"
-    # 途中で止めても壊れたモデルが残らないよう、完了してから置き換える
-    # (中途半端なファイルがあるとエンジンが「使える」と誤判定してしまう)
-    if [ ! -f "$HOME_DIR/models/sherpa-onnx-pyannote-segmentation-3-0/model.onnx" ]; then
-      curl -L --progress-bar -o "$HOME_DIR/models/seg.tar.bz2.part" "$SEG_URL"
-      tar xf "$HOME_DIR/models/seg.tar.bz2.part" -C "$HOME_DIR/models"
-      rm -f "$HOME_DIR/models/seg.tar.bz2.part"
-    fi
-    if [ ! -f "$HOME_DIR/models/speaker-embedding.onnx" ]; then
-      curl -L --progress-bar -o "$HOME_DIR/models/speaker-embedding.onnx.part" "$EMB_URL"
-      mv "$HOME_DIR/models/speaker-embedding.onnx.part" "$HOME_DIR/models/speaker-embedding.onnx"
-    fi
-    echo "=== 話者分離モデルの準備ができました: $HOME_DIR/models ==="
+    # URLと置き場所は backend/engines/diarize/model_sources.py だけが持つ
+    exec uv run --no-project python scripts/fetch_diarization_models.py \
+      --home "${KS_MODELS_HOME:-$(cache_dir)}" "${@:2}"
     ;;
   sync)
     # torchのwheelはGPUベンダーごとにindexが違う(pyproject.tomlのグループ参照)。

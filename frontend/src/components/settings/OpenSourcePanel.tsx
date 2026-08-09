@@ -18,6 +18,8 @@ type Bundled = {
   source: string
 }
 
+// THIRD_PARTY_LICENSES.md の「同梱しているもの」と対応させる。
+// 同梱物を足したらここにも足す(m32-oss-notice.spec.ts が件数を見張る)
 const BUNDLED: Bundled[] = [
   {
     name: 'FFmpeg',
@@ -29,9 +31,30 @@ const BUNDLED: Bundled[] = [
   {
     name: 'whisper.cpp',
     license: 'MIT',
-    platform: 'Linux版・macOS版に同梱',
-    purpose: '高速な文字起こし',
+    platform: '全OSに同梱',
+    purpose: '高速な文字起こし(Linux・WindowsはVulkan、macOSはMetal)',
     source: 'https://github.com/ggml-org/whisper.cpp',
+  },
+  {
+    name: '話者分離モデル(発話区間)',
+    license: 'MIT (c) 2022 CNRS',
+    platform: '全OSに同梱',
+    purpose: 'pyannote segmentation-3.0 をONNX化したもの',
+    source: 'https://huggingface.co/pyannote/segmentation-3.0',
+  },
+  {
+    name: '話者分離モデル(声の特徴量)',
+    license: 'Apache-2.0',
+    platform: '全OSに同梱',
+    purpose: '3D-Speaker eres2netv2 をONNX化したもの',
+    source: 'https://github.com/modelscope/3D-Speaker',
+  },
+  {
+    name: 'Pythonの依存パッケージ',
+    license: 'MIT / BSD / Apache-2.0 ほか',
+    platform: '全OSに同梱',
+    purpose: 'バックエンド(PyInstallerが実行ファイルに取り込む)',
+    source: 'licenses/python/THIRD-PARTY-NOTICES.txt',
   },
 ]
 

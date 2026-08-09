@@ -11,11 +11,13 @@
 #
 #   ./scripts/build_whispercpp.sh
 #   → frontend/src-tauri/resources/bin/whisper-cli
+#   → frontend/src-tauri/resources/licenses/whispercpp/{LICENSE,VERSION}.txt
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 SRC="${KS_WHISPERCPP_SRC:-$HOME/.cache/whisper-local/src/whisper.cpp}"
 OUT="frontend/src-tauri/resources/bin/whisper-cli"
+LICENSE_DEST="frontend/src-tauri/resources/licenses/whispercpp"
 
 case "$(uname -s)" in
   Darwin)
@@ -64,4 +66,17 @@ else
   echo "whisper-cli が見つかりません: $BUILD_DIR/bin" >&2
   exit 1
 fi
+
+# MITなので著作権表示とライセンス文を添えれば足りる。
+# これを忘れると再配布の条件を満たさない(.ps1 にしか無く、
+# Linux/macOSの配布物だけ条件未充足のまま出ていた)
+mkdir -p "$LICENSE_DEST"
+cp "$SRC/LICENSE" "$LICENSE_DEST/LICENSE.txt"
+cat > "$LICENSE_DEST/VERSION.txt" <<EOF
+whisper.cpp (https://github.com/ggml-org/whisper.cpp)
+commit: $(git -C "$SRC" rev-parse HEAD)
+build:  $BACKEND_NAME / static / Release
+EOF
+
 echo "=== できました: $OUT ($(du -h "$OUT" | cut -f1)) ==="
+echo "ライセンス表記: $LICENSE_DEST"

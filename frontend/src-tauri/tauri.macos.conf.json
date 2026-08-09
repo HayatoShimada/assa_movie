@@ -2,10 +2,13 @@
   "bundle": {
     "resources": {
       "resources/bin/whisper-cli": "bin/whisper-cli",
+      "resources/licenses/whispercpp/LICENSE.txt": "licenses/whispercpp/LICENSE.txt",
+      "resources/licenses/whispercpp/VERSION.txt": "licenses/whispercpp/VERSION.txt",
       "resources/licenses/python/THIRD-PARTY-NOTICES.txt": "licenses/python/THIRD-PARTY-NOTICES.txt",
       "resources/models/sherpa-onnx-pyannote-segmentation-3-0/model.onnx": "models/sherpa-onnx-pyannote-segmentation-3-0/model.onnx",
       "resources/models/speaker-embedding.onnx": "models/speaker-embedding.onnx",
       "resources/licenses/diarization/LICENSE-segmentation.txt": "licenses/diarization/LICENSE-segmentation.txt",
+      "resources/licenses/diarization/LICENSE-embedding-Apache-2.0.txt": "licenses/diarization/LICENSE-embedding-Apache-2.0.txt",
       "resources/licenses/diarization/NOTICE.md": "licenses/diarization/NOTICE.md"
     }
   }

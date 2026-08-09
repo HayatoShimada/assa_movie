@@ -17,11 +17,12 @@ import numpy as np
 
 from backend.core.paths import cache_dir
 
+# 取得元と相対パスは model_sources.py が唯一の定義(取得スクリプトと共有する)
+from backend.engines.diarize.model_sources import EMBEDDING_REL, SEGMENTATION_REL
+
 SAMPLE_RATE = 16000
 # 置き場所は backend/core/paths.py が決める(whisper.cppと同じディレクトリ)
 DEFAULT_HOME = Path(os.environ.get("KS_MODELS_HOME") or cache_dir())
-SEGMENTATION_REL = "models/sherpa-onnx-pyannote-segmentation-3-0/model.onnx"
-EMBEDDING_REL = "models/speaker-embedding.onnx"
 DEFAULT_SEGMENTATION = DEFAULT_HOME / SEGMENTATION_REL
 DEFAULT_EMBEDDING = DEFAULT_HOME / EMBEDDING_REL
 

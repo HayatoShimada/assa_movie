@@ -81,16 +81,21 @@ jobs:
       # WindowsはVulkan SDKの導入が要るので、まずは同梱せずに出す
       # (faster-whisperで動く。docs/verify_rocm.md の比較を参照)
       # Vulkanのシェーダ生成が重い(Linuxで実測2分半)。commitが変わるまで使い回す
+      # キャッシュ対象はソースとビルドツリー(build-bundled はSRCの下にある)。
+      # 以前はスクリプトが使う場所と別のパスを指していたため一度も当たらず、
+      # 「2分半かかるので使い回す」というコメントだけが残っていた
       - name: whisper.cppのビルドキャッシュ
         if: matrix.os != 'windows-latest'
         uses: actions/cache@v4
         with:
-          path: ~/.cache/kirinuki-studio/src/whisper.cpp
+          path: ${{ github.workspace }}/.cache/whisper.cpp
           key: whispercpp-${{ matrix.os }}-${{ hashFiles('scripts/build_whispercpp.sh') }}
 
       - name: whisper.cppを同梱(Linux/macOS)
         if: matrix.os != 'windows-latest'
         shell: bash
+        env:
+          KS_WHISPERCPP_SRC: ${{ github.workspace }}/.cache/whisper.cpp
         run: ./scripts/build_whispercpp.sh
 
       # WindowsもVulkanで同梱する。AMDのWindows機はROCmが無くCTranslate2も
@@ -139,8 +144,12 @@ jobs:
         id: ffmpeg-cache
         uses: actions/cache@v4
         with:
+          # bin/ を丸ごと対象にしない。**同じ場所に居る whisper-cli.exe を巻き込む**。
+          # whisper.cppを更新しても古いバイナリで上書きされ、VERSION.txt だけ
+          # 新しいという検知しようのない不整合が出荷される
           path: |
-            frontend/src-tauri/resources/bin
+            frontend/src-tauri/resources/bin/ffmpeg.exe
+            frontend/src-tauri/resources/bin/ffprobe.exe
             frontend/src-tauri/resources/licenses/ffmpeg
           key: ffmpeg-min-${{ hashFiles('scripts/build_ffmpeg.sh', 'licenses/ffmpeg-NOTICE.md', 'licenses/LGPL-2.1.txt') }}
 
@@ -167,17 +176,21 @@ jobs:
           path: |
             frontend/src-tauri/resources/models
             frontend/src-tauri/resources/licenses/diarization
-          key: diarize-models-${{ hashFiles('scripts/fetch_diarization_models.sh', 'licenses/diarization-NOTICE.md') }}
+          # 取得スクリプト・URL定義・表記のどれが変わってもキャッシュを作り直す。
+          # sh版だけをキーにしていた頃は、ps1を直してもWindowsが変更を無視した
+          key: >-
+            diarize-models-${{ hashFiles(
+              'scripts/fetch_diarization_models.py',
+              'backend/engines/diarize/model_sources.py',
+              'licenses/diarization-NOTICE.md',
+              'licenses/Apache-2.0.txt') }}
 
-      - name: 話者分離モデルを同梱(Linux/macOS)
-        if: matrix.os != 'windows-latest' && steps.diarize-cache.outputs.cache-hit != 'true'
+      # 3OS共通(標準ライブラリだけで動く)。sh版とps1版に分かれていた頃は、
+      # 「中身は同じ」と称しつつリトライの有無などが食い違っていた
+      - name: 話者分離モデルを同梱
+        if: steps.diarize-cache.outputs.cache-hit != 'true'
         shell: bash
-        run: ./scripts/fetch_diarization_models.sh
-
-      - name: 話者分離モデルを同梱(Windows)
-        if: matrix.os == 'windows-latest' && steps.diarize-cache.outputs.cache-hit != 'true'
-        shell: pwsh
-        run: ./scripts/fetch_diarization_models.ps1
+        run: uv run --no-project python scripts/fetch_diarization_models.py
 
       - name: パッケージを作る
         working-directory: frontend

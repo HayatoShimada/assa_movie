@@ -41,8 +41,9 @@ FFmpeg は本体とリンクしておらず、独立した実行ファイルを�
 インストール版では動きません。ONNX が唯一使えるエンジンなので、モデルを
 同梱しないと話者分離がまったく使えなくなります。
 
-取得は [scripts/fetch_diarization_models.sh](scripts/fetch_diarization_models.sh)
-(Windows は `.ps1`)。インストール後は `licenses/diarization/` に入ります。
+取得は [scripts/fetch_diarization_models.py](scripts/fetch_diarization_models.py)(3OS共通)。
+インストール後は `licenses/diarization/` に入り、MIT の本文・Apache-2.0 の本文・
+上記のNOTICEが揃います。
 
 ### Python の依存パッケージ
 
@@ -71,21 +72,36 @@ MIT ライセンスなので著作権表示とライセンス文の同梱で足�
 次のものは**配布物に含めず、利用者の環境で取得**します。再配布していないため、
 本ソフトウェアの配布に関する表記義務は生じません。
 
-- 文字起こし・話者分離のモデル(Whisper / pyannote / sherpa-onnx)
+- 文字起こしのモデル(Whisper の重み。whisper.cpp用のggmlモデルは3.1GBある)
   — 設定タブの「セットアップ」から利用者が取得します
-- Linux版が依存する ffmpeg — `.deb` の依存としてディストリビューションから入ります
+- torch を使う話者分離(pyannote)— 配布物に torch を入れていないため
+  インストール版では動きません。開発環境でのみ使えます
+- Linux版が依存する ffmpeg
+  — `.deb` はパッケージの依存で入ります。**AppImage は依存を宣言できない**ため
+    利用者が自分で入れる必要があり、未導入なら書き出し時に手順を案内します
 - Ollama・各社のLLM API — 利用者が用意します
+
+**話者分離のONNXモデルは同梱しています**(上記「同梱しているもの」を参照)。
+以前この節にも書いていましたが、同じ文書の中で矛盾していました。
 
 ## 表記の更新のしかた
 
 どちらも手で書き写さず、実際の配布物から機械的に集めます。取りこぼしを防ぐためです。
 
 ```bash
-./scripts/build_ffmpeg.sh     # MSYS2のmingw64シェル。ffmpegと同時に表記も生成
-./scripts/build_sidecar.sh    # Pythonバックエンド。同時に表記も生成
+./scripts/build_ffmpeg.sh                      # MSYS2のmingw64シェル。ffmpegと同時に生成
+./scripts/build_sidecar.sh                     # Pythonバックエンド。同時に生成
+./scripts/build_whispercpp.sh                  # whisper.cpp。LICENSEとコミットを記録
+uv run --no-project python scripts/fetch_diarization_models.py   # 話者分離モデル
 ```
+
+同梱物とライセンス表記の対応は `frontend/src-tauri/tauri.<os>.conf.json` が持ちます。
+**バイナリを足したら同じOSのconfに表記も足す。** whisper.cpp を3OSに広げたとき、
+表記の生成が `.ps1` にしか無く、Linux・macOS の配布物だけ MIT の条件を
+満たしていませんでした。
 
 ## 残っているもの
 
-- macOS版・AppImage版の ffmpeg 同梱(現在はWindows版のみ。macOSは `brew install ffmpeg`、
-  `.deb` はパッケージの依存で解決)
+- macOS版・AppImage版の ffmpeg 同梱(現在はWindows版のみ)。
+  macOSは `brew install ffmpeg`、`.deb` はパッケージの依存で解決。
+  AppImage だけは自動で入る経路が無いため、書き出し時に導入手順を案内している

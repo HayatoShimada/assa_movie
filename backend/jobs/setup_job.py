@@ -16,23 +16,18 @@ import requests
 
 from backend.engines.asr import whispercpp
 from backend.engines.diarize import onnx
+from backend.engines.diarize.model_sources import (
+    EMBEDDING_URL,
+    SEGMENTATION_SHARE,
+    SEGMENTATION_URL,
+    TOTAL_SIZE_MB as DIARIZATION_SIZE_MB,
+)
 from backend.jobs.queue import register
 
-SEGMENTATION_URL = (
-    "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-segmentation-models/"
-    "sherpa-onnx-pyannote-segmentation-3-0.tar.bz2"
-)
-EMBEDDING_URL = (
-    "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/"
-    "3dspeaker_speech_eres2netv2_sv_zh-cn_16k-common.onnx"
-)
-DIARIZATION_SIZE_MB = 76
 WHISPERCPP_MODEL_URL = (
     "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3.bin"
 )
 WHISPERCPP_SIZE_MB = 3100
-# 分離モデルの取得が全体の何割か(残りが埋め込みモデル。実サイズの比率に合わせる)
-SEGMENTATION_SHARE = 0.1
 
 
 def download(url: str, dest: Path, progress) -> None:
