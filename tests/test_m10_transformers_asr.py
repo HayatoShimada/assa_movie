@@ -116,7 +116,11 @@ class FakePipe:
 
 
 # ---- 言語名の解決(単語分割が壊れた原因) ----
+#
+# 対応表(LANGUAGES)はtransformers本体にあるので、入っていない環境では
+# 引数がそのまま返る。挙動の検証にはtransformersが要る
 
+@pytest.mark.torch
 @pytest.mark.parametrize(
     "given, expected",
     [
@@ -132,6 +136,7 @@ def test_full_language_name(given, expected):
     assert full_language_name(given) == expected
 
 
+@pytest.mark.torch
 def test_transcribe_sets_tokenizer_language_to_full_name():
     """回帰: tokenizer.languageが"ja"のままだと日本語が分割されない"""
     fake = FakePipe({"text": "はい", "chunks": [{"text": "はい", "timestamp": (0.0, 0.5)}]})

@@ -95,10 +95,15 @@ def config_dir(home: Path | None = None, os_name: str | None = None) -> Path:
     return _xdg("XDG_CONFIG_HOME", home, ".config")
 
 
-def config_file(name: str, home: Path | None = None, repo: Path | None = None) -> Path:
+def config_file(
+    name: str,
+    home: Path | None = None,
+    repo: Path | None = None,
+    os_name: str | None = None,
+) -> Path:
     """APIトークン等のファイル。リポジトリ直下に既にあるならそれを使う"""
     legacy = (repo or PROJECT_ROOT) / name
-    return legacy if legacy.exists() else config_dir(home=home) / name
+    return legacy if legacy.exists() else config_dir(home=home, os_name=os_name) / name
 
 
 def legacy_env_vars() -> list[str]:

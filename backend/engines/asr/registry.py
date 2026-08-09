@@ -5,7 +5,9 @@
 
 エンジンはアクセラレータで自動選択する(asr_engine="auto"):
 - CUDA  → faster-whisper(float16。Blackwellでint8はクラッシュ)
-- ROCm  → transformers版Whisper(CTranslate2がROCm非対応のため)
+- ROCm  → whisper.cpp。無ければ公式Whisper(CTranslate2がROCm非対応のため)。
+          公式Whisperもtorch依存で配布物には無いので、その場合はfaster-whisper(CPU)
+- GPUはあるがCUDA/ROCmでない(AMDのWindows等)→ whisper.cpp(Vulkan)
 - CPU   → faster-whisper(int8。int8クラッシュはBlackwell GPU限定でCPUは安全)
 """
 
@@ -15,6 +17,7 @@ from backend.core.device import detect_accel
 from backend.engines.asr.base import ASREngine
 from backend.engines.asr.fasterwhisper import FasterWhisperEngine
 from backend.engines.asr.openai_whisper import OpenAIWhisperEngine
+from backend.engines.asr.openai_whisper import is_available as openai_whisper_available
 from backend.engines.asr.transformers_whisper import TransformersWhisperEngine
 from backend.engines.asr.whispercpp import WhisperCppEngine
 from backend.engines.asr.whispercpp import is_available as whispercpp_available
@@ -88,7 +91,12 @@ def resolve_engine(engine_id: str, accel: str, has_gpu: bool = False) -> str:
     if engine_id != "auto":
         return engine_id
     if accel == "rocm":
-        return "whispercpp" if whispercpp_available() else "openai_whisper"
+        if whispercpp_available():
+            return "whispercpp"
+        # 公式Whisperはtorch依存で配布物に入っていない。開発機でだけ選ぶ。
+        # 配布版でここへ落とすとImportErrorで文字起こしが必ず失敗するので、
+        # GPUは使えなくても動くfaster-whisper(CPU)にする
+        return "openai_whisper" if openai_whisper_available() else "faster_whisper"
     if accel == "cuda":
         return "faster_whisper"  # CUDA版CTranslate2が最速
     # GPUはあるがCUDA/ROCmとして使えない。Vulkanなら賄える

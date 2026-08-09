@@ -12,6 +12,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from backend.core import keyfile
 from backend.engines.llm.base import LLMError
 
 DEFAULT_MODEL = "claude-opus-5"
@@ -31,10 +32,9 @@ def load_api_key(key_file: Path | None = None) -> str | None:
     key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
     if key:
         return key
-    if key_file and key_file.exists():
-        text = key_file.read_text(encoding="utf-8").strip()
-        if text.startswith(KEY_PREFIX) and "\n" not in text:
-            return text
+    text = keyfile.read(key_file)
+    if text and text.startswith(KEY_PREFIX) and "\n" not in text:
+        return text
     return None
 
 

@@ -59,6 +59,7 @@ class FakeModel:
         return {"language": "ja", "segments": RAW}
 
 
+@pytest.mark.torch
 def test_transcribe_requests_word_timestamps_and_prompt():
     fake = FakeModel()
     engine = OpenAIWhisperEngine(model_factory=lambda: fake)
@@ -79,6 +80,7 @@ def test_transcribe_requests_word_timestamps_and_prompt():
     assert progressed and progressed[-1] == 1.0
 
 
+@pytest.mark.torch
 def test_progress_is_relayed_from_internal_tqdm():
     """公式実装は進捗コールバックを持たないので、内部の進捗バーを横取りする"""
     import importlib

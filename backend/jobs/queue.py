@@ -15,6 +15,11 @@ from backend.core.cancellation import JobCancelled, bind, unbind
 
 Handler = Callable[[sqlite3.Connection, int | None, dict, Callable[[float], None]], None]
 
+# これ以上進まない状態。SSEの打ち切りもフロントの待機もこれで判断する。
+# フロント側の対応物は frontend/src/api/client.ts の JOB_TERMINAL_STATUSES
+# (突き合わせは tests/test_m39_shipped_bugs.py)
+TERMINAL_STATUSES = ("completed", "failed", "cancelled")
+
 _HANDLERS: dict[str, Handler] = {}
 
 
@@ -267,7 +272,7 @@ class JobQueue:
         deadline = time.time() + timeout
         while time.time() < deadline:
             job = self.get(job_id)
-            if job and job["status"] in ("completed", "failed"):
+            if job and job["status"] in TERMINAL_STATUSES:
                 return job
             time.sleep(0.05)
         raise TimeoutError(f"ジョブ {job_id} がタイムアウトしました")

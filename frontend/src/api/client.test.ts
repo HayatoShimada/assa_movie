@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, api, resolveApiBase } from './client'
+import { ApiError, JOB_TERMINAL_STATUSES, api, isJobDone, resolveApiBase } from './client'
 
 function mockFetch(body: unknown, status = 200) {
   const spy = vi.fn().mockResolvedValue({
@@ -48,6 +48,27 @@ describe('apiクライアント', () => {
     const [url, init] = spy.mock.calls[0]
     expect(url).toBe('/api/media/2/jobs')
     expect(JSON.parse(init.body)).toEqual({ type: 'resolve', params: { level: 'strong' } })
+  })
+})
+
+describe('ジョブの終了判定', () => {
+  // バックエンドが返さない 'succeeded' を待っていたため、モデルの取得が
+  // 終わってもボタンが「取得中…」のまま固まっていた(SetupPanel)。
+  // 判定を1箇所にまとめ、状態名は backend/jobs/queue.py の TERMINAL_STATUSES と
+  // 突き合わせる(tests/test_m39_shipped_bugs.py)
+  it('バックエンドの終端状態をすべて終了とみなす', () => {
+    for (const status of ['completed', 'failed', 'cancelled']) {
+      expect(isJobDone(status)).toBe(true)
+    }
+  })
+
+  it('進行中は終了とみなさない', () => {
+    for (const status of ['queued', 'running']) expect(isJobDone(status)).toBe(false)
+  })
+
+  it('存在しない状態名を終了扱いしない', () => {
+    expect(isJobDone('succeeded')).toBe(false)
+    expect(JOB_TERMINAL_STATUSES).not.toContain('succeeded')
   })
 })
 

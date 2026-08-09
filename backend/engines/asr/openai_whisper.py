@@ -22,6 +22,21 @@ PROGRESS_START = 0.02
 PROGRESS_END = 0.99
 
 
+def is_available() -> bool:
+    """openai-whisperが使えるか。
+
+    torchに依存するので配布物には入っていない(torchだけで11.5GB)。
+    実質「ROCmの開発機かどうか」の判定になる。自動選択のフォールバック先を
+    決めるのに使う(入っていないものへ落とすとImportErrorで止まる)。
+    """
+    from importlib.util import find_spec
+
+    try:
+        return find_spec("whisper") is not None and find_spec("torch") is not None
+    except (ImportError, ValueError):
+        return False
+
+
 @contextlib.contextmanager
 def _progress_via_tqdm(progress: ProgressFn | None):
     """whisperが内部で使う進捗バーを横取りして呼び出し側へ流す。

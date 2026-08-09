@@ -51,6 +51,8 @@ def test_build_engine_auto_selects_by_accel(
     monkeypatch.setattr(registry, "detect_accel", lambda: accel)
     # whisper.cppは外部ビルドなので、無い環境の挙動として固定する
     monkeypatch.setattr(registry, "whispercpp_available", lambda: False)
+    # 公式Whisperはtorch依存。開発機に入っているかで結果が変わらないよう固定する
+    monkeypatch.setattr(registry, "openai_whisper_available", lambda: True)
     engine = build_engine(Settings(_env_file=None))  # asr_engine="auto"
     assert isinstance(engine, expected_type)
     assert engine.device == expected_device
@@ -74,7 +76,22 @@ def test_build_engine_falls_back_when_whispercpp_missing(monkeypatch):
 
     monkeypatch.setattr(registry, "detect_accel", lambda: "rocm")
     monkeypatch.setattr(registry, "whispercpp_available", lambda: False)
+    monkeypatch.setattr(registry, "openai_whisper_available", lambda: True)
     assert isinstance(build_engine(Settings(_env_file=None)), OpenAIWhisperEngine)
+
+
+def test_build_engine_falls_back_to_faster_whisper_without_torch(monkeypatch):
+    """配布物にtorchは無い。公式Whisperへ落とすとImportErrorで必ず失敗する。
+
+    faster-whisperのGPU版はCUDA専用なのでROCmではCPUになるが、
+    「遅い」と「動かない」なら遅いほうがよい。
+    """
+    from backend.engines.asr import registry
+
+    monkeypatch.setattr(registry, "detect_accel", lambda: "rocm")
+    monkeypatch.setattr(registry, "whispercpp_available", lambda: False)
+    monkeypatch.setattr(registry, "openai_whisper_available", lambda: False)
+    assert isinstance(build_engine(Settings(_env_file=None)), FasterWhisperEngine)
 
 
 def test_build_engine_explicit_transformers_on_cpu(monkeypatch):

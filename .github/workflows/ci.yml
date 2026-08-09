@@ -1,0 +1,183 @@
+# push/PRごとにテストを走らせる。
+#
+# これまでCIには release.yml しか無く、しかもトリガはタグだけだった。
+# つまり **テストは一度もCIで走っていなかった**。その結果、
+#   - ローカルで確認した経路とCIの経路が違う(3回)
+#   - Windowsのロケール依存エンコーディング(4回)
+#   - ビルドは通るが実際には動かない(3回)
+# を繰り返した。ここが「マージしてよい」の判断基準になる。
+#
+# 配布物のビルド(PyInstaller/Tauri/whisper.cpp)は重いのでここでは行わない。
+# それは release.yml の担当。ここは「壊れていないか」だけを速く見る。
+name: テスト
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+  workflow_dispatch:
+
+# 同じブランチに続けてpushしたら、古い実行は止める
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # ランナーによってはハードリンクが張れない。コピーは少し遅いだけで安全
+  UV_LINK_MODE: copy
+
+jobs:
+  # ---- Python: 3OSすべてで回す ----
+  #
+  # Windowsのロケール(日本語cp932 / 英語cp1252)で落ちる不具合を4回踏んでいる。
+  # 手元がWindowsでもCIは英語ロケールなので、両方を通す意味がある
+  backend:
+    name: バックエンド (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-14, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      # torch系は入れない(rocmグループはLinux専用、CPU版でも200MB以上)。
+      # torchが要るテストは @pytest.mark.torch が付いていて自動でスキップされる。
+      # 実際の配布物にもtorchは入っていないので、これが本番に近い構成になる
+      - name: 依存を入れる
+        run: uv sync --no-default-groups --group dev
+
+      - name: pytest
+        run: uv run --no-sync pytest -q
+
+  # ---- torch系エンジンのテスト(Linuxのみ) ----
+  #
+  # transformers版Whisperと公式Whisperは開発グループにしか無い。
+  # GPUは要らないのでCPU版のwheelで足りる
+  backend-torch:
+    name: バックエンド (torch系)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: 依存を入れる(CPU版torch)
+        run: uv sync --no-default-groups --group dev --group cpu --group torch-engines
+
+      - name: pytest (torchマーカーのみ)
+        run: uv run --no-sync pytest -q -m torch
+
+  # ---- フロントエンド: 型・lint・単体テスト・ビルド ----
+  frontend:
+    name: フロントエンド
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: 依存を入れる
+        working-directory: frontend
+        run: npm ci
+
+      - name: typecheck / lint / vitest / build
+        working-directory: frontend
+        run: npm run check
+
+  # ---- Tauriシェル(Rust) ----
+  #
+  # 12件のテストがあるのに、これまでどこからも実行されていなかった。
+  # 子プロセスの後始末(Job Object / プロセスグループ)がここに入っている
+  tauri:
+    name: Tauriシェル (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Linuxのビルド依存
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: frontend/src-tauri
+
+      # tauri.conf.json が frontendDist を要求するので、空でも用意しておく
+      - name: フロントの出力先を用意する
+        shell: bash
+        run: mkdir -p frontend/dist && touch frontend/dist/index.html
+
+      - name: cargo test
+        run: cargo test --manifest-path frontend/src-tauri/Cargo.toml
+
+  # ---- E2E ----
+  #
+  # CLAUDE.md が「UIを変えたらE2Eも足す」と定めているのに、dev.sh check に
+  # 入っておらず壊れても気付けなかった。LinuxとWindowsで回す
+  # (Windowsは配布の主対象で、パス・エンコーディングの差が出る側)
+  e2e:
+    name: E2E (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: 依存を入れる
+        run: uv sync --no-default-groups --group dev
+
+      - name: フロントの依存
+        working-directory: frontend
+        run: npm ci
+
+      - name: Playwrightのブラウザ
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: E2E
+        working-directory: frontend
+        # 素の `uv run` は既定グループ(Linuxではrocmのtorch=14GB)を同期しに行く。
+        # ここでは上で入れた構成のまま起動したいので --no-sync を渡す
+        env:
+          KS_E2E_BACKEND: uv run --no-sync python -m backend.e2e_server
+        run: npx playwright test
+
+      - name: 失敗時のレポート
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ matrix.os }}
+          path: frontend/playwright-report
+          retention-days: 7

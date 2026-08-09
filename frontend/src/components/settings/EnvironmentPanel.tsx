@@ -127,7 +127,10 @@ export function EnvironmentPanel() {
           onClick={() =>
             update.mutate({
               asr_model: rec.asr_model,
-              asr_engine: rec.asr_engine,
+              // 具体名で固定すると、同梱物が増えて推奨が変わっても追従しない。
+              // v0.9.5がここでfaster_whisperを書き込み、whisper.cppを同梱した
+              // あともGPUが使われないままだった。表示はrec.asr_engine、保存はauto
+              asr_engine: 'auto',
               ...(rec.ollama_model
                 ? { llm_provider: 'ollama', ollama_model: rec.ollama_model }
                 : {}),

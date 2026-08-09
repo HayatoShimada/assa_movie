@@ -47,17 +47,23 @@ dependencies = [
 # dependency-groupは配布物(project.dependencies)には入らないので、
 # 開発と比較検証でだけ使うものはここに置く
 [dependency-groups]
-# torchを使うASR・話者分離。入れると .venv が約0.6GB → 約14GB になる
+# torchを使うASR・話者分離。入れると .venv が約0.6GB → 約14GB になる。
+#
+# **Linux限定にしている。** torch系を使うのはROCm/CUDAのGPU検証だけで、
+# Windows/macOSでは同梱のwhisper.cpp(Vulkan/Metal)とONNX話者分離を使うため
+# 出番が無い。マーカーを付けないとWindowsで `uv sync` が解決に失敗し、
+# 開発もE2Eも一切動かせなくなる(手作りのvenvで凌ぐ羽目になっていた)。
+# これらに依存するテストは @pytest.mark.torch で自動スキップされる
 torch-engines = [
     # ROCmでtorch経由で動くWhisper実装(whisper.cppが無い環境向けの保険)
-    "transformers>=4.44",
+    "transformers>=4.44; sys_platform == 'linux'",
     # 公式Whisper。依存のtritonはNVIDIA版でpytorch-triton-rocmと同じモジュール名を
     # 奪うため tool.uv.override-dependencies で除外している
-    "openai-whisper>=20240930",
+    "openai-whisper>=20240930; sys_platform == 'linux'",
     # 旧・話者分離エンジン。4.x系は同意済みでないモデルを要求するため3.x系に固定
-    "pyannote-audio>=3.3,<4",
+    "pyannote-audio>=3.3,<4; sys_platform == 'linux'",
     # pyannote-audio 3.x はhuggingface_hub 1.0で削除されたuse_auth_token引数を使う
-    "huggingface-hub<1.0",
+    "huggingface-hub<1.0; sys_platform == 'linux'",
 ]
 
 dev = [
@@ -65,9 +71,18 @@ dev = [
     "httpx>=0.28",
 ]
 cu128 = ["torch==2.8.*", "torchaudio==2.8.*"]
+# CI用。GPUが無いランナーでtorch系のテストを回すためだけに使う。
+# PyPIの既定のwheelはCUDAランタイム同梱で2.5GBあるが、CPU版なら約200MB
+cpu = ["torch==2.8.*", "torchaudio==2.8.*"]
+# ROCmのwheelはLinux(linux_x86_64)にしか存在しない。マーカーが無いと
+# Windows/macOSでは `uv sync` がここで必ず失敗する(既定グループなので回避不能)
 # pytorch-triton-rocmはtorch(rocm版)の推移依存だが、wheelがrocm indexにしか
 # 無いためuvの仕様上ここに明示する必要がある
-rocm = ["torch==2.8.*", "torchaudio==2.8.*", "pytorch-triton-rocm"]
+rocm = [
+    "torch==2.8.*; sys_platform == 'linux'",
+    "torchaudio==2.8.*; sys_platform == 'linux'",
+    "pytorch-triton-rocm; sys_platform == 'linux'",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -79,17 +94,19 @@ default-groups = ["dev", "rocm", "torch-engines"]
 # openai-whisperが要求するtritonはNVIDIA版。ROCmでは pytorch-triton-rocm が
 # 同名モジュールを提供済みで、二重に入れるとファイルが衝突する
 override-dependencies = ["triton; sys_platform == 'no-such-platform'"]
-# cu128とrocmは同時に入れられない(torchのwheelが排他)
-conflicts = [[{ group = "cu128" }, { group = "rocm" }]]
+# cu128・rocm・cpuは同時に入れられない(torchのwheelが排他)
+conflicts = [[{ group = "cu128" }, { group = "rocm" }, { group = "cpu" }]]
 
 [tool.uv.sources]
 torch = [
     { index = "pytorch-cu128", group = "cu128" },
     { index = "pytorch-rocm", group = "rocm" },
+    { index = "pytorch-cpu", group = "cpu" },
 ]
 torchaudio = [
     { index = "pytorch-cu128", group = "cu128" },
     { index = "pytorch-rocm", group = "rocm" },
+    { index = "pytorch-cpu", group = "cpu" },
 ]
 # torch(rocm版)の推移依存。PyPIに3.4系が無くrocm indexにしかない
 pytorch-triton-rocm = [{ index = "pytorch-rocm", group = "rocm" }]
@@ -102,4 +119,9 @@ explicit = true
 [[tool.uv.index]]
 name = "pytorch-rocm"
 url = "https://download.pytorch.org/whl/rocm6.4"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
 explicit = true

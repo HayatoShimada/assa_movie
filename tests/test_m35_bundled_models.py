@@ -19,8 +19,17 @@ from backend.engines.diarize import onnx
 
 @pytest.fixture
 def bundled(tmp_path, monkeypatch):
-    """同梱物のあるインストール環境を作る"""
+    """同梱物だけがあるインストール環境を作る。
+
+    自分で取得したもの(DEFAULT_HOME)も空にしておく。ここを差し替えないと、
+    開発機のキャッシュに本物が居るせいで「同梱物を見つけられなくても通る」
+    テストになる(実際そうなっていた)。
+    """
     monkeypatch.setenv("KS_RESOURCE_DIR", str(tmp_path))
+    empty = tmp_path / "no-cache"
+    monkeypatch.setattr(whispercpp, "DEFAULT_HOME", empty)
+    monkeypatch.setattr(onnx, "DEFAULT_SEGMENTATION", empty / "seg.onnx")
+    monkeypatch.setattr(onnx, "DEFAULT_EMBEDDING", empty / "emb.onnx")
     return tmp_path
 
 
@@ -149,7 +158,11 @@ def test_ROCmは従来どおりwhispercpp優先(monkeypatch):
     monkeypatch.setattr(registry, "whispercpp_available", lambda: True)
     assert registry.resolve_engine("auto", "rocm", has_gpu=True) == "whispercpp"
     monkeypatch.setattr(registry, "whispercpp_available", lambda: False)
+    # torchの有無で落ちる先が変わる。開発機の状態に依存させない
+    monkeypatch.setattr(registry, "openai_whisper_available", lambda: True)
     assert registry.resolve_engine("auto", "rocm", has_gpu=True) == "openai_whisper"
+    monkeypatch.setattr(registry, "openai_whisper_available", lambda: False)
+    assert registry.resolve_engine("auto", "rocm", has_gpu=True) == "faster_whisper"
 
 
 # ---- whisper.cpp ----
@@ -160,7 +173,7 @@ def test_Windowsのwhisper_cliは拡張子付きで探す():
 
 
 def test_同梱whisper_cliを見つける(bundled):
-    _put(bundled / "bin" / whispercpp.BINARY_NAME)
-    got = whispercpp.resolve_binary()
-    assert got is not None
-    assert got.name == whispercpp.BINARY_NAME
+    placed = _put(bundled / "bin" / whispercpp.BINARY_NAME)
+    placed.chmod(0o755)  # Linux/macOSでは実行ビットが無いと候補から外れる
+    # 同梱物そのものを指していることまで見る(名前だけでは開発機のものと区別できない)
+    assert whispercpp.resolve_binary() == placed

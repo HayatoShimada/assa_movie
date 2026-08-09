@@ -14,6 +14,10 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
+# OneDrive配下ではハードリンクが張れず uv sync が os error 396 で落ちる。
+# コピーは少し遅いだけでどのOSでも安全なので常に指定する
+export UV_LINK_MODE="${UV_LINK_MODE:-copy}"
+
 # モデルの置き場所の決め方は backend/core/paths.py だけが持つ(ここで二重定義しない)
 cache_dir() { uv run --no-sync python -c 'from backend.core.paths import cache_dir; print(cache_dir())'; }
 
@@ -98,10 +102,17 @@ case "${1:-all}" in
     fi
     ;;
   check)
+    # CI(.github/workflows/ci.yml)と同じものを手元で流す。
+    # cargo testとE2Eが入っていなかったため、Rustの12件は誰も実行しておらず、
+    # E2Eは壊れても気付けなかった
     echo "=== backend: pytest ==="
     uv run pytest -q
     echo "=== frontend: typecheck / lint / test / build ==="
     (cd frontend && npm run check)
+    echo "=== tauri: cargo test ==="
+    PATH="$HOME/.cargo/bin:$PATH" cargo test --manifest-path frontend/src-tauri/Cargo.toml
+    echo "=== e2e: playwright ==="
+    (cd frontend && npm run e2e)
     echo "=== 全て通りました ==="
     ;;
   all)

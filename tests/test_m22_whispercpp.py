@@ -76,7 +76,8 @@ def test_build_command_requests_full_json_and_beam():
         Path("/bin/whisper-cli"), Path("/m/ggml.bin"), Path("/tmp/a.wav"),
         Path("/tmp/out"), language="ja", beam_size=5, initial_prompt="えーと、",
     )
-    assert cmd[0] == "/bin/whisper-cli"
+    # 区切り文字はOSで変わるので str(Path) と突き合わせる(Windowsでは \)
+    assert cmd[0] == str(Path("/bin/whisper-cli"))
     # -ojf がトークンのタイムスタンプと確率を有効にする(これが要)
     assert "-ojf" in cmd
     # -ml を付けると句読点が落ちるので付けてはいけない

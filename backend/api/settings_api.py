@@ -90,6 +90,27 @@ def parse_fc_list(output: str) -> list[str]:
     return sorted(fonts)
 
 
+# fc-listはLinux(fontconfig)専用。無いOSでの候補は「そのOSに標準で入って
+# いるもの」を挙げる。存在しないフォント名だけを出すと、選んでも反映されず
+# 字幕フォントが実質変えられない状態になる(Windowsが Noto Sans JP 固定だった)
+FALLBACK_FONTS = {
+    "Windows": ["Yu Gothic UI", "Yu Gothic", "Meiryo", "MS Gothic", "MS Mincho"],
+    "Darwin": ["Hiragino Sans", "Hiragino Kaku Gothic ProN", "Hiragino Mincho ProN"],
+    "Linux": ["Noto Sans JP", "IPAGothic", "TakaoGothic"],
+}
+
+
+def fallback_fonts(os_name: str | None = None) -> list[str]:
+    """fc-listが使えないときのフォント候補(純関数)。
+
+    知らないOSはLinux扱いにする。候補を空で返すとUIの選択肢が消えるため、
+    必ず1つ以上返す。
+    """
+    import platform
+
+    return FALLBACK_FONTS.get(os_name or platform.system(), FALLBACK_FONTS["Linux"])
+
+
 @router.get("/fonts")
 def list_fonts() -> dict:
     """日本語対応フォントの一覧(字幕のフォント選択UI用)"""
@@ -106,9 +127,7 @@ def list_fonts() -> dict:
             fonts = parse_fc_list(out.stdout)
         except subprocess.SubprocessError:
             fonts = []
-    if not fonts:
-        fonts = ["Noto Sans JP"]  # fc-list不在でも既定フォントは選べるようにする
-    return {"fonts": fonts}
+    return {"fonts": fonts or fallback_fonts()}
 
 
 @router.get("/settings")

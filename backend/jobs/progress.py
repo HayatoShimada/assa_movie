@@ -4,7 +4,7 @@ import asyncio
 import json
 from typing import AsyncIterator
 
-from backend.jobs.queue import JobQueue
+from backend.jobs.queue import TERMINAL_STATUSES, JobQueue
 
 POLL_INTERVAL = 1.0
 
@@ -34,6 +34,6 @@ async def job_events(jobs: JobQueue, job_id: int) -> AsyncIterator[dict]:
                 ),
             }
 
-        if job["status"] in ("completed", "failed", "cancelled"):
+        if job["status"] in TERMINAL_STATUSES:
             return
         await asyncio.sleep(POLL_INTERVAL)

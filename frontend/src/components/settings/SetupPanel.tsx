@@ -6,7 +6,7 @@
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { api, subscribeJob, type SetupItem } from '../../api/client'
+import { api, isJobDone, subscribeJob, type SetupItem } from '../../api/client'
 import { Button } from '../ui'
 
 /** 3.1GBを「3100MB」と出すと大きさが伝わらない */
@@ -27,7 +27,7 @@ export function SetupItemRow({ id, item }: { id: string; item: SetupItem }) {
       await new Promise<void>((resolve) => {
         const stop = subscribeJob(job.id, (j) => {
           setProgress(j.progress)
-          if (j.status === 'succeeded' || j.status === 'failed') {
+          if (isJobDone(j.status)) {
             stop()
             resolve()
           }

@@ -227,13 +227,25 @@ export interface SettingsResponse {
   }[]
 }
 
+/**
+ * ジョブがこれ以上進まない状態(backend/jobs/queue.py の TERMINAL_STATUSES と対応)。
+ *
+ * 各所で文字列を直に書くと取りこぼす。実際 SetupPanel は存在しない状態名を
+ * 待っていて、ダウンロードが終わってもボタンが「取得中…」のまま固まっていた。
+ */
+export const JOB_TERMINAL_STATUSES = ['completed', 'failed', 'cancelled'] as const
+
+export function isJobDone(status: string): boolean {
+  return (JOB_TERMINAL_STATUSES as readonly string[]).includes(status)
+}
+
 /** ジョブ進捗をSSEで購読する。戻り値を呼ぶと購読を止める。 */
 export function subscribeJob(jobId: number, onProgress: (job: Job) => void): () => void {
   const source = new EventSource(`${API_BASE}/api/jobs/${jobId}/events`)
   source.addEventListener('progress', (e) => {
     const job = JSON.parse((e as MessageEvent).data) as Job & { job_id: number }
     onProgress(job)
-    if (['completed', 'failed', 'cancelled'].includes(job.status)) source.close()
+    if (isJobDone(job.status)) source.close()
   })
   source.onerror = () => source.close()
   return () => source.close()

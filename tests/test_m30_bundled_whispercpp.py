@@ -6,6 +6,7 @@
 """
 
 import os
+import platform
 
 import pytest
 
@@ -48,8 +49,16 @@ def test_どちらも無ければNone(dirs):
     assert whispercpp.resolve_binary() is None
 
 
+@pytest.mark.skipif(
+    platform.system() == "Windows",
+    reason="Windowsに実行権限ビットが無く、chmodしてもX_OKは真のまま",
+)
 def test_実行権限が無いものは選ばない(dirs):
-    """展開に失敗して権限が落ちたファイルを掴まない"""
+    """展開に失敗して権限が落ちたファイルを掴まない。
+
+    .deb/.AppImage/.dmg で実際に起きうる。落ちていても例外にはならず、
+    黙ってfaster-whisper(CPU)へ降格するだけなので気付けない
+    """
     bundled, _ = dirs
     path = place_binary(bundled)
     path.chmod(0o644)

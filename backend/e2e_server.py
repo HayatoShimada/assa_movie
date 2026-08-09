@@ -106,6 +106,27 @@ def _fake_transcribe(
     progress(1.0)
 
 
+def _fake_setup_diarization(
+    conn: sqlite3.Connection, media_id: int, params: dict, progress: Callable[[float], None]
+) -> None:
+    """76MBのダウンロードの代わりに、モデルが置かれた状態を作る。
+
+    取得ボタンが「完了を検知できるか」を見たいだけなので中身は問わない
+    (完了を待つ状態名がずれていて、終わってもボタンが固まっていた)。
+    """
+    import time
+
+    from backend.engines.diarize import onnx
+
+    for step in range(3):
+        progress((step + 1) / 3 * 0.9)
+        time.sleep(0.1)  # 進捗バーをUIで観測できるよう少し待つ
+    for path in (onnx.DEFAULT_SEGMENTATION, onnx.DEFAULT_EMBEDDING):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"fake onnx model")
+    progress(1.0)
+
+
 router = APIRouter(prefix="/api/e2e", tags=["e2e"])
 
 # E2E用の使い捨てライセンス発行鍵(プロセスごとに作り直す)
@@ -147,6 +168,12 @@ def reset(request: Request) -> dict:
 
     for provider in keys_api.PROVIDERS:
         keys_api.key_path(provider).unlink(missing_ok=True)
+
+    # 取得済みにした話者分離モデルも消す(セットアップのspecは「未取得」から始まる)
+    from backend.engines.diarize import onnx
+
+    for path in (onnx.DEFAULT_SEGMENTATION, onnx.DEFAULT_EMBEDDING):
+        path.unlink(missing_ok=True)
 
     # グローバル設定も既定に戻す。あるspecが変えた値(ASRモデル等)が次のspecへ
     # 持ち越されると、単独では通るのに通しで落ちる。実際にそうなっていた
@@ -210,6 +237,8 @@ def build_app():
     # 「本当に中止できた」のか「単に失敗した」のかを区別できるようにする。
     # backend.app が本物を登録した後に上書きする必要があるのでここで行う
     job_queue.register("transcribe")(_fake_transcribe)
+    # セットアップの取得も同様に差し替える(実物は76MBのダウンロード)
+    job_queue.register("setup_diarization")(_fake_setup_diarization)
 
     # ライセンスは使い捨ての鍵ペアで検証し、保存先も一時ディレクトリにする
     license_api.PUBLIC_KEY = lic.public_key_to_text(_E2E_ISSUER.public_key())

@@ -52,12 +52,40 @@ def sample_frames(path: Path, times: list[float]) -> list:
     return frames
 
 
+def cascade_path(filename: str = FRONTAL_XML) -> Path:
+    """OpenCVに同梱されているカスケード定義の場所"""
+    import cv2
+
+    return Path(cv2.data.haarcascades) / filename
+
+
+def load_cascade(path: Path):
+    """カスケード定義を読む。XMLを自分で渡すのは非ASCIIパス対策。
+
+    cv2.CascadeClassifier(str) はC++層がANSIコードページでfopenするため、
+    パスに非ASCIIが混ざると例外を出さずに**空の分類器**を返す。PyInstallerの
+    展開先はユーザー名を含むので、ユーザー名が日本語のWindows機では顔検出が
+    黙って全滅する(検出0件=中央クロップに見えるので気付きにくい)。
+    FileStorageのメモリ読み込みならパスがOpenCVに渡らない。
+    """
+    import cv2
+
+    fs = cv2.FileStorage(
+        Path(path).read_text(encoding="utf-8"),
+        cv2.FILE_STORAGE_READ | cv2.FILE_STORAGE_MEMORY,
+    )
+    try:
+        classifier = cv2.CascadeClassifier()
+        classifier.read(fs.getFirstTopLevelNode())
+    finally:
+        fs.release()
+    return classifier
+
+
 @lru_cache(maxsize=4)
 def _cascade(filename: str):
     """Haarカスケードは状態を持たないので読み込みを使い回す(1回12ms)"""
-    import cv2
-
-    return cv2.CascadeClassifier(cv2.data.haarcascades + filename)
+    return load_cascade(cascade_path(filename))
 
 
 def _merge_boxes(boxes: list[Box]) -> list[Box]:

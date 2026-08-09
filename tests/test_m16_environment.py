@@ -85,6 +85,9 @@ def test_recommend_table(
 
     # whisper.cppは外部ビルドなので、無い環境の推奨として固定する
     monkeypatch.setattr(registry, "whispercpp_available", lambda: False)
+    # 公式Whisperはtorch依存。開発機に入っているかで表の結果が変わらないよう固定する
+    # (配布版では入っていないので faster_whisper になる。下の別テストで見る)
+    monkeypatch.setattr(registry, "openai_whisper_available", lambda: True)
     rec = recommend(vram_mb, accel, INSTALLED)
     assert rec["asr_engine"] == expected_engine, name
     assert rec["asr_model"] == expected_model, name
@@ -92,6 +95,15 @@ def test_recommend_table(
         assert rec["ollama_model"] is None, name
     else:
         assert rec["ollama_model"] == expected_llm, name
+
+
+def test_ROCmでtorchが無ければfaster_whisperを勧める(monkeypatch):
+    """配布版の状態。入っていないエンジンを勧めるとImportErrorで必ず失敗する"""
+    from backend.engines.asr import registry
+
+    monkeypatch.setattr(registry, "whispercpp_available", lambda: False)
+    monkeypatch.setattr(registry, "openai_whisper_available", lambda: False)
+    assert recommend(24560, "rocm", INSTALLED)["asr_engine"] == "faster_whisper"
 
 
 def test_recommend_without_installed_models():

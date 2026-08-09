@@ -64,8 +64,13 @@ def ffprobe_path() -> str | None:
     return resolve("ffprobe")
 
 
-def missing_message(os_name: str | None = None) -> str:
-    """ffmpegが見つからないときの案内。OSごとに入れ方が違う"""
+def missing_message(os_name: str | None = None, appimage: bool | None = None) -> str:
+    """ffmpegが見つからないときの案内。OSごとに入れ方が違う。
+
+    AppImageを分けるのは、`.deb` の依存宣言(linux.deb.depends)がAppImageには
+    効かないため。AppImageは依存を宣言する仕組みが無くffmpegも同梱していないので、
+    未導入の利用者は書き出しで初めて失敗する。導入手順まで出す。
+    """
     os_name = os_name or platform.system()
     if os_name == "Windows":
         return (
@@ -74,4 +79,15 @@ def missing_message(os_name: str | None = None) -> str:
         )
     if os_name == "Darwin":
         return "ffmpegが見つかりません。`brew install ffmpeg` でインストールしてください"
+    # AppImageは起動時に自身のパスを APPIMAGE 環境変数へ入れる
+    if appimage is None:
+        appimage = bool(os.environ.get("APPIMAGE"))
+    if appimage:
+        return (
+            "ffmpegが見つかりません。AppImage版にはffmpegを同梱していないため、"
+            "別途インストールが必要です:"
+            " Debian/Ubuntu なら `sudo apt install ffmpeg`、"
+            " Fedora なら `sudo dnf install ffmpeg`、"
+            " Arch なら `sudo pacman -S ffmpeg`"
+        )
     return "ffmpegが見つかりません。`sudo apt install ffmpeg` でインストールしてください"

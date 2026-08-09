@@ -10,6 +10,8 @@ from pathlib import Path
 
 import numpy as np
 
+from backend.core import keyfile
+
 SAMPLE_RATE = 16000
 DEFAULT_MODEL = "pyannote/speaker-diarization-3.1"
 
@@ -35,10 +37,9 @@ def load_hf_token(token_file: Path | None = None) -> str | None:
     token = os.environ.get("HF_TOKEN", "").strip()
     if token.startswith("hf_"):
         return token
-    if token_file and token_file.exists():
-        token = token_file.read_text(encoding="utf-8").strip()
-        if token.startswith("hf_") and "\n" not in token:
-            return token
+    token = keyfile.read(token_file)
+    if token and token.startswith("hf_") and "\n" not in token:
+        return token
     return None
 
 

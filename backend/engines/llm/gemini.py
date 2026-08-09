@@ -12,6 +12,7 @@ from pathlib import Path
 
 import requests
 
+from backend.core import keyfile
 from backend.engines.llm.base import LLMError
 
 API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
@@ -22,11 +23,10 @@ def load_api_key(key_file: Path | None = None) -> str | None:
     key = os.environ.get("GEMINI_API_KEY", "").strip()
     if key:
         return key
-    if key_file and key_file.exists():
-        text = key_file.read_text(encoding="utf-8").strip()
-        # 説明文が残っているファイルを誤って使わないよう単一行のみ受け付ける
-        if text and "\n" not in text and " " not in text:
-            return text
+    text = keyfile.read(key_file)
+    # 説明文が残っているファイルを誤って使わないよう単一行のみ受け付ける
+    if text and "\n" not in text and " " not in text:
+        return text
     return None
 
 

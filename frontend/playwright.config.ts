@@ -24,11 +24,16 @@ export default defineConfig({
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: [
     {
-      // E2E用バックエンド(FakeLLM・一時DB)
-      command: 'uv run python -m backend.e2e_server',
+      // E2E用バックエンド(FakeLLM・一時DB)。
+      // 起動方法を差し替えられるようにしておく(venvを自分で用意した場合など)
+      // 例: KS_E2E_BACKEND=".venv/Scripts/python.exe -m backend.e2e_server"
+      command: process.env.KS_E2E_BACKEND ?? 'uv run python -m backend.e2e_server',
       cwd: '..',
       port: 8001,
-      reuseExistingServer: !process.env.CI,
+      // 既に8001に居るサーバを使い回さない。**古いコードのサーバに対して
+      // テストが通ってしまう**ため(バックエンドを直したのに全部緑になり、
+      // 落として起動し直したら起動すらしなかった)。使用中ならエラーで止める
+      reuseExistingServer: false,
       stdout: 'pipe',
       stderr: 'pipe',
     },

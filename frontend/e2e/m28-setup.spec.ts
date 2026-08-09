@@ -19,6 +19,26 @@ test('セットアップ: 足りないものが案内される', async ({ page, 
   await expect(page.getByTestId('setup-fetch-whispercpp')).toHaveCount(0)
 })
 
+test('セットアップ: 取得すると完了を検知して「準備できています」になる', async ({
+  page,
+  request,
+}) => {
+  const mediaId = await seedTranscribed(request)
+  await page.goto(`/#/media/${mediaId}`)
+  await page.getByTestId('tab-settings').click()
+
+  await expect(page.getByTestId('setup-state-diarization')).toContainText('未取得')
+  await page.getByTestId('setup-fetch-diarization').click()
+
+  // 完了を待つ状態名がバックエンドとずれていて、取得が終わってもボタンが
+  // 「取得中…」のまま固まっていた(v0.9.8まで)。終端の検知そのものを見る
+  await expect(page.getByTestId('setup-state-diarization')).toContainText(
+    '準備できています',
+    { timeout: 20000 },
+  )
+  await expect(page.getByTestId('setup-fetch-diarization')).toHaveCount(0)
+})
+
 test('セットアップ: 3.1GBはGB表記で出す', async ({ page, request }) => {
   const mediaId = await seedTranscribed(request)
   await page.goto(`/#/media/${mediaId}`)

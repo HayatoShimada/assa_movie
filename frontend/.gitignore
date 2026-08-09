@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# 生成物(コミットしない)
+playwright-report
+test-results
+.openapi.json
