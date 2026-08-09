@@ -237,10 +237,24 @@ jobs:
             frontend/src-tauri/target/release/bundle/nsis/*.exe
           if-no-files-found: error
 
+      # CHANGELOG.md の先頭の節をそのままリリースノートにする。
+      # 添付だけして本文が空だと、利用者は何が変わったのか分からない
+      - name: リリースノートを取り出す
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          awk '/^## v/{ if (found) exit; found=1; next } found' CHANGELOG.md > RELEASE_BODY.md
+          if [ ! -s RELEASE_BODY.md ]; then
+            echo "CHANGELOG.md に節がありません" >&2
+            exit 1
+          fi
+          head -5 RELEASE_BODY.md
+
       - name: リリースに添付(タグを打ったときだけ)
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          body_path: RELEASE_BODY.md
           files: |
             frontend/src-tauri/target/release/bundle/deb/*.deb
             frontend/src-tauri/target/release/bundle/appimage/*.AppImage
