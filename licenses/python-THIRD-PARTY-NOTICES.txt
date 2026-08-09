@@ -144,7 +144,7 @@ KirinukiStudio 本体は MIT ライセンスです。バックエンドの実行
   sse-starlette 3.4.8
       ライセンス: BSD-3-Clause
       入手先: https://github.com/sysid/sse-starlette
-  starlette 1.5.0
+  starlette 1.6.0
       ライセンス: BSD-3-Clause
       入手先: https://github.com/Kludex/starlette
   tokenizers 0.23.1
@@ -12138,7 +12138,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ------------------------------------------------------------------------
-starlette 1.5.0 — LICENSE.md
+starlette 1.6.0 — LICENSE.md
 ------------------------------------------------------------------------
 Copyright © 2018, [Encode OSS Ltd](https://www.encode.io/).
 All rights reserved.

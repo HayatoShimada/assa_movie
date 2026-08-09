@@ -24,6 +24,7 @@ from pathlib import Path
 import numpy as np
 
 from backend.engines.asr.base import ProgressFn, Segment, TranscribeResult, Word
+from backend.core.console import SUBPROCESS_TEXT
 from backend.core.paths import cache_dir
 from backend.engines.asr.transformers_whisper import words_to_segments
 
@@ -166,7 +167,7 @@ class WhisperCppEngine:
         return self
 
     def _run(self, cmd: list[str], out_base: Path) -> None:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=7200)
+        proc = subprocess.run(cmd, capture_output=True, timeout=7200, **SUBPROCESS_TEXT)
         if proc.returncode != 0:
             raise RuntimeError(
                 f"whisper.cppが失敗しました(exit {proc.returncode}): {proc.stderr[-1500:]}"

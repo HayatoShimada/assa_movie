@@ -33,6 +33,10 @@ esac
 # PyInstallerはネイティブのパス表記を要求する(git bashの /d/... は解釈できない)
 REPO_ROOT="$(pwd -W 2>/dev/null || pwd)"
 
+# OneDriveやDropbox配下だと、uvの既定(ハードリンク)がOSに拒否されて止まる
+# (Windows実測: "クラウド操作は、互換性のないハードリンクのファイルでは実行できません")
+export UV_LINK_MODE="${UV_LINK_MODE:-copy}"
+
 echo "=== 配布用の仮想環境を作る(torchなし) ==="
 mkdir -p "$BUILD_DIR"
 rm -rf "$VENV"

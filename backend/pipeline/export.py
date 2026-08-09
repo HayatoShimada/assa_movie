@@ -10,6 +10,7 @@ from functools import lru_cache
 from pathlib import Path
 
 
+from backend.core.console import SUBPROCESS_TEXT
 from backend.core.ffmpeg import ffmpeg_path, ffprobe_path, missing_message
 
 VAAPI_DEVICE = "/dev/dri/renderD128"
@@ -86,7 +87,7 @@ def detect_encoder() -> str | None:
     try:
         out = subprocess.run(
             [exe, "-hide_banner", "-encoders"],
-            capture_output=True, text=True, timeout=30,
+            capture_output=True, timeout=30, **SUBPROCESS_TEXT,
         )
         encoders = out.stdout
     except subprocess.SubprocessError:
@@ -106,7 +107,7 @@ def probe_media(path: Path) -> tuple[float | None, int | None, int | None]:
                 [probe, "-v", "error", "-select_streams", "v:0",
                  "-show_entries", "stream=width,height",
                  "-show_entries", "format=duration", "-of", "json", str(path)],
-                capture_output=True, text=True, timeout=60,
+                capture_output=True, timeout=60, **SUBPROCESS_TEXT,
             )
             if out.returncode == 0:
                 data = json.loads(out.stdout)
@@ -249,7 +250,7 @@ def run_export(
     timeout: int = 3600,
 ) -> None:
     """ffmpegを実行し、-progress pipe:1 の out_time_ms から進捗を報告する"""
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **SUBPROCESS_TEXT)
     try:
         assert proc.stdout is not None
         for line in proc.stdout:

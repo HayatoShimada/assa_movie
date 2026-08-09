@@ -8,6 +8,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from backend.core.console import SUBPROCESS_TEXT
 from backend.core.ffmpeg import ffmpeg_path
 from backend.core.project_settings import resolve_settings
 from backend.api.deps import get_db, get_jobs
@@ -173,7 +174,7 @@ def jetcut(clip_id: int, db: sqlite3.Connection = Depends(get_db)):
                  "-i", media["path"], "-af",
                  f"silencedetect=noise={SILENCE_NOISE_DB}dB:d={SILENCE_MIN_DURATION}",
                  "-f", "null", "-"],
-                capture_output=True, text=True, timeout=120,
+                capture_output=True, timeout=120, **SUBPROCESS_TEXT,
             )
             for s, e in parse_silences(out.stderr, offset=clip["start"]):
                 proposals.append((s, e, "silence"))

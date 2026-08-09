@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, create_model
 
 from backend.api.deps import get_db, get_jobs
 from backend.core.config import Settings, settings
+from backend.core.console import SUBPROCESS_TEXT
 from backend.core.environment import recommend, scan_environment
 from backend.core.project_settings import MUTABLE_FIELDS, save_global_overrides
 from backend.engines.asr.registry import ENGINES, MODELS
@@ -100,7 +101,7 @@ def list_fonts() -> dict:
         try:
             out = subprocess.run(
                 ["fc-list", ":lang=ja", "family"],
-                capture_output=True, text=True, timeout=10,
+                capture_output=True, timeout=10, **SUBPROCESS_TEXT,
             )
             fonts = parse_fc_list(out.stdout)
         except subprocess.SubprocessError:

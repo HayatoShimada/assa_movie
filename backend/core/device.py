@@ -21,6 +21,8 @@ import subprocess
 import sys
 from functools import lru_cache
 
+from backend.core.console import SUBPROCESS_TEXT
+
 EMPTY_GPU = {"accel": "cpu", "name": "", "vram_total_mb": 0, "vram_free_mb": 0}
 CLI_TIMEOUT = 5
 
@@ -42,7 +44,9 @@ def _run(cmd: list[str]) -> str:
     if not shutil.which(cmd[0]):
         return ""
     try:
-        out = subprocess.run(cmd, capture_output=True, text=True, timeout=CLI_TIMEOUT)
+        out = subprocess.run(
+            cmd, capture_output=True, timeout=CLI_TIMEOUT, **SUBPROCESS_TEXT
+        )
         return out.stdout if out.returncode == 0 else ""
     except (subprocess.SubprocessError, OSError):
         return ""
@@ -301,7 +305,7 @@ def _probe_gpu_torch() -> dict:
     )
     try:
         out = subprocess.run(
-            [sys.executable, "-c", code], capture_output=True, text=True, timeout=120
+            [sys.executable, "-c", code], capture_output=True, timeout=120, **SUBPROCESS_TEXT
         )
         info = json.loads(out.stdout.strip().splitlines()[-1])
         return info if info.get("accel") != "cpu" else {}

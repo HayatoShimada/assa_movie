@@ -12,6 +12,17 @@ isolated configでPythonを起動するため、環境変数を読まないた�
 import sys
 from typing import Any
 
+# 子プロセスの出力を読むときに必ず渡す。
+#
+# `text=True` だけだとロケール依存のコーデックで復号され、ffmpegやwhisper-cliの
+# 出力に含まれるバイトで UnicodeDecodeError になる(日本語Windowsはcp932、
+# CIの英語Windowsはcp1252)。errors="replace" にするのは、ログが読めないことで
+# 処理そのものを止めないため。
+#
+# 新しく subprocess を足すときもこれを展開して渡す
+# (tests/test_m36_subprocess_encoding.py が見張っている)
+SUBPROCESS_TEXT = {"text": True, "encoding": "utf-8", "errors": "replace"}
+
 
 def force_utf8(*streams: Any) -> None:
     """渡されたテキストストリームをUTF-8に付け替える。
