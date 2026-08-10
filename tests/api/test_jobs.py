@@ -91,6 +91,39 @@ def test_progress_is_persisted(db):
         q.stop()
 
 
+def test_進捗と一緒に工程名を伝えられる(db):
+    """文字起こしジョブは話者分離→ASRの順で走る。ずっと「文字起こし中」と
+    表示されると、時間のかかる話者分離が止まっているように見える"""
+    q = JobQueue(db)
+    seen = threading.Event()
+
+    @register("test_phase")
+    def _h(conn, media_id, params, progress):
+        progress(0.2, "話者分離中")
+        progress(0.3)  # 工程名を省略したら直前の工程を維持する
+        seen.wait(timeout=5)
+
+    q.start()
+    try:
+        job_id = q.enqueue(None, "test_phase", {})
+        deadline = time.time() + 5
+        while time.time() < deadline and q.get(job_id)["progress"] != 0.3:
+            time.sleep(0.02)
+        job = q.get(job_id)
+        assert job["phase"] == "話者分離中"
+        assert job["progress"] == 0.3
+    finally:
+        seen.set()
+        q.stop()
+
+
+def test_終端状態では工程名を出さない(jobs):
+    """完了・失敗後に「話者分離中」が残ると誤解を招く"""
+    job_id = jobs.enqueue(None, "test_ok", {})
+    job = jobs.wait(job_id, timeout=10)
+    assert job["phase"] is None
+
+
 # ---- API ----
 def _make_media(client, tmp_path) -> int:
     pid = client.post("/api/projects", json={"name": "p"}).json()["id"]
@@ -157,6 +190,7 @@ def test_job_events_sse_streams_completion(client, tmp_path):
                     break
     assert payloads[-1]["status"] == "completed"
     assert payloads[-1]["progress"] == 1.0
+    assert "phase" in payloads[-1]  # 工程名もSSEで届く(終端ではNone)
 
 
 # ---- セグメントAPI ----

@@ -93,8 +93,11 @@ def _fake_transcribe(
     import time
 
     conn.execute("DELETE FROM segments WHERE media_id=?", (media_id,))
+    # 本物と同じ工程名を流す。SSEは1秒ポーリングなので観測できる長さだけ待つ
+    progress(0.1, "話者分離中")
+    time.sleep(1.2)
     for idx, (text, speaker) in enumerate(SEED_SEGMENTS):
-        progress((idx + 1) / len(SEED_SEGMENTS) * 0.9)
+        progress(0.4 + (idx + 1) / len(SEED_SEGMENTS) * 0.5, "文字起こし中")
         time.sleep(0.15)  # 進捗表示をUIで観測できるよう少し待つ
         conn.execute(
             "INSERT INTO segments (media_id, idx, start, end, text, original_text,"

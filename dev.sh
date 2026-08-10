@@ -52,6 +52,14 @@ case "${1:-all}" in
     # ROCmで最速のASR(公式Whisperの約2.6倍)。外部ビルドなので任意。
     # 用意されていればエンジン自動選択がこれを使い、無ければ公式版に落ちる。
     # 置き場所は KS_WHISPERCPP_HOME で変更できる(既定: ~/.cache/kirinuki-studio)
+    if ! command -v hipconfig > /dev/null; then
+      # hipconfig無しで進むとHIPCXXが壊れた値になり、cmakeの分かりにくい
+      # エラー(No CMAKE_CXX_COMPILER)まで到達してしまう
+      echo "hipconfig が見つかりません。このターゲットは ROCm(AMD GPU)機専用です。" >&2
+      echo "  - NVIDIA機では不要: エンジン自動選択が faster-whisper(CUDA・最速)を使います" >&2
+      echo "  - 配布用の同梱whisper.cpp(Vulkan)は ./dev.sh package が作ります" >&2
+      exit 1
+    fi
     HOME_DIR="${KS_WHISPERCPP_HOME:-$(cache_dir)}"
     GPU_ARCH="${KS_GPU_ARCH:-gfx1100}"
     MODEL_NAME="${KS_GGML_MODEL:-ggml-large-v3.bin}"

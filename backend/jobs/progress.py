@@ -18,7 +18,7 @@ async def job_events(jobs: JobQueue, job_id: int) -> AsyncIterator[dict]:
             yield {"event": "error", "data": json.dumps({"error": "job not found"})}
             return
 
-        current = (job["status"], job["progress"])
+        current = (job["status"], job["progress"], job.get("phase"))
         if current != last:
             last = current
             yield {
@@ -28,6 +28,7 @@ async def job_events(jobs: JobQueue, job_id: int) -> AsyncIterator[dict]:
                         "job_id": job_id,
                         "status": job["status"],
                         "progress": job["progress"],
+                        "phase": job.get("phase"),
                         "error": job["error"],
                     },
                     ensure_ascii=False,

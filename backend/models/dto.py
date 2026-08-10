@@ -58,6 +58,8 @@ class Job(BaseModel):
     type: str
     status: str
     progress: float
+    # いま何をしているか(「話者分離中」等)。実行中のみ。表示はフロントに任せる
+    phase: str | None = None
     error: str | None = None
     result: dict | None = None  # 書き出しジョブの出力パスなど
     created_at: str

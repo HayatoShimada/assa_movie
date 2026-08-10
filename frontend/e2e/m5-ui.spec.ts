@@ -37,6 +37,20 @@ test('文字起こしを実行すると進捗が出て完了する', async ({ pa
   await expect(row.getByRole('button', { name: '開く' })).toBeEnabled()
 })
 
+test('進捗には工程名が出る(ずっと「文字起こし中」にしない)', async ({ page, request }) => {
+  const seed = await (await request.post(`${API}/api/e2e/seed`)).json()
+  await page.goto('/#/')
+  const row = page.getByTestId(`media-${seed.media_id}`)
+  await expect(row).toBeVisible()
+
+  // UIのボタンから開始する(SSE購読が始まるのはこの経路だけ)
+  await row.getByTestId(`media-transcribe-${seed.media_id}`).click()
+
+  // Fakeジョブは「話者分離中」を1秒以上保つので、SSEの1秒ポーリングで観測できる
+  await expect(row).toContainText('話者分離中', { timeout: 10000 })
+  await expect(row).toContainText('文字起こし完了', { timeout: 15000 })
+})
+
 test('エディタでセグメントが表示されクリックで選択できる', async ({ page, request }) => {
   const seed = await (await request.post(`${API}/api/e2e/seed`)).json()
   await request.post(`${API}/api/media/${seed.media_id}/jobs`, {

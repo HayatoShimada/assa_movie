@@ -2,6 +2,8 @@
 
 ハンドラは `register(type)` デコレータで登録する。
 ハンドラのシグネチャ: (conn, media_id, params, progress) -> None
+progress は割合(0..1)に加えて工程名も渡せる: progress(0.4, "話者分離中")。
+工程名を省略したら直前の工程を維持する。
 """
 
 import json
@@ -13,7 +15,7 @@ from typing import Callable
 
 from backend.core.cancellation import JobCancelled, bind, unbind
 
-Handler = Callable[[sqlite3.Connection, int | None, dict, Callable[[float], None]], None]
+Handler = Callable[[sqlite3.Connection, int | None, dict, Callable[..., None]], None]
 
 # これ以上進まない状態。SSEの打ち切りもフロントの待機もこれで判断する。
 # フロント側の対応物は frontend/src/api/client.ts の JOB_TERMINAL_STATUSES
@@ -44,6 +46,9 @@ class JobQueue:
         # 実行中ジョブの進捗はメモリ保持(ハンドラのトランザクション中に
         # DBへ書くとロック競合するため。終端状態の書き込み時に確定させる)
         self._progress: dict[int, float] = {}
+        # いま何をしているか(「話者分離中」等)。進捗と同じくメモリのみで、
+        # 終端状態では出さない(完了後に「〜中」が残ると誤解を招く)
+        self._phase: dict[int, str] = {}
         # 中止を要求されたジョブ。進捗通知の時点で JobCancelled にする
         self._cancelled: set[int] = set()
         # 実行中ジョブが持つ子プロセス。中止時に直接止める
@@ -157,9 +162,11 @@ class JobQueue:
         with self.lock:
             row = self.conn.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
             mem_progress = self._progress.get(job_id)
+            mem_phase = self._phase.get(job_id)
         if row is None:
             return None
         job = dict(row)
+        job["phase"] = mem_phase if job["status"] == "running" else None
         if mem_progress is not None and job["status"] == "running":
             job["progress"] = mem_progress
         return job
@@ -177,10 +184,12 @@ class JobQueue:
             self._thread.join(timeout=timeout)
             self._thread = None
 
-    def _set_progress(self, job_id: int, p: float) -> None:
+    def _set_progress(self, job_id: int, p: float, phase: str | None = None) -> None:
         with self.lock:
             cancelled = job_id in self._cancelled
             self._progress[job_id] = round(p, 4)
+            if phase is not None:
+                self._phase[job_id] = phase
         # ハンドラ側に中止の分岐を書かせない。ここで送出すればfinallyが走る
         if cancelled:
             raise JobCancelled()
@@ -234,7 +243,9 @@ class JobQueue:
                         conn,
                         job["media_id"],
                         params,
-                        lambda p, _id=job_id: self._set_progress(_id, float(p)),
+                        lambda p, phase=None, _id=job_id: self._set_progress(
+                            _id, float(p), phase
+                        ),
                     )
                     conn.commit()  # ハンドラのcommit漏れでロックを持ち越さない
                     self._update(job_id, status="completed", progress=1.0)
@@ -259,6 +270,7 @@ class JobQueue:
                     unbind()
                     with self.lock:
                         self._progress.pop(job_id, None)
+                        self._phase.pop(job_id, None)
                         self._cancelled.discard(job_id)
                         self._procs.pop(job_id, None)
         finally:

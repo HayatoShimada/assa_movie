@@ -8,6 +8,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { api, machineQueryOptions, type SettingsResponse } from '../../api/client'
 import { CONVERT_METHOD_LABELS } from '../../lib/catalogs'
+import { CloudKeySetup } from './ApiKeysPanel'
 import { BASE_RES_X } from '../../lib/subtitleLayout'
 import { selectCls } from '../ui'
 
@@ -402,6 +403,11 @@ export function SettingsFields({
             ))}
           </select>
         </Row>
+        {/* クラウドプロバイダのキーは、選ぶその場で登録・差し替えできるようにする */}
+        <CloudKeySetup
+          providers={meta.llm_providers.filter((p) => !p.local).map((p) => p.id)}
+          selected={String(v.llm_provider)}
+        />
         {v.llm_provider === 'ollama' && (
           <Row label="Ollamaモデル">
             <span>

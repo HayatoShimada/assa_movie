@@ -19,6 +19,9 @@ from backend.pipeline import filler as filler_mod
 from backend.pipeline.aizuchi import is_aizuchi
 
 # 進捗の配分: 話者分離40% + 文字起こし55% + 保存5%
+# 進捗には工程名も添える。ずっと「文字起こし中」だと、先に走る話者分離が
+# 止まっているように見える(実際にそう見えていた)
+DECODE_SHARE = 0.05
 DIARIZE_SHARE = 0.4
 ASR_SHARE = 0.55
 
@@ -40,15 +43,22 @@ def run_transcribe(
     apply_rocm_workarounds()
     apply_vram_budget(s.vram_budget_mb)
     # 長尺のデコードや初回のモデルDL中に0%のまま見えないよう、開始を即時通知する
-    progress(0.01)
+    progress(0.01, "音声を読み込み中")
     audio = audio_io.decode(Path(row["path"]))
-    progress(0.05)
+    progress(DECODE_SHARE)
 
     # ---- 話者分離 ----
     turns: list = []
     label_map: dict[str, str] = {}
     if s.diarization_enabled:
-        turns, _engine = diarize.run_diarization(audio, s)
+        progress(DECODE_SHARE, "話者分離中")
+        turns, _engine = diarize.run_diarization(
+            audio, s,
+            # 5%(デコード後)〜40%を話者分離の実進捗で埋める
+            progress=lambda p: progress(
+                DECODE_SHARE + p * (DIARIZE_SHARE - DECODE_SHARE)
+            ),
+        )
         if turns:
             label_map = diarize_labels.build_label_map(
                 audio, turns,
@@ -56,7 +66,7 @@ def run_transcribe(
                 female_name=s.female_name,
                 log=lambda *_: None,
             )
-    progress(DIARIZE_SHARE)
+    progress(DIARIZE_SHARE, "文字起こし中")
 
     # ---- 文字起こし ----
     # initial_prompt: フィラーを含む文体例を与えるとWhisperが言い淀みを忠実に転写する。
@@ -86,6 +96,7 @@ def run_transcribe(
         engine.unload()
 
     # ---- 保存(再実行時は作り直す) ----
+    progress(DIARIZE_SHARE + ASR_SHARE, "保存中")
     conn.execute("DELETE FROM segments WHERE media_id=?", (media_id,))
     rows = []
     for idx, seg in enumerate(result.segments):

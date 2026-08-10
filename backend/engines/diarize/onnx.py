@@ -103,11 +103,26 @@ def _build_diarizer(
     )
 
 
+def sherpa_progress(progress):
+    """sherpa-onnxの進捗コールバック (処理済みチャンク, 総数)->int に変換する(純関数)。
+
+    0以外を返すと処理が中断される仕様なので、常に0を返す。
+    """
+
+    def callback(processed: int, total: int) -> int:
+        if progress is not None and total > 0:
+            progress(processed / total)
+        return 0
+
+    return callback
+
+
 def run_diarization(
     audio: np.ndarray,
     num_speakers: int | None = 2,
     segmentation: Path | None = None,
     embedding: Path | None = None,
+    progress=None,
 ) -> list[Turn]:
     """(開始秒, 終了秒, 話者ラベル) のリストを返す(pyannote版と同じ形)"""
     seg = segmentation or resolve_segmentation()
@@ -123,4 +138,7 @@ def run_diarization(
         num_speakers=num_speakers,
         num_threads=_default_threads(),
     )
-    return to_turns(diarizer.process(np.asarray(audio, dtype=np.float32)).sort_by_start_time())
+    result = diarizer.process(
+        np.asarray(audio, dtype=np.float32), callback=sherpa_progress(progress)
+    )
+    return to_turns(result.sort_by_start_time())

@@ -28,11 +28,12 @@ def resolve_engine(engine_id: str) -> str | None:
     return "onnx" if onnx.is_available() else None
 
 
-def run_diarization(audio, settings) -> tuple[list[Turn], str | None]:
+def run_diarization(audio, settings, progress=None) -> tuple[list[Turn], str | None]:
     """設定に従って話者分離を実行し、(区間リスト, 使ったエンジン名) を返す。
 
     使えるエンジンが無ければ ([], None) を返す。話者分離は必須ではないので、
     ここで例外にせずジョブを続行させる。
+    progress には 0..1 の進捗が届く(長尺では数分かかるため表示に使う)。
     """
     engine_id = getattr(settings, "diarization_engine", "auto")
     if engine_id not in ENGINES:
@@ -40,5 +41,8 @@ def run_diarization(audio, settings) -> tuple[list[Turn], str | None]:
             f"未知の話者分離エンジン: {engine_id}(選択肢: {', '.join(ENGINES)})"
         )
     if resolve_engine(engine_id) == "onnx":
-        return onnx.run_diarization(audio, num_speakers=settings.num_speakers), "onnx"
+        turns = onnx.run_diarization(
+            audio, num_speakers=settings.num_speakers, progress=progress
+        )
+        return turns, "onnx"
     return [], None

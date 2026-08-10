@@ -922,6 +922,8 @@ export interface components {
             status: string;
             /** Progress */
             progress: number;
+            /** Phase */
+            phase?: string | null;
             /** Error */
             error?: string | null;
             /** Result */

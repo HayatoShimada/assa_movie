@@ -50,7 +50,8 @@ function MediaRow({ media }: { media: Media }) {
                     ? '中止しました'
                     : progress.status === 'completed'
                       ? '文字起こし完了'
-                      : `文字起こし中... ${Math.round(progress.progress * 100)}%`
+                      : // 工程名はジョブが報告する(話者分離中→文字起こし中→保存中)
+                        `${progress.phase ?? '文字起こし中'}... ${Math.round(progress.progress * 100)}%`
               }
             />
           </div>

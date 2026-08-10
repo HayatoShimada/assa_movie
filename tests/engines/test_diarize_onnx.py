@@ -72,8 +72,9 @@ def test_run_diarization_uses_injected_backend(monkeypatch, tmp_path):
         def __init__(self, cfg):
             captured["cfg"] = cfg
 
-        def process(self, audio):
+        def process(self, audio, callback=None):
             captured["samples"] = len(audio)
+            captured["callback"] = callback
             return FakeResult()
 
     monkeypatch.setattr(mod, "_build_diarizer", lambda **kw: FakeDiarizer(kw))
@@ -83,6 +84,7 @@ def test_run_diarization_uses_injected_backend(monkeypatch, tmp_path):
     assert turns == [(0.0, 2.0, "SPEAKER_00"), (2.0, 4.0, "SPEAKER_01")]
     assert captured["cfg"]["num_speakers"] == 2
     assert captured["samples"] == 16000
+    assert callable(captured["callback"])  # 進捗コールバックが配線されている
 
 
 def test_run_diarization_without_models_raises(monkeypatch, tmp_path):

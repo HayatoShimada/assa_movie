@@ -60,6 +60,32 @@ test('APIキー: 登録すると削除できる', async ({ page, request }) => {
   expect((await (await request.get(`${API}/api/keys`)).json()).claude.configured).toBe(false)
 })
 
+test('LLMセクションにキー登録の動線があり、その場で登録すると選べる', async ({ page, request }) => {
+  // 「(APIキー未設定)」と出るだけでは、どこで登録するのか分からなかった
+  const mediaId = await seedTranscribed(request)
+  await openSettings(page, mediaId)
+
+  const setup = page.getByTestId('llm-key-setup')
+  await expect(setup).toBeVisible()
+
+  const provider = page.getByTestId('setting-llm-provider')
+  const gemini = provider.locator('option[value="gemini"]')
+  await expect(gemini).toHaveJSProperty('disabled', true)
+
+  await page.getByTestId('llmkey-input-gemini').fill('AQ.Ab8RN6Je2etestkey')
+  await page.getByTestId('llmkey-save-gemini').click()
+
+  await expect(gemini).toHaveJSProperty('disabled', false)
+  // 選択していないプロバイダは、登録が済んだらインライン登録から消える
+  await expect(page.getByTestId('llmkey-input-gemini')).toHaveCount(0)
+
+  // 選択中のプロバイダは登録済みでも表示され、その場で差し替え・削除できる
+  await provider.selectOption('gemini')
+  await expect(page.getByTestId('llm-key-setup')).toContainText('登録済み …tkey')
+  await expect(page.getByTestId('llmkey-input-gemini')).toBeVisible()
+  await expect(page.getByTestId('llmkey-delete-gemini')).toBeVisible()
+})
+
 test('LLMプロバイダ: Claudeはキーが無いと選べず、登録すると選べる', async ({ page, request }) => {
   const mediaId = await seedTranscribed(request)
   await openSettings(page, mediaId)
