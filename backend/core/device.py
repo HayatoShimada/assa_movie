@@ -33,19 +33,28 @@ CUDA_RUNTIME_LIBS = ("libcublas.so.12", "libcudnn.so.9")
 
 
 def missing_cuda_libs(loader=None, search_roots=None) -> list[str]:
-    """CUDA実行に必要なライブラリのうち、見つからないものを返す(Linux以外は常に空)。
+    """CUDA実行に必要なライブラリのうち、プロセスへ読み込めなかったものを返す
+    (Linux以外は常に空)。
 
-    2段階で探す:
+    2段階で試す:
     (1) 通常のdlopen経路(システムのCUDA・LD_LIBRARY_PATH)
-    (2) pipのnvidia系パッケージ(nvidia-cublas-cu12等)。ctranslate2のwheelは
-        ここをrpathで参照するため、dlopenで見つからなくても実行時には使える。
+    (2) pipのnvidia系パッケージ(nvidia-cublas-cu12等)を絶対パスでロードする。
+        ctranslate2自身はrpathを持たず、通常はCUDA版torchが同梱ライブラリを
+        先にプロセスへロードしてくれることに依存している。ROCm版torchの環境や
+        torchを外した配布版では誰もロードしないため、ここでRTLD_GLOBALで
+        載せておくと ctranslate2 内部の dlopen("libcublas.so.12") が解決できる。
+
+    「ファイルがある」だけでは判定しない。存在だけ見て「使える」と返した結果、
+    faster-whisperがGPU実行を試みて落ちた実例がある。
     loader / search_roots はテスト差し替え口。
     """
     if platform.system() != "Linux":
         return []  # .soの名前も配布形態もLinux前提。他OSで誤ってGPUを諦めない
     import ctypes
 
-    load = loader if loader is not None else ctypes.CDLL
+    load = loader if loader is not None else (
+        lambda path: ctypes.CDLL(str(path), mode=ctypes.RTLD_GLOBAL)
+    )
     roots = _nvidia_package_roots() if search_roots is None else list(search_roots)
     missing = []
     for lib in CUDA_RUNTIME_LIBS:
@@ -54,7 +63,12 @@ def missing_cuda_libs(loader=None, search_roots=None) -> list[str]:
             continue
         except OSError:
             pass
-        if not any(next(root.glob(f"*/lib/{lib}"), None) for root in roots):
+        bundled = next((hit for root in roots for hit in root.glob(f"*/lib/{lib}")), None)
+        try:
+            if bundled is None:
+                raise OSError(f"{lib} が見つかりません")
+            load(str(bundled))
+        except OSError:
             missing.append(lib)
     return missing
 

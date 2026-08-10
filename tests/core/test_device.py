@@ -63,21 +63,50 @@ def test_missing_cuda_libs_どこにも無ければ全て列挙():
     assert missing_cuda_libs(loader=_loader_fail, search_roots=[]) == list(CUDA_RUNTIME_LIBS)
 
 
-def test_missing_cuda_libs_pip配布のnvidiaパッケージも探す(tmp_path):
-    """ctranslate2のwheelはpipのnvidia系パッケージをrpathで参照する。
-    dlopenの通常経路に無くても、そこにあれば実行時には使える"""
+def _loader_abs_only(loaded):
+    """絶対パスのロードだけ成功するloader(pip配布はあるが通常経路に無い環境)"""
+
+    def load(name):
+        if "/" not in str(name):
+            raise OSError("not on default search path")
+        loaded.append(str(name))
+        return object()
+
+    return load
+
+
+def test_missing_cuda_libs_pip配布のnvidiaパッケージを絶対パスでロードする(tmp_path):
+    """ctranslate2はrpathを持たず、CUDA版torchが先にロードしてくれることに
+    依存している。ROCm版torch環境や配布版では誰もロードしないので、
+    こちらでプロセスへ載せる(載れば ctranslate2 のdlopenが解決できる)"""
     for lib in CUDA_RUNTIME_LIBS:
         d = tmp_path / lib.split(".")[0].removeprefix("lib") / "lib"
         d.mkdir(parents=True)
         (d / lib).write_bytes(b"")
-    assert missing_cuda_libs(loader=_loader_fail, search_roots=[tmp_path]) == []
+    loaded: list[str] = []
+    assert missing_cuda_libs(loader=_loader_abs_only(loaded), search_roots=[tmp_path]) == []
+    assert len(loaded) == len(CUDA_RUNTIME_LIBS)
+    assert all(path.startswith(str(tmp_path)) for path in loaded)
+
+
+def test_missing_cuda_libs_ファイルがあっても読み込めなければ欠落扱い(tmp_path):
+    """実際に踏んだバグ: ファイルの存在だけで「使える」と判定し、
+    faster-whisperがGPU実行を試みて libcublas.so.12 で落ちた"""
+    for lib in CUDA_RUNTIME_LIBS:
+        d = tmp_path / lib.split(".")[0].removeprefix("lib") / "lib"
+        d.mkdir(parents=True)
+        (d / lib).write_bytes(b"")
+    assert missing_cuda_libs(loader=_loader_fail, search_roots=[tmp_path]) == list(CUDA_RUNTIME_LIBS)
 
 
 def test_missing_cuda_libs_片方だけ無い場合はそれだけ返す(tmp_path):
     d = tmp_path / "cublas" / "lib"
     d.mkdir(parents=True)
     (d / "libcublas.so.12").write_bytes(b"")
-    assert missing_cuda_libs(loader=_loader_fail, search_roots=[tmp_path]) == ["libcudnn.so.9"]
+    loaded: list[str] = []
+    assert missing_cuda_libs(loader=_loader_abs_only(loaded), search_roots=[tmp_path]) == [
+        "libcudnn.so.9"
+    ]
 
 
 def test_missing_cuda_libs_linux以外は常に空(monkeypatch):
