@@ -168,7 +168,7 @@ function LlmStep() {
                   onClick={() => register.mutate()}
                   disabled={!key.trim() || register.isPending}
                 >
-                  登録する
+                  {register.isPending ? '確認中…' : '登録する'}
                 </Button>
               </div>
               {register.isError && (

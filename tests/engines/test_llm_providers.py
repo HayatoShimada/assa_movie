@@ -3,11 +3,13 @@
 import json
 
 import pytest
+import requests
 from fastapi.testclient import TestClient
 
 from backend.core.config import Settings
 from backend.engines.llm.base import LLMError
-from backend.engines.llm.gemini import GeminiClient, load_api_key, to_gemini_schema
+from backend.engines.llm.claude import verify_api_key as claude_verify_api_key
+from backend.engines.llm.gemini import GeminiClient, load_api_key, to_gemini_schema, verify_api_key
 from backend.engines.llm.ollama import OllamaClient
 from backend.engines.llm.registry import PROVIDERS, build_client
 from backend.pipeline.pronoun import EDITS_SCHEMA
@@ -145,6 +147,56 @@ def test_gemini_retries_then_raises(monkeypatch):
     with pytest.raises(LLMError, match="2回失敗"):
         c.complete_json("s", "u", EDITS_SCHEMA)
     assert len(calls) == 2
+
+
+# ---- APIキーの疎通確認(登録時に1回だけ呼ぶ) ----
+def _fake_get(captured, status=200):
+    def fake_get(url, headers=None, params=None, timeout=None):
+        captured.update(url=url, headers=headers)
+        return _FakeResponse({}, status=status)
+
+    return fake_get
+
+
+def test_gemini_verify_api_key_通れば何も返さない(monkeypatch):
+    captured = {}
+    monkeypatch.setattr("backend.engines.llm.gemini.requests.get", _fake_get(captured))
+    assert verify_api_key("AQ.Ab8RN6Jxxxx") is None
+    assert captured["headers"]["x-goog-api-key"] == "AQ.Ab8RN6Jxxxx"
+
+
+def test_gemini_verify_api_key_認証エラーなら理由を返す(monkeypatch):
+    for status in (400, 401, 403):
+        monkeypatch.setattr("backend.engines.llm.gemini.requests.get", _fake_get({}, status))
+        assert "受け付けません" in verify_api_key("bad-key")
+
+
+def test_gemini_verify_api_key_レート制限はキー有効とみなす(monkeypatch):
+    """429はクォータの問題で、キーそのものは正しい"""
+    monkeypatch.setattr("backend.engines.llm.gemini.requests.get", _fake_get({}, 429))
+    assert verify_api_key("AQ.Ab8RN6Jxxxx") is None
+
+
+def test_gemini_verify_api_key_通信エラーは例外のまま上げる(monkeypatch):
+    def boom(url, headers=None, params=None, timeout=None):
+        raise requests.ConnectionError("down")
+
+    monkeypatch.setattr("backend.engines.llm.gemini.requests.get", boom)
+    with pytest.raises(requests.ConnectionError):
+        verify_api_key("AQ.Ab8RN6Jxxxx")
+
+
+def test_claude_verify_api_key_通れば何も返さない(monkeypatch):
+    captured = {}
+    monkeypatch.setattr("backend.engines.llm.claude.requests.get", _fake_get(captured))
+    assert claude_verify_api_key("sk-ant-api03-xxxx") is None
+    assert captured["headers"]["x-api-key"] == "sk-ant-api03-xxxx"
+    assert "anthropic-version" in captured["headers"]
+
+
+def test_claude_verify_api_key_認証エラーなら理由を返す(monkeypatch):
+    monkeypatch.setattr("backend.engines.llm.claude.requests.get", _fake_get({}, 401))
+    assert "受け付けません" in claude_verify_api_key("sk-ant-bad")
 
 
 # ---- 設定API ----

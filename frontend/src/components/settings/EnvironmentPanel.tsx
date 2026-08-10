@@ -67,6 +67,12 @@ export function EnvironmentPanel() {
           hasGpu ? `${e.gpu.name}(${e.accel.toUpperCase()})` : 'なし(CPU実行・低速)'
         }
       />
+      {e.cuda_libs_missing?.length > 0 && (
+        <p data-testid="env-cuda-missing" className="text-xs text-amber-700 dark:text-amber-400">
+          CUDAライブラリが見つからないため({e.cuda_libs_missing.join(', ')})、
+          文字起こしはwhisper.cpp(Vulkan)またはCPUで実行します。
+        </p>
+      )}
       {hasGpu && (
         <Item label="VRAM" value={`${GB(total)}(空き ${GB(e.gpu.vram_free_mb ?? 0)})`} />
       )}

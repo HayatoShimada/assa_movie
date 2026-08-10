@@ -7,6 +7,19 @@
     Meiryo, sans-serif;
 }
 
+/* ネイティブ描画のフォーム部品(selectの箱とドロップダウン・チェックボックス等)に
+   ページの配色を伝える。宣言しないとダークUIでもライト配色で描かれ、白文字が
+   沈んで読めない(Ubuntu版で実例)。ドロップダウンはCSSで塗れないのでこれが唯一の対処 */
+:root {
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+  }
+}
+
 html,
 body,
 #root {

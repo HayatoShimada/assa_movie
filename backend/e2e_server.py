@@ -251,6 +251,9 @@ def build_app():
 
     key_dir = Path(tempfile.mkdtemp(prefix="ks-e2e-keys-"))
     keys_api.key_path = lambda provider: key_dir / f"{provider}.txt"
+    # 登録時の疎通確認は実APIへ出るので、E2Eでは常に成功するFakeに差し替える
+    for provider in keys_api.VERIFIERS:
+        keys_api.VERIFIERS[provider] = lambda key: None
 
     # モデルも一時ディレクトリを指す。開発機に本物が入っているかどうかで
     # セットアップ画面のE2Eの結果が変わらないようにする

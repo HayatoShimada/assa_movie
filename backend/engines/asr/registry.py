@@ -13,7 +13,7 @@
 
 from dataclasses import dataclass
 
-from backend.core.device import detect_accel
+from backend.core.device import detect_accel, missing_cuda_libs
 from backend.engines.asr.base import ASREngine
 from backend.engines.asr.fasterwhisper import FasterWhisperEngine
 from backend.engines.asr.openai_whisper import OpenAIWhisperEngine
@@ -113,6 +113,14 @@ def build_engine(settings) -> ASREngine:
     from backend.core.device import probe_gpu
 
     accel = detect_accel()
+    missing = missing_cuda_libs() if accel == "cuda" else []
+    if missing:
+        # ドライバはある(nvidia-smiが通る)のにCUDAランタイムが無い機体がある
+        # (配布版Ubuntuで実例: libcublas.so.12が無くモデル読み込みで必ず落ちる)。
+        # 「GPUはあるがCUDA/ROCmとしては使えない」機体と同じ規則に落とし、
+        # whisper.cpp(Vulkan)かCPUで動かす。クラッシュより遅い成功を選ぶ
+        print(f"CUDAライブラリが見つかりません({', '.join(missing)})。GPUなしの規則でASRエンジンを選びます")
+        accel = "cpu"
     # CUDA/ROCmが無くてもGPUが載っていればVulkanのwhisper.cppが使える
     engine_id = resolve_engine(
         settings.asr_engine, accel, has_gpu=bool(probe_gpu().get("name"))

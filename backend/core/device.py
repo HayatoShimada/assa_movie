@@ -26,6 +26,52 @@ from backend.core.console import SUBPROCESS_TEXT
 EMPTY_GPU = {"accel": "cpu", "name": "", "vram_total_mb": 0, "vram_free_mb": 0}
 CLI_TIMEOUT = 5
 
+# faster-whisper(CTranslate2 4.x)のCUDA実行に必要な動的ライブラリ。
+# nvidia-smiが通る(=ドライバはある)のにCUDAランタイムが入っていない機体があり、
+# その場合モデル読み込みが「Library libcublas.so.12 is not found」で必ず落ちる
+CUDA_RUNTIME_LIBS = ("libcublas.so.12", "libcudnn.so.9")
+
+
+def missing_cuda_libs(loader=None, search_roots=None) -> list[str]:
+    """CUDA実行に必要なライブラリのうち、見つからないものを返す(Linux以外は常に空)。
+
+    2段階で探す:
+    (1) 通常のdlopen経路(システムのCUDA・LD_LIBRARY_PATH)
+    (2) pipのnvidia系パッケージ(nvidia-cublas-cu12等)。ctranslate2のwheelは
+        ここをrpathで参照するため、dlopenで見つからなくても実行時には使える。
+    loader / search_roots はテスト差し替え口。
+    """
+    if platform.system() != "Linux":
+        return []  # .soの名前も配布形態もLinux前提。他OSで誤ってGPUを諦めない
+    import ctypes
+
+    load = loader if loader is not None else ctypes.CDLL
+    roots = _nvidia_package_roots() if search_roots is None else list(search_roots)
+    missing = []
+    for lib in CUDA_RUNTIME_LIBS:
+        try:
+            load(lib)
+            continue
+        except OSError:
+            pass
+        if not any(next(root.glob(f"*/lib/{lib}"), None) for root in roots):
+            missing.append(lib)
+    return missing
+
+
+def _nvidia_package_roots() -> list:
+    """pipのnvidia名前空間パッケージの場所(無ければ空)"""
+    import importlib.util
+    from pathlib import Path
+
+    try:
+        spec = importlib.util.find_spec("nvidia")
+    except (ImportError, ValueError):
+        return []
+    if spec is None:
+        return []
+    return [Path(p) for p in (spec.submodule_search_locations or [])]
+
 
 def _torch(torch_module=None):
     """torchを返す(テスト差し替え口)。import不能ならNone"""

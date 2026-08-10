@@ -100,6 +100,25 @@ def test_recommend_without_installed_models():
     assert rec["ollama_model"] is None  # 入っていないモデルは推奨しない
 
 
+def test_scan_environment_CUDAランタイムが無ければcpu扱いにする(monkeypatch):
+    """ドライバのみ(nvidia-smiは通る)の機体。実行時のエンジン選択と推奨表示を揃える"""
+    from backend.core import environment
+    from backend.core.config import Settings
+
+    monkeypatch.setattr(
+        environment, "probe_gpu",
+        lambda: {"accel": "cuda", "name": "NVIDIA GeForce RTX 4070",
+                 "vram_total_mb": 12282, "vram_free_mb": 11000},
+    )
+    monkeypatch.setattr(environment, "missing_cuda_libs", lambda: ["libcublas.so.12"])
+    monkeypatch.setattr(environment, "scan_ollama", lambda url: {"reachable": False, "models": []})
+    env = environment.scan_environment(Settings(_env_file=None))
+    assert env["accel"] == "cpu"
+    assert env["gpu_compute"] is False
+    assert env["cuda_libs_missing"] == ["libcublas.so.12"]
+    assert env["gpu"]["name"] == "NVIDIA GeForce RTX 4070"  # 搭載自体は表示する
+
+
 # ---- scan_ollama(HTTPはfake) ----
 
 def test_scan_ollama_parses_tags(monkeypatch):

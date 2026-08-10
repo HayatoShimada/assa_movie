@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from backend.core.device import detect_accel
+from backend.core.device import CUDA_RUNTIME_LIBS, detect_accel, missing_cuda_libs
 
 
 def _fake_torch(cuda_available: bool, hip: str | None, cuda: str | None):
@@ -44,3 +44,45 @@ def test_detect_accel_without_torch():
 def test_detect_accel_real_torch_returns_valid_value():
     # 実環境のtorchで呼んでも3値のどれかを返す(GPU有無に依存しない検証)
     assert detect_accel() in ("cuda", "rocm", "cpu")
+
+
+# ---- CUDAランタイムの欠落検出(配布版Ubuntuの libcublas.so.12 クラッシュ対策) ----
+def _loader_ok(lib):
+    return object()
+
+
+def _loader_fail(lib):
+    raise OSError(f"{lib}: cannot open shared object file")
+
+
+def test_missing_cuda_libs_全部読めれば空():
+    assert missing_cuda_libs(loader=_loader_ok, search_roots=[]) == []
+
+
+def test_missing_cuda_libs_どこにも無ければ全て列挙():
+    assert missing_cuda_libs(loader=_loader_fail, search_roots=[]) == list(CUDA_RUNTIME_LIBS)
+
+
+def test_missing_cuda_libs_pip配布のnvidiaパッケージも探す(tmp_path):
+    """ctranslate2のwheelはpipのnvidia系パッケージをrpathで参照する。
+    dlopenの通常経路に無くても、そこにあれば実行時には使える"""
+    for lib in CUDA_RUNTIME_LIBS:
+        d = tmp_path / lib.split(".")[0].removeprefix("lib") / "lib"
+        d.mkdir(parents=True)
+        (d / lib).write_bytes(b"")
+    assert missing_cuda_libs(loader=_loader_fail, search_roots=[tmp_path]) == []
+
+
+def test_missing_cuda_libs_片方だけ無い場合はそれだけ返す(tmp_path):
+    d = tmp_path / "cublas" / "lib"
+    d.mkdir(parents=True)
+    (d / "libcublas.so.12").write_bytes(b"")
+    assert missing_cuda_libs(loader=_loader_fail, search_roots=[tmp_path]) == ["libcudnn.so.9"]
+
+
+def test_missing_cuda_libs_linux以外は常に空(monkeypatch):
+    """.soの名前も配布形態もLinux前提。他OSで誤ってGPUを諦めない"""
+    import backend.core.device as device
+
+    monkeypatch.setattr(device.platform, "system", lambda: "Windows")
+    assert missing_cuda_libs(loader=_loader_fail, search_roots=[]) == []

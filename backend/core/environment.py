@@ -6,7 +6,7 @@
 
 from urllib.parse import urlparse
 
-from backend.core.device import probe_gpu
+from backend.core.device import missing_cuda_libs, probe_gpu
 
 # OllamaのVRAM目安 = モデルファイルサイズ × オーバーヘッド係数(KVキャッシュ等)
 OLLAMA_VRAM_FACTOR = 1.15
@@ -45,13 +45,20 @@ def scan_environment(settings) -> dict:
         if probe.get("name")
         else {}
     )
+    accel = probe.get("accel", "cpu")
+    # ドライバはある(nvidia-smiが通る)がCUDAランタイムが無い機体では、実行時の
+    # エンジン選択(asr/registry.py)がGPUを諦める。推奨表示も同じ規則に揃える
+    cuda_missing = missing_cuda_libs() if accel == "cuda" else []
+    if cuda_missing:
+        accel = "cpu"
     return {
-        "accel": probe.get("accel", "cpu"),
+        "accel": accel,
+        "cuda_libs_missing": cuda_missing,
         "gpu": gpu,
         # 積んでいることと、計算に使えることは別。AMDのWindows機はGPUが見えても
         # ROCmが無く、CTranslate2もCUDA専用なので文字起こしはCPUで動く。
         # VRAMを前提にしたモデル推奨をここで止める
-        "gpu_compute": probe.get("accel", "cpu") != "cpu",
+        "gpu_compute": accel != "cpu",
         "ffmpeg": encoder is not None,
         "encoder": encoder,
         "ollama": scan_ollama(settings.ollama_url),

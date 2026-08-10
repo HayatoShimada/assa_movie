@@ -24,6 +24,18 @@ test('APIキー: 未登録から登録して、キー本体は画面に出ない
   await expect(page.getByTestId('apikey-input-claude')).toHaveValue('')
 })
 
+test('APIキー: Geminiの新形式(AQ.〜)も登録できる', async ({ page, request }) => {
+  // 接頭辞(AIza〜)での形式チェックをやめ、疎通確認で判定するようになった
+  const mediaId = await seedTranscribed(request)
+  await openSettings(page, mediaId)
+
+  await page.getByTestId('apikey-input-gemini').fill('AQ.Ab8RN6Je2etestkey')
+  await page.getByTestId('apikey-save-gemini').click()
+
+  await expect(page.getByTestId('apikeys-panel')).toContainText('登録済み …tkey')
+  expect((await (await request.get(`${API}/api/keys`)).json()).gemini.configured).toBe(true)
+})
+
 test('APIキー: 形式が違うキーはエラーになり登録されない', async ({ page, request }) => {
   const mediaId = await seedTranscribed(request)
   await openSettings(page, mediaId)

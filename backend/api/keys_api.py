@@ -1,12 +1,14 @@
 """クラウドLLMのAPIキーの登録。
 
-キーはこの端末の設定ディレクトリに置くだけで、どこにも送らない。
+キーはこの端末の設定ディレクトリに保存する。登録時に有効性の疎通確認のため
+提供元のAPIへ1回だけ送り、それ以外にはどこにも送らない。
 画面には「設定済みかどうか」と末尾4文字しか返さない(全文を出す必要が無い)。
 """
 
 from dataclasses import dataclass
 from pathlib import Path
 
+import requests
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -25,6 +27,8 @@ class KeySpec:
     label: str
     filename: str
     env_var: str
+    # 空文字なら接頭辞は見ない(Geminiは AIza〜/AQ.〜 など仕様変更で変わるため、
+    # 形式ではなく登録時の疎通確認で判定する)
     prefix: str
     # 環境変数にも入っていないか調べる関数(プロバイダごとの読み方に合わせる)
     loader: object
@@ -42,9 +46,15 @@ PROVIDERS: dict[str, KeySpec] = {
         label="Gemini (Google)",
         filename="gemini_api_key.txt",
         env_var="GEMINI_API_KEY",
-        prefix="AIza",
+        prefix="",
         loader=gemini.load_api_key,
     ),
+}
+
+# 登録時の疎通確認。テスト・E2Eではここを差し替えて実ネットワークに出ない
+VERIFIERS: dict[str, object] = {
+    "claude": claude.verify_api_key,
+    "gemini": gemini.verify_api_key,
 }
 
 
@@ -97,11 +107,23 @@ def list_keys() -> dict:
 def register_key(provider: str, body: KeyRegistration) -> dict:
     spec = _spec(provider)
     key = body.key.strip()
-    if not key.startswith(spec.prefix):
+    # 説明文ごと貼り付けたケース。読み込み側(loader)が単一行しか受けないので先に弾く
+    if not key or any(ch.isspace() for ch in key):
+        raise HTTPException(400, "APIキーだけを1行で貼り付けてください(空白や改行は含めない)。")
+    if spec.prefix and not key.startswith(spec.prefix):
         # 既存の登録は壊さない(打ち間違いで使えなくなるのを防ぐ)
         raise HTTPException(
             400, f"{spec.label} のAPIキーは「{spec.prefix}」で始まります。全文を貼り付けてください。"
         )
+    # 形式が合っていても使えないキーはあるので、保存前に実際にAPIへ接続して確かめる
+    try:
+        error = VERIFIERS[provider](key)
+    except requests.RequestException:
+        raise HTTPException(
+            502, f"{spec.label} に接続できませんでした。ネットワークを確認して、もう一度お試しください。"
+        )
+    if error:
+        raise HTTPException(400, error)
     path = key_path(provider)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(key + "\n", encoding="utf-8")

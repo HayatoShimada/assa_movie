@@ -1,7 +1,8 @@
 /**
  * APIキーのパネル(設定タブ)。
  *
- * キーはこの端末に保存するだけで、どこにも送らない。
+ * 保存前にバックエンドが提供元のAPIへ接続してキーの有効性を確かめる
+ * (形式は仕様変更で変わるため、接頭辞では判定しない)。それ以外には送らない。
  * 登録済みかどうかと末尾4文字だけを表示する(全文を画面に出す必要が無い)。
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -57,7 +58,7 @@ function KeyRow({
           onClick={() => save.mutate(key)}
           disabled={!key.trim() || save.isPending}
         >
-          保存
+          {save.isPending ? '確認中…' : '保存'}
         </Button>
         {removable && (
           <Button
@@ -98,7 +99,8 @@ export function ApiKeysPanel() {
     >
       <h3 className="mb-1 text-sm font-semibold">クラウドLLMのAPIキー</h3>
       <p className="mb-2 text-xs text-neutral-500">
-        この端末にだけ保存します。クラウドLLMを選ぶと、文字起こしがその提供元に送信されます。
+        保存する前にキーが有効か提供元へ接続して確認し、この端末にだけ保存します。
+        クラウドLLMを選ぶと、文字起こしがその提供元に送信されます。
       </p>
       {Object.entries(keys.data).map(([provider, status]) => (
         <KeyRow key={provider} provider={provider} status={status} onSaved={onSaved} />

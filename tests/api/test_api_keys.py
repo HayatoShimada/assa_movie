@@ -1,6 +1,7 @@
 """M27: APIキーの登録(設定画面から入れられるようにする)"""
 
 import pytest
+import requests
 
 from backend.api import keys_api
 
@@ -12,6 +13,23 @@ def key_dir(monkeypatch, tmp_path):
     for var in ("ANTHROPIC_API_KEY", "GEMINI_API_KEY"):
         monkeypatch.delenv(var, raising=False)
     return tmp_path
+
+
+@pytest.fixture(autouse=True)
+def verify_ok(monkeypatch):
+    """疎通確認は既定で成功させる(テストから実ネットワークに出ない)"""
+    calls = []
+
+    def _record(provider):
+        def _verify(key):
+            calls.append((provider, key))
+            return None
+
+        return _verify
+
+    for provider in keys_api.PROVIDERS:
+        monkeypatch.setitem(keys_api.VERIFIERS, provider, _record(provider))
+    return calls
 
 
 def test_未登録なら未登録と返る(client):
@@ -90,3 +108,47 @@ def test_Geminiのキーも同じ形で扱える(client):
     res = client.put("/api/keys/gemini", json={"key": "AIzaSyXXXXXXXXXXXX"})
     assert res.status_code == 200
     assert res.json()["gemini"]["configured"] is True
+
+
+def test_Geminiの新形式キーも登録できる(client):
+    """キーの形式は仕様変更で変わる(AIza〜 → AQ.〜)。接頭辞では判定しない"""
+    res = client.put("/api/keys/gemini", json={"key": "AQ.Ab8RN6JXXXXXXXXXXXX"})
+    assert res.status_code == 200
+    assert res.json()["gemini"]["configured"] is True
+
+
+def test_登録時に疎通確認が走る(client, verify_ok):
+    """形式の目視チェックではなく、実際にAPIへ接続して確かめる"""
+    client.put("/api/keys/gemini", json={"key": "AQ.Ab8RN6Jxxxx"})
+    assert verify_ok == [("gemini", "AQ.Ab8RN6Jxxxx")]
+
+
+def test_疎通確認に失敗したキーは保存しない(client, monkeypatch):
+    monkeypatch.setitem(
+        keys_api.VERIFIERS, "gemini", lambda key: "Gemini APIがこのキーを受け付けませんでした。"
+    )
+    res = client.put("/api/keys/gemini", json={"key": "AQ.Ab8RN6Jxxxx"})
+    assert res.status_code == 400
+    assert "受け付けません" in res.json()["detail"]
+    assert client.get("/api/keys").json()["gemini"]["configured"] is False
+
+
+def test_通信できないときは保存せず既存キーも壊さない(client, monkeypatch):
+    """ネットワーク断でキーの良し悪しは判定できない。既存の登録は守る"""
+    client.put("/api/keys/gemini", json={"key": "AQ.Ab8RN6Jold"})
+
+    def _unreachable(key):
+        raise requests.ConnectionError("network down")
+
+    monkeypatch.setitem(keys_api.VERIFIERS, "gemini", _unreachable)
+    res = client.put("/api/keys/gemini", json={"key": "AQ.Ab8RN6Jnew"})
+    assert res.status_code == 502
+    assert "接続できません" in res.json()["detail"]
+    assert client.get("/api/keys").json()["gemini"]["hint"] == "…Jold"
+
+
+def test_空白や改行を含むキーは疎通確認より前に弾く(client, verify_ok):
+    """説明文ごと貼り付けたケース。読み込み側が単一行しか受けないので保存もしない"""
+    res = client.put("/api/keys/gemini", json={"key": "ここに貼る AQ.Ab8RN6Jxxxx"})
+    assert res.status_code == 400
+    assert verify_ok == []  # 無駄な通信をしない

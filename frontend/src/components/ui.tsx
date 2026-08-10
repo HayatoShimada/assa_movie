@@ -67,9 +67,11 @@ export function Card({ title, children }: { title: string; children: ReactNode }
   )
 }
 
-/** フォーム部品(select/input)の共通クラス */
+/** フォーム部品(select/input)の共通クラス。
+ * 文字色と背景は明示する。継承任せにするとネイティブ描画のselect
+ * (色はCSS・箱はOSテーマ)で白文字がライトな箱に沈むことがある(Ubuntu版で実例) */
 export const selectCls =
-  'rounded-md border border-neutral-300 bg-transparent px-2 py-1 text-sm dark:border-neutral-700 dark:bg-neutral-900'
+  'rounded-md border border-neutral-300 bg-white px-2 py-1 text-sm text-neutral-900 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100'
 
 /** 秒を 1:23 / 1:02:03 形式にする */
 export function formatTime(seconds: number): string {

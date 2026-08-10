@@ -12,6 +12,8 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import requests
+
 from backend.core import keyfile
 from backend.engines.llm.base import LLMError
 
@@ -35,6 +37,26 @@ def load_api_key(key_file: Path | None = None) -> str | None:
     text = keyfile.read(key_file)
     if text and text.startswith(KEY_PREFIX) and "\n" not in text:
         return text
+    return None
+
+
+def verify_api_key(key: str, timeout: float = 10.0) -> str | None:
+    """キーが実際に使えるかをAPIに問い合わせる(登録時の疎通確認)。
+
+    モデル一覧の取得はトークンを消費しない。キーが拒否されたら理由の文字列を
+    返し、通れば None。通信そのものの失敗は requests の例外のまま上げる。
+    """
+    resp = requests.get(
+        "https://api.anthropic.com/v1/models",
+        headers={"x-api-key": key, "anthropic-version": "2023-06-01"},
+        params={"limit": 1},
+        timeout=timeout,
+    )
+    if resp.status_code in (400, 401, 403):
+        return "Anthropic APIがこのキーを受け付けませんでした。キーの全文を貼り付けたか確認してください。"
+    if resp.status_code == 429:
+        return None  # レート制限はクォータの問題で、キーそのものは有効
+    resp.raise_for_status()
     return None
 
 

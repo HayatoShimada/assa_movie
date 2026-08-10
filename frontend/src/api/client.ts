@@ -195,6 +195,8 @@ export interface EnvironmentResponse {
   gpu: { name?: string; vram_total_mb?: number; vram_free_mb?: number }
   /** GPUを計算に使えるか。搭載していてもCUDA/ROCmが無ければfalse(書き出しには使える) */
   gpu_compute: boolean
+  /** NVIDIAドライバはあるのにCUDAランタイムが無い機体で、見つからなかったライブラリ名 */
+  cuda_libs_missing: string[]
   ffmpeg: boolean
   encoder: string | null
   ollama: { reachable: boolean; models: { name: string; vram_mb: number }[] }

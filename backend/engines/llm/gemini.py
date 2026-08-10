@@ -30,6 +30,28 @@ def load_api_key(key_file: Path | None = None) -> str | None:
     return None
 
 
+def verify_api_key(key: str, timeout: float = 10.0) -> str | None:
+    """キーが実際に使えるかをAPIに問い合わせる(登録時の疎通確認)。
+
+    接頭辞は仕様変更で変わる(AIza〜 の旧形式に加えて AQ.〜 の新形式がある)ため、
+    形式では判定せず、モデル一覧APIに1回だけ接続して確かめる。
+    キーが拒否されたら理由の文字列を返し、通れば None。
+    通信そのものの失敗は判定できないので requests の例外のまま上げる。
+    """
+    resp = requests.get(
+        API_BASE,
+        headers={"x-goog-api-key": key},
+        params={"pageSize": 1},
+        timeout=timeout,
+    )
+    if resp.status_code in (400, 401, 403):
+        return "Gemini APIがこのキーを受け付けませんでした。キーの全文を貼り付けたか確認してください。"
+    if resp.status_code == 429:
+        return None  # レート制限はクォータの問題で、キーそのものは有効
+    resp.raise_for_status()
+    return None
+
+
 def to_gemini_schema(schema: dict) -> dict:
     """JSON SchemaをGeminiのresponseSchemaに変換する。
 

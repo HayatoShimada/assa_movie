@@ -9,6 +9,15 @@ from backend.engines.asr.registry import DEFAULT_MODEL, ENGINES, MODELS, build_e
 from backend.engines.asr.openai_whisper import OpenAIWhisperEngine
 
 
+@pytest.fixture(autouse=True)
+def cuda_runtime_ok(monkeypatch):
+    """既定はCUDAランタイムあり(開発機の実環境に左右されない)。
+    欠落時の挙動は個別テストで上書きする"""
+    from backend.engines.asr import registry
+
+    monkeypatch.setattr(registry, "missing_cuda_libs", lambda: [])
+
+
 def test_default_model_is_large_v3():
     # 精度優先・単語タイムスタンプ必須の要件による決定(BACKEND_DESIGN.md)
     assert DEFAULT_MODEL == "large-v3"
@@ -91,6 +100,55 @@ def test_build_engine_falls_back_to_faster_whisper_without_torch(monkeypatch):
     monkeypatch.setattr(registry, "whispercpp_available", lambda: False)
     monkeypatch.setattr(registry, "openai_whisper_available", lambda: False)
     assert isinstance(build_engine(Settings(_env_file=None)), FasterWhisperEngine)
+
+
+# ---- CUDAランタイム欠落時のフォールバック ----
+# nvidia-smiが通る(ドライバはある)のにCUDAランタイムが無い機体があり、
+# faster-whisperのモデル読み込みが「Library libcublas.so.12 is not found」で
+# 必ず落ちる(配布版Ubuntuで実例)。クラッシュではなくGPUなしの規則で動かす。
+
+
+@pytest.fixture
+def cuda_without_runtime(monkeypatch):
+    from backend.core import device
+    from backend.engines.asr import registry
+
+    monkeypatch.setattr(registry, "detect_accel", lambda: "cuda")
+    monkeypatch.setattr(registry, "missing_cuda_libs", lambda: ["libcublas.so.12"])
+    # GPU自体は積んでいる(nvidia-smiで名前が取れる)機体を想定
+    monkeypatch.setattr(
+        device, "probe_gpu",
+        lambda: {"accel": "cuda", "name": "NVIDIA GeForce RTX 4070",
+                 "vram_total_mb": 12282, "vram_free_mb": 11000},
+    )
+
+
+def test_CUDAランタイムが無ければwhispercppに落ちる(monkeypatch, cuda_without_runtime):
+    """VulkanビルドのwhisperがあればGPUのまま動かせる"""
+    from backend.engines.asr import registry
+    from backend.engines.asr.whispercpp import WhisperCppEngine
+
+    monkeypatch.setattr(registry, "whispercpp_available", lambda: True)
+    assert isinstance(build_engine(Settings(_env_file=None)), WhisperCppEngine)
+
+
+def test_CUDAランタイムもwhispercppも無ければCPUで動かす(monkeypatch, cuda_without_runtime):
+    """「遅い」と「動かない」なら遅いほうがよい"""
+    from backend.engines.asr import registry
+
+    monkeypatch.setattr(registry, "whispercpp_available", lambda: False)
+    engine = build_engine(Settings(_env_file=None))
+    assert isinstance(engine, FasterWhisperEngine)
+    assert engine.device == "cpu"
+    assert engine.compute_type == "int8"
+
+
+def test_CUDAランタイム欠落時は明示指定のfaster_whisperもCPUにする(monkeypatch, cuda_without_runtime):
+    """auto以外を選んでいても、無いライブラリでのGPU実行は必ず失敗するので避ける"""
+    s = Settings(_env_file=None)
+    s.asr_engine = "faster_whisper"
+    engine = build_engine(s)
+    assert engine.device == "cpu"
 
 
 def test_transformersエンジンはもう選べない():
