@@ -45,11 +45,10 @@ jobs:
         with:
           enable-cache: true
 
-      # torch系は入れない(rocmグループはLinux専用、CPU版でも200MB以上)。
-      # torchが要るテストは @pytest.mark.torch が付いていて自動でスキップされる。
-      # 実際の配布物にもtorchは入っていないので、これが本番に近い構成になる
+      # torchは入れない。2026-08-10にtorch依存のエンジンを全て削除したので、
+      # バックエンドはもうtorchを使わない(配布物と同じ構成になる)
       - name: 依存を入れる
-        run: uv sync --no-default-groups --group dev
+        run: uv sync
 
       # 失敗の要約をアノテーションに出す。ログのダウンロードにはリポジトリの
       # 管理者権限が要るため、それが無い人には「exit code 1」しか見えない。
@@ -63,26 +62,6 @@ jobs:
             echo "::error title=pytest (${{ matrix.os }})::$(echo "$summary" | tr '\n' '％')"
             exit 1
           }
-
-  # ---- torch系エンジンのテスト(Linuxのみ) ----
-  #
-  # transformers版Whisperと公式Whisperは開発グループにしか無い。
-  # GPUは要らないのでCPU版のwheelで足りる
-  backend-torch:
-    name: バックエンド (torch系)
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
-
-      - name: 依存を入れる(CPU版torch)
-        run: uv sync --no-default-groups --group dev --group cpu --group torch-engines
-
-      - name: pytest (torchマーカーのみ)
-        run: uv run --no-sync pytest -q -m torch
 
   # ---- フロントエンド: 型・lint・単体テスト・ビルド ----
   frontend:
@@ -209,7 +188,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: 依存を入れる
-        run: uv sync --no-default-groups --group dev
+        run: uv sync
 
       - name: フロントの依存
         working-directory: frontend
@@ -221,8 +200,7 @@ jobs:
 
       - name: E2E
         working-directory: frontend
-        # 素の `uv run` は既定グループ(Linuxではrocmのtorch=14GB)を同期しに行く。
-        # ここでは上で入れた構成のまま起動したいので --no-sync を渡す
+        # 上で入れた構成のまま起動する(--no-syncで再解決を避ける)
         env:
           KS_E2E_BACKEND: uv run --no-sync python -m backend.e2e_server
         run: npx playwright test

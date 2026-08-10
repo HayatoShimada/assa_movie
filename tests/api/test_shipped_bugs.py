@@ -3,14 +3,15 @@
 戦略的リファクタリングの調査で見つかったもの。いずれも「特定の環境でしか
 踏まない」型で、開発機では再現しないためテストで固定する。
 
-  0-1 ROCm Linux でフォールバック先が配布物に無いエンジンだった
   0-2 セットアップのダウンロードが存在しないジョブ状態を待って固まった
   0-4 APIキーのファイルが cp932 だと例外が漏れた
   0-5 非ASCIIパスで顔検出が空の分類器になった
   0-6 Windows で字幕フォントが列挙できなかった
   0-7 AppImage 版に ffmpeg の案内が無かった
 
-0-3(EnvironmentPanelのエンジン固定)はフロントのみなので e2e/m16 で見る。
+0-1(ROCmのフォールバック先)と0-3(EnvironmentPanelのエンジン固定)は、
+エンジン選択がプロファイル固定方式になった2026-08-10に構造ごと無くなった
+(多段フォールバック自体が存在しない。tests/core/test_hwprofile.py が対応表を見る)。
 """
 
 import platform
@@ -18,40 +19,6 @@ import re
 from pathlib import Path
 
 import pytest
-
-
-# ---- 0-1 ROCm のフォールバック先 ----
-#
-# resolve_engine("auto","rocm") は whisper.cpp が使えないとき openai_whisper へ
-# 落としていた。しかし配布物に torch は無く、whispercpp_available() は
-# バイナリとモデル(3.1GB)の両方を要求する。モデルは同梱していないので、
-# 未取得の利用者は必ず ImportError になっていた。
-#
-# 単純に faster_whisper へ変えると、torch のある ROCm 開発機で
-# GPU が使えなくなる(faster-whisper の GPU 版は CUDA 専用)。
-# openai_whisper が「入っているか」を見て分岐する。
-class TestRocmフォールバック:
-    def test_torchが無ければfaster_whisperへ落とす(self, monkeypatch):
-        """配布版の状態。ImportErrorで落ちるより、CPUでも動くほうがよい"""
-        from backend.engines.asr import registry
-
-        monkeypatch.setattr(registry, "whispercpp_available", lambda: False)
-        monkeypatch.setattr(registry, "openai_whisper_available", lambda: False)
-        assert registry.resolve_engine("auto", "rocm") == "faster_whisper"
-
-    def test_torchがあればopenai_whisperを使う(self, monkeypatch):
-        """ROCm開発機では従来どおり。faster-whisperのGPU版はCUDA専用なので"""
-        from backend.engines.asr import registry
-
-        monkeypatch.setattr(registry, "whispercpp_available", lambda: False)
-        monkeypatch.setattr(registry, "openai_whisper_available", lambda: True)
-        assert registry.resolve_engine("auto", "rocm") == "openai_whisper"
-
-    def test_whispercppがあればそちらが優先(self, monkeypatch):
-        from backend.engines.asr import registry
-
-        monkeypatch.setattr(registry, "whispercpp_available", lambda: True)
-        assert registry.resolve_engine("auto", "rocm") == "whispercpp"
 
 
 # ---- 0-2 ジョブの終端状態がPythonとTSでずれていた ----

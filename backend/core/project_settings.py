@@ -12,10 +12,12 @@ import sqlite3
 
 from backend.core.config import Settings, settings
 
-# UIから変更可能な項目(誤ってDBパス等を書き換えられないよう明示的に許可する)
+# UIから変更可能な項目(誤ってDBパス等を書き換えられないよう明示的に許可する)。
+# asr_engine はハードウェアプロファイル(core/hwprofile.py)で決まるため入れない
+# (v0.9.5でUI保存された固定値が whisper.cpp 同梱後も残り続けた事故の再発防止)
 MUTABLE_FIELDS = {
-    "asr_model", "asr_engine", "asr_language", "asr_beam_size", "asr_vad_filter",
-    "diarization_enabled", "diarization_engine",
+    "asr_model", "asr_language", "asr_beam_size", "asr_vad_filter",
+    "diarization_enabled",
     "num_speakers", "male_name", "female_name",
     "aizuchi_max_duration",
     "filler_level",
@@ -27,13 +29,12 @@ MUTABLE_FIELDS = {
     "subtitle_bg", "subtitle_bg_color", "subtitle_bg_opacity",
     "convert_method",
     "llm_provider", "ollama_model", "gemini_model", "claude_model",
-    "vram_budget_mb",
     "setup_completed",
 }
 
 # プロジェクト単位で上書きできる項目。
-# VRAM割当と初回セットアップの完了はマシン全体の状態なのでプロジェクト単位化しない
-PROJECT_OVERRIDABLE = set(MUTABLE_FIELDS) - {"vram_budget_mb", "setup_completed"}
+# 初回セットアップの完了はマシン全体の状態なのでプロジェクト単位化しない
+PROJECT_OVERRIDABLE = set(MUTABLE_FIELDS) - {"setup_completed"}
 
 
 def project_overrides(conn: sqlite3.Connection, project_id: int) -> dict:

@@ -80,5 +80,6 @@ def test_settings_defaults_match_design():
     s = Settings(_env_file=None)
     # BACKEND_DESIGN.md の決定事項: 精度優先・単語TS必須のためlarge-v3が既定
     assert s.asr_model == "large-v3"
-    assert s.asr_compute_type == "float16"  # Blackwellでint8はクラッシュする
+    # エンジンはハードウェアプロファイルが決める。空=プロファイルに従う
+    assert s.asr_engine == ""
     assert s.pronoun_form == "annotate"      # おすすめ既定: かっこ注釈

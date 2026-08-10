@@ -25,7 +25,7 @@
 | M14 向き変換 | **完了** | 縦→縦/横→縦/横→横/縦→横。crop(位置調整可)/blur_pad/face(1人=追従・2人=上下分割、OpenCV Haar)。クリップ単位上書き |
 | M15 フロント | **完了** | テンプレート4択の作成フォーム・プロジェクト設定編集(既定に戻す)・削除UI・クリップ変換UI・縦プレビュー。E2E 25件 |
 | M22 whisper.cpp | **完了** | ROCmでhipBLASビルド。`-ojf`で句読点・単語TS・確率が同時取得。実時間比13.5倍(公式版の約3倍)。未ビルドなら公式版に自動フォールバック |
-| M16 環境スキャン | **完了** | 起動時スキャン(GPU/VRAM/エンコーダ/Ollama)・GET /api/environment・VRAM割当設定(torch系に適用)・収まる最良のASR/LLM推奨とワンクリック適用 |
+| M16 環境スキャン | **完了** | 起動時スキャン(GPU/VRAM/エンコーダ/Ollama)・GET /api/environment・収まる最良のASR/LLMモデル推奨とワンクリック適用。2026-08-10に実行環境プロファイル方式へ移行(VRAM割当設定は廃止) |
 
 **全マイルストーン完了(2026-08-07)。** テスト: backend 351件 / frontend unit 28件 / E2E 25件。
 
@@ -39,15 +39,16 @@
 1. **設計書が正** — 迷ったら設計書の該当節に従う。設計書にない判断が必要になったら、実装せずTODOコメントと質問を残す
 2. **マイルストーン単位でコミット** — 各Mの受け入れ基準を全て満たしてから次へ。飛ばさない
 3. **テストファースト** — 各タスクの「テスト」列を先に書き、失敗を確認してから実装する
-4. **既存を壊さない** — `transcribe.py` / `resolve_pronouns.py` は各Mの完了時点で従来どおり動くこと(回帰確認: `uv run python transcribe.py <smoke.wav> ja`)
-5. **依存バージョンを変えない** — pyproject.tomlのtorch 2.8系 / pyannote 3.x / huggingface_hub 0.x 固定は互換性検証済み。変更禁止(理由はDESIGN.md「制約・技術メモ」)
+4. **既存を壊さない** — (2026-08-10で役割終了) 移植元CLI `transcribe.py` / `resolve_pronouns.py` は
+   アプリが全機能を引き継いだため削除した。回帰検証は `tests/` の単体・E2Eが担う
+5. **依存バージョンを変えない** — 互換性を実機検証した組み合わせを固定する(理由はDESIGN.md「制約・技術メモ」)。
+   torch系の固定は2026-08-10のtorch完全削除で不要になった
 6. **スコープ外のことをしない** — 各タスクの「やらないこと」を守る。リファクタ衝動は抑える
 
 ## リポジトリ構成(monorepo)
 
 ```
 kirinuki-studio/
-├── transcribe.py, resolve_pronouns.py   # 既存CLI(M1以降は内部でbackendモジュールを呼ぶ薄いラッパ)
 ├── backend/                             # BACKEND_DESIGN.md のツリーどおり
 ├── frontend/                            # FRONTEND_DESIGN.md のツリーどおり
 ├── tests/                               # pytest(backend用)

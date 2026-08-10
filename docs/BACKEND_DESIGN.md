@@ -28,18 +28,18 @@ backend/
 │   ├── transcripts.py      # セグメントCRUD(UI編集用)
 │   └── clips.py            # 切り抜き候補・書き出し
 ├── core/
-│   └── config.py           # pydantic-settings(UI設定と1対1対応)
+│   ├── config.py           # pydantic-settings(UI設定と1対1対応)
+│   └── hwprofile.py        # 実行環境の検出(初回1回)と構成の静的対応表
 ├── jobs/
 │   ├── queue.py            # SQLiteジョブテーブル + ワーカースレッド
 │   └── progress.py         # 進捗イベント発行(SSE)
 ├── engines/
 │   ├── asr/
 │   │   ├── base.py         # ASREngine抽象クラス
-│   │   ├── fasterwhisper.py# CUDA/CPU(large-v3既定/turboは設定切替)
-│   │   ├── whispercpp.py   # 同梱バイナリ(Vulkan/Metal)をCLIとして呼ぶ
-│   │   ├── openai_whisper.py # ROCm開発機向け(torch依存・配布物には入らない)
+│   │   ├── fasterwhisper.py# CPU実行(int8)。GPUが無い/使えない機体用
+│   │   ├── whispercpp.py   # 同梱バイナリ(Vulkan/Metal)をCLIとして呼ぶ。GPU機の本体
 │   │   ├── segmenting.py   # Word列→セグメント(エンジン非依存の純関数)
-│   │   └── registry.py     # GPUに合わせた自動選択
+│   │   └── registry.py     # プロファイル→エンジンの組み立て(判定はしない)
 │   ├── diarize/
 │   │   ├── onnx.py         # sherpa-onnx(既定)
 │   │   ├── labels.py       # ピッチによる話者名割り当て
@@ -98,7 +98,7 @@ class ASREngine(Protocol):
 
 ```
 メディア登録
-  → [job:transcribe] デコード → VAD → ASR(GPUで自動選択)→ 句読点付与
+  → [job:transcribe] デコード → VAD → ASR(プロファイルで確定した構成)→ 句読点付与
        → 話者分離(ONNX)→ ピッチで話者名割り当て → 相槌フラグ付け
   → [job:resolve]   指示語置換(3段階) ※有効時のみ
   → [job:attention] 切り抜き候補スコアリング(Phase 2)

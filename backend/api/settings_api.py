@@ -10,13 +10,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, create_model
 
 from backend.api.deps import get_db, get_jobs
+from backend.core import hwprofile
 from backend.core.config import Settings, settings
 from backend.core.console import SUBPROCESS_TEXT
 from backend.core.environment import recommend, scan_environment
 from backend.core.project_settings import MUTABLE_FIELDS, save_global_overrides
-from backend.engines.asr.registry import ENGINES, MODELS
-from backend.engines.diarize.registry import ENGINES as DIARIZE_ENGINES
-from backend.engines.diarize.registry import resolve_engine as resolve_diarize_engine
+from backend.engines.asr.registry import MODELS
+from backend.engines.diarize import registry as diarize
 from backend.api.keys_api import provider_ready
 from backend.engines.llm.registry import PROVIDERS
 
@@ -37,30 +37,30 @@ SettingsUpdate = create_model(
 
 @router.get("/environment")
 def get_environment() -> dict:
-    """環境スキャン結果と、割当VRAMに収まるASR/LLMの推奨を返す(設定タブの環境パネル用)"""
+    """確定済みプロファイルと、VRAMに収まるASR/LLMモデルの推奨(設定タブの環境パネル用)"""
     env = scan_environment(settings)
-    # 「積んでいる」ではなく「計算に使える」で判断する。GPUが見えていても
-    # CUDA/ROCmが無ければモデルはCPUに載るので、VRAMを前提に選ばせてはいけない
-    has_gpu = env["gpu_compute"]
-    total = env["gpu"].get("vram_total_mb", 0) if has_gpu else 0
-    budget = int(settings.vram_budget_mb or 0)
-    effective = min(budget, total) if budget > 0 else total
+    # GPUで計算する構成のときだけVRAMを前提にモデルを選ばせる
+    on_gpu = env["resolved"]["engine"] == "whispercpp"
+    total = env["gpu"].get("vram_total_mb", 0) if on_gpu else 0
 
     ollama_options = [
-        {**m, "fits": has_gpu and m["vram_mb"] <= effective}
+        {**m, "fits": on_gpu and m["vram_mb"] <= total}
         for m in env["ollama"]["models"]
     ]
     return {
         **env,
-        "vram_budget_mb": budget,
-        "effective_vram_mb": effective,
-        # GPUが載っていればCUDA/ROCmが無くてもVulkanのwhisper.cppを勧められる
         "recommendations": recommend(
-            effective, env["accel"], env["ollama"]["models"],
-            has_gpu=bool(env["gpu"].get("name")),
+            total, env["resolved"]["engine"], env["ollama"]["models"]
         ),
         "ollama_options": ollama_options,
     }
+
+
+@router.post("/environment/redetect")
+def redetect_environment(db: sqlite3.Connection = Depends(get_db)) -> dict:
+    """実行環境の再検出(GPU増設・ドライバ導入後の唯一の追従手段)"""
+    hwprofile.redetect(db)
+    return get_environment()
 
 
 def parse_fc_list(output: str) -> list[str]:
@@ -120,17 +120,8 @@ def list_fonts() -> dict:
 def get_settings_api() -> dict:
     return {
         "values": {k: getattr(settings, k) for k in sorted(MUTABLE_FIELDS)},
-        "diarization_engines": [
-            {
-                "id": engine_id, "label": label,
-                # モデル未取得のエンジンはUIで選べないよう伝える
-                "ready": resolve_diarize_engine(engine_id) is not None,
-            }
-            for engine_id, label in DIARIZE_ENGINES.items()
-        ],
-        "asr_engines": [
-            {"id": engine_id, "label": label} for engine_id, label in ENGINES.items()
-        ],
+        # 話者分離はONNXのみ。モデル未取得ならUIでスイッチを無効化する
+        "diarization_ready": diarize.available(),
         "asr_models": [
             {
                 "id": m.id, "label": m.label, "rtf": m.rtf,
@@ -156,10 +147,6 @@ def update_settings(body: SettingsUpdate, db: sqlite3.Connection = Depends(get_d
     changes = body.model_dump(exclude_none=True)
     if "asr_model" in changes and changes["asr_model"] not in MODELS:
         raise HTTPException(400, f"未知のASRモデル: {changes['asr_model']}")
-    if "asr_engine" in changes and changes["asr_engine"] not in ENGINES:
-        raise HTTPException(400, f"未知のASRエンジン: {changes['asr_engine']}")
-    if "diarization_engine" in changes and changes["diarization_engine"] not in DIARIZE_ENGINES:
-        raise HTTPException(400, f"未知の話者分離エンジン: {changes['diarization_engine']}")
     if "llm_provider" in changes and changes["llm_provider"] not in PROVIDERS:
         raise HTTPException(400, f"未知のLLMプロバイダ: {changes['llm_provider']}")
     for key, value in changes.items():

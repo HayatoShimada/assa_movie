@@ -188,24 +188,32 @@ if (-not $app.HasExited) {
         }
 
         try {
-            # 環境スキャンはGPU検出に子プロセスを使うので少し待つ
             $env_ = Invoke-RestMethod "$base/api/environment" -TimeoutSec 60
-            $gpu = if ($env_.gpu.name) { $env_.gpu.name } else { "(検出なし)" }
-            Info "GPU: $gpu / accel: $($env_.accel)"
-            Info "推奨ASR: $($env_.recommendations.asr_engine) / $($env_.recommendations.asr_model)"
+            $p = $env_.profile
+            Info "実行環境: $($p.os)/$($p.gpu) $($p.gpu_name) → $($env_.resolved.label)"
+            Info "推奨モデル: $($env_.recommendations.asr_model)"
+
+            # 初回起動でプロファイルが確定していること(空だと以後の選択が不定になる)
+            if ($p.os -and $p.gpu -and $p.detected_at) {
+                Ok "実行環境プロファイルが保存されている"
+            } else {
+                Ng "実行環境プロファイルが確定していない: $($p | ConvertTo-Json -Compress)"
+            }
+            if ($p.os -ne "windows") { Ng "OS判定が windows でない: $($p.os)" }
 
             if ($env_.ffmpeg) { Ok "ffmpeg を見つけている" } else { Ng "ffmpeg が見つからない" }
             if ($env_.encoder) { Ok "動画エンコーダ: $($env_.encoder)" } else { Ng "エンコーダを決められない" }
 
-            # 同梱したwhisper.cppが選ばれないなら、同梱した意味がない(v0.9.6の退行)。
-            # ただし**入れた直後は選ばれないのが正しい**。whisper.cppは3.1GBのggmlモデルを
-            # 別途必要とし、それは同梱していない(セットアップ画面から利用者が取得する)。
-            # 「本体もモデルも揃っているのに選ばれない」ときだけNGにする
-            if ($env_.gpu.name -and $setup.whispercpp.ready -and
-                $env_.recommendations.asr_engine -ne "whispercpp") {
-                Ng "モデルまで揃っているのに推奨が $($env_.recommendations.asr_engine)(同梱のwhisper.cppが選ばれていない)"
-            } elseif ($env_.gpu.name -and -not $setup.whispercpp.ready) {
-                Info "推奨は $($env_.recommendations.asr_engine)(ggmlモデル未取得なので正しい)"
+            # GPU機なら同梱のwhisper.cppが構成に選ばれるはず(同梱した意味がなくなる)。
+            # ggmlモデル3.1GBは同梱していないので、モデルの有無は問わない
+            if ($p.gpu -ne "cpu") {
+                if ($env_.resolved.engine -eq "whispercpp") {
+                    Ok "GPU機でwhisper.cppが選ばれている"
+                } else {
+                    Ng "GPU機なのに $($env_.resolved.engine) が選ばれている(同梱物を起動できていない)"
+                }
+            } else {
+                Info "GPUを検出していないのでCPU実行(faster-whisper)"
             }
         } catch {
             Ng "/api/environment が叩けない: $_"

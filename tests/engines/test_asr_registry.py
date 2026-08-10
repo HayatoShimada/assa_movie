@@ -1,21 +1,46 @@
-"""M3: ASRエンジン選択機構のテスト"""
+"""ASRエンジンの組み立て(プロファイル固定方式)のテスト。
+
+設計(DESIGN.md 2026-08-10): エンジンは実行時に検出しない。確定済みの
+ハードウェアプロファイル → 静的対応表(hwprofile.resolve_spec)で決まり、
+構成が壊れていたらフォールバックせず直し方を含むエラーで止める。
+"""
 
 import pytest
-from fastapi.testclient import TestClient
 
+from backend.core import hwprofile
 from backend.core.config import Settings
+from backend.core.hwprofile import HwProfile
 from backend.engines.asr.fasterwhisper import FasterWhisperEngine
-from backend.engines.asr.registry import DEFAULT_MODEL, ENGINES, MODELS, build_engine
-from backend.engines.asr.openai_whisper import OpenAIWhisperEngine
+from backend.engines.asr.registry import DEFAULT_MODEL, MODELS, build_engine
+from backend.engines.asr.whispercpp import WhisperCppEngine
+
+
+GPU = HwProfile(os="linux", gpu="nvidia", gpu_name="GPU", vram_total_mb=8000,
+                whispercpp_ok=True, detected_at="t")
+CPU = HwProfile(os="linux", gpu="cpu", detected_at="t")
 
 
 @pytest.fixture(autouse=True)
-def cuda_runtime_ok(monkeypatch):
-    """既定はCUDAランタイムあり(開発機の実環境に左右されない)。
-    欠落時の挙動は個別テストで上書きする"""
-    from backend.engines.asr import registry
+def reset_profile():
+    """テストごとにプロファイルの現在値を明示設定させる(実機に依存させない)"""
+    hwprofile.set_current(CPU)
+    yield
+    hwprofile.set_current(None)
 
-    monkeypatch.setattr(registry, "missing_cuda_libs", lambda: [])
+
+@pytest.fixture
+def whispercpp_ready(monkeypatch, tmp_path):
+    """whisper.cppのバイナリとモデルが揃った状態"""
+    from backend.engines.asr import whispercpp
+
+    binary = tmp_path / "whisper-cli"
+    binary.write_bytes(b"")
+    binary.chmod(0o755)
+    model = tmp_path / "ggml-large-v3.bin"
+    model.write_bytes(b"")
+    monkeypatch.setattr(whispercpp, "resolve_binary", lambda: binary)
+    monkeypatch.setattr(whispercpp, "resolve_model", lambda: model)
+    return tmp_path
 
 
 def test_default_model_is_large_v3():
@@ -29,138 +54,90 @@ def test_all_registered_models_have_word_timestamps():
     assert all(m.word_timestamps for m in MODELS.values())
 
 
-def test_build_engine_uses_configured_model(monkeypatch):
-    from backend.engines.asr import registry
-
-    monkeypatch.setattr(registry, "detect_accel", lambda: "cuda")
-    s = Settings(_env_file=None)
-    s.asr_model = "large-v3-turbo"
-    engine = build_engine(s)
-    assert engine.model_size == "large-v3-turbo"
-    assert engine.compute_type == "float16"  # Blackwellでint8はクラッシュする
+# ---- プロファイル → エンジンの写像 ----
+def test_GPU機はwhispercpp(whispercpp_ready):
+    hwprofile.set_current(GPU)
+    engine = build_engine(Settings(_env_file=None))
+    assert isinstance(engine, WhisperCppEngine)
 
 
-@pytest.mark.parametrize(
-    "accel, expected_type, expected_device, expected_compute",
-    [
-        # CUDA: faster-whisper float16(従来どおり)
-        ("cuda", FasterWhisperEngine, "cuda", "float16"),
-        # ROCm: CTranslate2非対応のため公式Whisper(HIPはcudaを名乗る)
-        ("rocm", OpenAIWhisperEngine, "cuda", None),
-        # GPUなし: faster-whisperのCPU int8(int8クラッシュはBlackwell GPU限定)
-        ("cpu", FasterWhisperEngine, "cpu", "int8"),
-    ],
-)
-def test_build_engine_auto_selects_by_accel(
-    monkeypatch, accel, expected_type, expected_device, expected_compute
-):
-    from backend.engines.asr import registry
-
-    monkeypatch.setattr(registry, "detect_accel", lambda: accel)
-    # whisper.cppは外部ビルドなので、無い環境の挙動として固定する
-    monkeypatch.setattr(registry, "whispercpp_available", lambda: False)
-    # 公式Whisperはtorch依存。開発機に入っているかで結果が変わらないよう固定する
-    monkeypatch.setattr(registry, "openai_whisper_available", lambda: True)
-    engine = build_engine(Settings(_env_file=None))  # asr_engine="auto"
-    assert isinstance(engine, expected_type)
-    assert engine.device == expected_device
-    if expected_compute is not None:
-        assert engine.compute_type == expected_compute
-
-
-def test_build_engine_prefers_whispercpp_on_rocm_when_built(monkeypatch):
-    """whisper.cppが用意されていればROCmではそれを使う(公式版の約2.6倍速)"""
-    from backend.engines.asr import registry
-    from backend.engines.asr.whispercpp import WhisperCppEngine
-
-    monkeypatch.setattr(registry, "detect_accel", lambda: "rocm")
-    monkeypatch.setattr(registry, "whispercpp_available", lambda: True)
-    assert isinstance(build_engine(Settings(_env_file=None)), WhisperCppEngine)
-
-
-def test_build_engine_falls_back_when_whispercpp_missing(monkeypatch):
-    """ビルドしていない環境では公式Whisperに落ちる(壊れない)"""
-    from backend.engines.asr import registry
-
-    monkeypatch.setattr(registry, "detect_accel", lambda: "rocm")
-    monkeypatch.setattr(registry, "whispercpp_available", lambda: False)
-    monkeypatch.setattr(registry, "openai_whisper_available", lambda: True)
-    assert isinstance(build_engine(Settings(_env_file=None)), OpenAIWhisperEngine)
-
-
-def test_build_engine_falls_back_to_faster_whisper_without_torch(monkeypatch):
-    """配布物にtorchは無い。公式Whisperへ落とすとImportErrorで必ず失敗する。
-
-    faster-whisperのGPU版はCUDA専用なのでROCmではCPUになるが、
-    「遅い」と「動かない」なら遅いほうがよい。
-    """
-    from backend.engines.asr import registry
-
-    monkeypatch.setattr(registry, "detect_accel", lambda: "rocm")
-    monkeypatch.setattr(registry, "whispercpp_available", lambda: False)
-    monkeypatch.setattr(registry, "openai_whisper_available", lambda: False)
-    assert isinstance(build_engine(Settings(_env_file=None)), FasterWhisperEngine)
-
-
-# ---- CUDAランタイム欠落時のフォールバック ----
-# nvidia-smiが通る(ドライバはある)のにCUDAランタイムが無い機体があり、
-# faster-whisperのモデル読み込みが「Library libcublas.so.12 is not found」で
-# 必ず落ちる(配布版Ubuntuで実例)。クラッシュではなくGPUなしの規則で動かす。
-
-
-@pytest.fixture
-def cuda_without_runtime(monkeypatch):
-    from backend.core import device
-    from backend.engines.asr import registry
-
-    monkeypatch.setattr(registry, "detect_accel", lambda: "cuda")
-    monkeypatch.setattr(registry, "missing_cuda_libs", lambda: ["libcublas.so.12"])
-    # GPU自体は積んでいる(nvidia-smiで名前が取れる)機体を想定
-    monkeypatch.setattr(
-        device, "probe_gpu",
-        lambda: {"accel": "cuda", "name": "NVIDIA GeForce RTX 4070",
-                 "vram_total_mb": 12282, "vram_free_mb": 11000},
-    )
-
-
-def test_CUDAランタイムが無ければwhispercppに落ちる(monkeypatch, cuda_without_runtime):
-    """VulkanビルドのwhisperがあればGPUのまま動かせる"""
-    from backend.engines.asr import registry
-    from backend.engines.asr.whispercpp import WhisperCppEngine
-
-    monkeypatch.setattr(registry, "whispercpp_available", lambda: True)
-    assert isinstance(build_engine(Settings(_env_file=None)), WhisperCppEngine)
-
-
-def test_CUDAランタイムもwhispercppも無ければCPUで動かす(monkeypatch, cuda_without_runtime):
-    """「遅い」と「動かない」なら遅いほうがよい"""
-    from backend.engines.asr import registry
-
-    monkeypatch.setattr(registry, "whispercpp_available", lambda: False)
+def test_CPU機はfaster_whisperのCPU_int8():
+    hwprofile.set_current(CPU)
     engine = build_engine(Settings(_env_file=None))
     assert isinstance(engine, FasterWhisperEngine)
     assert engine.device == "cpu"
     assert engine.compute_type == "int8"
 
 
-def test_CUDAランタイム欠落時は明示指定のfaster_whisperもCPUにする(monkeypatch, cuda_without_runtime):
-    """auto以外を選んでいても、無いライブラリでのGPU実行は必ず失敗するので避ける"""
-    s = Settings(_env_file=None)
-    s.asr_engine = "faster_whisper"
-    engine = build_engine(s)
+def test_検証失敗のGPU機はcpu構成():
+    """プロファイル確定時にcpu行へ落ちている(実行時フォールバックではない)"""
+    hwprofile.set_current(
+        HwProfile(os="windows", gpu="radeon", whispercpp_ok=False, detected_at="t")
+    )
+    engine = build_engine(Settings(_env_file=None))
+    assert isinstance(engine, FasterWhisperEngine)
     assert engine.device == "cpu"
 
 
-def test_transformersエンジンはもう選べない():
-    """M41で削除した。単語確率とinitial_promptが取れず、torch依存で
-    配布物にも入らないため、選択肢として残す理由が無くなった"""
-    from backend.engines.asr.registry import ENGINES
-
-    assert "transformers" not in ENGINES
+def test_モデルサイズ等の設定は従来どおり効く():
+    hwprofile.set_current(CPU)
     s = Settings(_env_file=None)
-    s.asr_engine = "transformers"
-    with pytest.raises(ValueError, match="未知のASRエンジン"):
-        build_engine(s)
+    s.asr_model = "large-v3-turbo"
+    s.asr_beam_size = 3
+    engine = build_engine(s)
+    assert engine.model_size == "large-v3-turbo"
+    assert engine.beam_size == 3
+
+
+# ---- 破損時はフォールバックせずエラーで案内する(ユーザー決定) ----
+def test_whispercppのバイナリが無ければ案内付きエラー(monkeypatch):
+    from backend.engines.asr import whispercpp
+
+    hwprofile.set_current(GPU)
+    monkeypatch.setattr(whispercpp, "resolve_binary", lambda: None)
+    with pytest.raises(RuntimeError, match="再検出"):
+        build_engine(Settings(_env_file=None))
+
+
+def test_whispercppのモデルが無ければ案内付きエラー(monkeypatch, tmp_path):
+    from backend.engines.asr import whispercpp
+
+    hwprofile.set_current(GPU)
+    binary = tmp_path / "whisper-cli"
+    binary.write_bytes(b"")
+    monkeypatch.setattr(whispercpp, "resolve_binary", lambda: binary)
+    monkeypatch.setattr(whispercpp, "resolve_model", lambda: tmp_path / "no.bin")
+    with pytest.raises(RuntimeError, match="セットアップ"):
+        build_engine(Settings(_env_file=None))
+
+
+# ---- KS_ASR_ENGINE(上級者向けの唯一の上書き手段) ----
+def test_環境変数でwhispercppを強制できる(whispercpp_ready):
+    hwprofile.set_current(CPU)
+    s = Settings(_env_file=None)
+    s.asr_engine = "whispercpp"
+    assert isinstance(build_engine(s), WhisperCppEngine)
+
+
+def test_環境変数でfaster_whisperを強制するとCPU実行(whispercpp_ready):
+    """CUDA経路は廃止した。faster-whisperは常にCPU int8"""
+    hwprofile.set_current(GPU)
+    s = Settings(_env_file=None)
+    s.asr_engine = "faster_whisper"
+    engine = build_engine(s)
+    assert isinstance(engine, FasterWhisperEngine)
+    assert engine.device == "cpu"
+    assert engine.compute_type == "int8"
+
+
+# ---- バリデーション ----
+def test_削除済みエンジンは選べない():
+    """auto・openai_whisper・transformersはもう存在しない"""
+    for engine_id in ("auto", "openai_whisper", "transformers", "whisperx"):
+        s = Settings(_env_file=None)
+        s.asr_engine = engine_id
+        with pytest.raises(ValueError, match="未知のASRエンジン"):
+            build_engine(s)
 
 
 def test_build_engine_rejects_unknown_model():
@@ -170,26 +147,21 @@ def test_build_engine_rejects_unknown_model():
         build_engine(s)
 
 
-def test_build_engine_rejects_unknown_engine():
-    s = Settings(_env_file=None)
-    s.asr_engine = "whisperx"
-    with pytest.raises(ValueError, match="未知のASRエンジン"):
-        build_engine(s)
-
-
-def test_settings_api_lists_engines(client):
-    body = client.get("/api/settings").json()
-    assert {e["id"] for e in body["asr_engines"]} == set(ENGINES)
-    assert body["values"]["asr_engine"] == "auto"
-
-
-def test_engine_unload_is_safe_without_load(monkeypatch):
-    from backend.engines.asr import registry
-
-    monkeypatch.setattr(registry, "detect_accel", lambda: "cuda")
+def test_engine_unload_is_safe_without_load():
     engine = build_engine(Settings(_env_file=None))
     engine.unload()  # ロード前でも例外にならない
     assert engine._model is None
+
+
+# ---- 設定API(エンジン選択の撤去) ----
+def test_settings_api_にasr_enginesはもう無い(client):
+    body = client.get("/api/settings").json()
+    assert "asr_engines" not in body
+    assert "asr_engine" not in body["values"]
+
+
+def test_settings_api_はasr_engineの変更を受け付けない(client):
+    assert client.patch("/api/settings", json={"asr_engine": "whispercpp"}).status_code == 422
 
 
 def test_settings_api_returns_models_with_notes(client):

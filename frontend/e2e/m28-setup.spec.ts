@@ -1,6 +1,6 @@
 /** M28: セットアップパネル(足りていないモデルの案内と取得) */
 import { expect, test } from '@playwright/test'
-import { seedTranscribed } from './helpers'
+import { API, seedTranscribed } from './helpers'
 
 test('セットアップ: 足りないものが案内される', async ({ page, request }) => {
   const mediaId = await seedTranscribed(request)
@@ -45,4 +45,20 @@ test('セットアップ: 3.1GBはGB表記で出す', async ({ page, request }) 
   await page.getByTestId('tab-settings').click()
   // 「3100MB」では大きさが伝わらない
   await expect(page.getByTestId('setup-item-whispercpp')).toContainText('3.0GB')
+})
+
+test('セットアップ: GPU機ではwhisper.cppモデルが必須と分かる', async ({ page, request }) => {
+  const mediaId = await seedTranscribed(request)
+  // 実機のGPU有無に依らないよう、プロファイルをGPU機に差し替える
+  // (resetがDBの設定を消すので、シードの後で行う)
+  await request.post(`${API}/api/e2e/profile?gpu=radeon`)
+  await page.goto(`/#/media/${mediaId}`)
+  await page.getByTestId('tab-settings').click()
+
+  const item = page.getByTestId('setup-item-whispercpp')
+  await expect(item).toContainText('必須')
+  await expect(page.getByTestId('setup-panel')).toContainText('必須')
+
+  // 実行環境パネルにもGPU機の構成が出る
+  await expect(page.getByTestId('env-resolved')).toContainText('whisper.cpp')
 })

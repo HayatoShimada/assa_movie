@@ -8,7 +8,6 @@ import sqlite3
 from pathlib import Path
 from typing import Callable
 
-from backend.core.device import apply_rocm_workarounds, apply_vram_budget
 from backend.core.project_settings import resolve_settings
 from backend.engines.asr.registry import build_engine
 from backend.engines.diarize import labels as diarize_labels
@@ -39,9 +38,6 @@ def run_transcribe(
 
     s = resolve_settings(conn, media_id=media_id)
     language = params.get("language", s.asr_language)
-    # torchを使うのはこのジョブ(話者分離とASR)だけなので、ここで一度設定する
-    apply_rocm_workarounds()
-    apply_vram_budget(s.vram_budget_mb)
     # 長尺のデコードや初回のモデルDL中に0%のまま見えないよう、開始を即時通知する
     progress(0.01, "音声を読み込み中")
     audio = audio_io.decode(Path(row["path"]))

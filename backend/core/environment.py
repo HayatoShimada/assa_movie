@@ -1,12 +1,15 @@
-"""起動時の環境スキャンと、VRAMに応じたASR/LLMモデルの推奨。
+"""環境情報のスキャンと、VRAMに応じたモデル推奨。
 
+実行環境(OS×GPUクラス)は初回起動で確定したハードウェアプロファイル
+(backend/core/hwprofile.py)が持つ。ここではプロファイルの表示用整形と、
+その構成でのASRモデル・LLMモデルの推奨だけを行う。
 スキャン結果は GET /api/environment で返り、設定タブの環境パネルに表示される。
-推奨ロジックは純関数(recommend)としてテーブル駆動テストする。
 """
 
 from urllib.parse import urlparse
 
-from backend.core.device import missing_cuda_libs, probe_gpu
+from backend.core import hwprofile
+from backend.core.hwprofile import EngineSpec, HwProfile
 
 # OllamaのVRAM目安 = モデルファイルサイズ × オーバーヘッド係数(KVキャッシュ等)
 OLLAMA_VRAM_FACTOR = 1.15
@@ -34,61 +37,66 @@ def scan_ollama(ollama_url: str) -> dict:
         return {"reachable": False, "models": []}
 
 
+def profile_warnings(profile: HwProfile, spec: EngineSpec) -> list[str]:
+    """検出結果の注意点(環境パネル・ウィザードに琥珀色で表示する)を組み立てる(純関数)"""
+    warnings = []
+    if profile.gpu != "cpu" and not profile.whispercpp_ok:
+        warnings.append(
+            "GPUを検出しましたが、whisper.cppを起動できないためCPUで実行します。"
+            "アプリを入れ直すか「再検出」を試してください。"
+        )
+    return warnings
+
+
 def scan_environment(settings) -> dict:
-    """GPU・エンコーダ・ffmpeg・Ollamaをスキャンする(設定タブの環境パネル用)"""
+    """環境パネル用の情報一式(プロファイル・確定構成・エンコーダ・Ollama)"""
     from backend.pipeline.export import detect_encoder
 
-    probe = probe_gpu()  # torch初期化は子プロセスで行う(APIを止めないため)
+    profile = hwprofile.current()
+    spec = hwprofile.resolve_spec(profile)
     encoder = detect_encoder()
-    gpu = (
-        {k: probe[k] for k in ("name", "vram_total_mb", "vram_free_mb")}
-        if probe.get("name")
-        else {}
-    )
-    accel = probe.get("accel", "cpu")
-    # ドライバはある(nvidia-smiが通る)がCUDAランタイムが無い機体では、実行時の
-    # エンジン選択(asr/registry.py)がGPUを諦める。推奨表示も同じ規則に揃える
-    cuda_missing = missing_cuda_libs() if accel == "cuda" else []
-    if cuda_missing:
-        accel = "cpu"
     return {
-        "accel": accel,
-        "cuda_libs_missing": cuda_missing,
-        "gpu": gpu,
-        # 積んでいることと、計算に使えることは別。AMDのWindows機はGPUが見えても
-        # ROCmが無く、CTranslate2もCUDA専用なので文字起こしはCPUで動く。
-        # VRAMを前提にしたモデル推奨をここで止める
-        "gpu_compute": accel != "cpu",
+        "profile": profile.to_dict(),
+        "resolved": {
+            "engine": spec.engine,
+            "device": spec.device,
+            "compute_type": spec.compute_type,
+            "label": spec.label,
+            "needs_whispercpp_model": spec.needs_whispercpp_model,
+        },
+        "warnings": profile_warnings(profile, spec),
+        "gpu": (
+            {"name": profile.gpu_name, "vram_total_mb": profile.vram_total_mb}
+            if profile.gpu_name
+            else {}
+        ),
         "ffmpeg": encoder is not None,
         "encoder": encoder,
         "ollama": scan_ollama(settings.ollama_url),
     }
 
 
-def recommend(
-    vram_mb: int, accel: str, ollama_models: list[dict], has_gpu: bool = False
-) -> dict:
-    """割当VRAMに収まる範囲で最も性能の良いASRエンジン・モデル・LLMを選ぶ(純関数)。
+def recommend(vram_mb: int, engine: str, ollama_models: list[dict]) -> dict:
+    """VRAMに収まる範囲で最良のASRモデルとLLMを選ぶ(純関数)。
 
+    エンジンの選択はプロファイルで確定済みなので、ここではモデルだけを決める。
     ASRとLLMは直列実行(ASRはunloadしてからLLM)なので、それぞれ個別に判定する。
     """
-    from backend.engines.asr.registry import MODELS, resolve_engine
+    from backend.engines.asr.registry import MODELS
 
-    engine = resolve_engine("auto", accel, has_gpu=has_gpu)  # 実行時と同じ選択規則
-
-    if accel == "cpu":
-        # CPUはVRAM制約なし。実用速度を優先して速い方(rtfが大きい)を推奨
+    if engine == "faster_whisper":
+        # CPU実行はVRAM制約なし。実用速度を優先して速い方(rtfが大きい)を推奨
         asr_model = max(MODELS.values(), key=lambda m: m.rtf).id
     else:
         # 精度優先(rtfが小さい=低速だが高精度)で、収まる最大モデルを選ぶ。
         # 何も収まらなければ最も軽いものを提示する
         ordered = sorted(MODELS.values(), key=lambda m: m.rtf)
         asr_model = next(
-            (m.id for m in ordered if m.vram_mb(engine) <= vram_mb), ordered[-1].id
+            (m.id for m in ordered if m.vram_mb <= vram_mb), ordered[-1].id
         )
 
     # LLM: インストール済みOllamaモデルのうち収まる最大(=最も高性能とみなす)
     fitting = [m for m in ollama_models if 0 < m["vram_mb"] <= vram_mb]
     ollama_model = max(fitting, key=lambda m: m["vram_mb"])["name"] if fitting else None
 
-    return {"asr_engine": engine, "asr_model": asr_model, "ollama_model": ollama_model}
+    return {"asr_model": asr_model, "ollama_model": ollama_model}

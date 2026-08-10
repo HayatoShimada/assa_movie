@@ -1,7 +1,9 @@
-"""faster-whisperエンジン(既定)。
+"""faster-whisperエンジン(CPU機用)。
 
-既定モデルは large-v3。精度優先・単語タイムスタンプ必須の要件による
-(2026-08-07の実測比較はBACKEND_DESIGN.md「検証済み」表を参照)。
+プロファイル固定方式(DESIGN.md 2026-08-10)では、GPU機はwhisper.cppを使い、
+このエンジンはCPU機(GPU無し・検証失敗機)専用のint8実行になった。
+モデルDL不要で必ず動く終端としての役割を持つ。
+既定モデルは large-v3(2026-08-07の実測比較はBACKEND_DESIGN.md「検証済み」表)。
 """
 
 import numpy as np
@@ -15,10 +17,8 @@ class FasterWhisperEngine:
     def __init__(
         self,
         model_size: str = "large-v3",
-        device: str = "cuda",
-        # ★ Blackwell(RTX 50/RTX PRO 6000)ではint8がCUBLAS_STATUS_NOT_SUPPORTEDで
-        #   クラッシュする既知の不具合があるため、必ず float16 を使用する
-        compute_type: str = "float16",
+        device: str = "cpu",
+        compute_type: str = "int8",  # CPUのint8は安全(クラッシュ実績はGPU限定)
         beam_size: int = 5,
         vad_filter: bool = True,
     ):
@@ -83,9 +83,3 @@ class FasterWhisperEngine:
         if self._model is not None:
             del self._model
             self._model = None
-            try:
-                import torch
-
-                torch.cuda.empty_cache()
-            except Exception:
-                pass

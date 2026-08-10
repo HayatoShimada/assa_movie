@@ -1,4 +1,4 @@
-"""M28: torchを入れなくてもGPUを検出できること。
+"""M28: torchを入れなくてもGPUを検出できること(ベンダーCLI+OS問い合わせ)。
 
 配布物からtorchを外すと、torch頼みの検出では ROCm/CUDA機でも "cpu" と判定され、
 whisper.cppではなく遅いエンジンが黙って選ばれてしまう。
@@ -90,49 +90,37 @@ def test_macOSはsystem_profilerを見る(monkeypatch):
     monkeypatch.setattr(device, "probe_gpu_mac", lambda: {"accel": "metal"})
     assert device.probe_gpu_cli(os_name="Darwin")["accel"] == "metal"
 
-
-def test_probe_gpuはCLIで足りればtorchを起動しない(monkeypatch):
-    """torchの初期化は実測5秒。表示用の情報のためにそれを払わない"""
+def test_probe_gpuはCLIで足りればOSに聞かない(monkeypatch):
+    """レジストリ読みはCLIで分かる機体では無駄"""
     device.probe_gpu.cache_clear()
     called = []
     monkeypatch.setattr(device, "probe_gpu_cli", lambda: {"accel": "rocm", "name": "x",
                                                           "vram_total_mb": 100, "vram_free_mb": 50})
-    monkeypatch.setattr(device, "_probe_gpu_torch", lambda: called.append(1) or {})
+    monkeypatch.setattr(device, "probe_gpu_windows", lambda: called.append(1) or {})
     assert device.probe_gpu()["accel"] == "rocm"
     assert called == []
     device.probe_gpu.cache_clear()
 
 
-def test_CLIが無い環境ではtorchに聞く(monkeypatch):
+def test_CLIが無い環境ではOSに聞く(monkeypatch):
+    """AMDのWindows機はnvidia-smiもrocm-smiも無い。レジストリなら搭載を拾える"""
     device.probe_gpu.cache_clear()
     monkeypatch.setattr(device, "probe_gpu_cli", lambda: {})
     monkeypatch.setattr(
-        device, "_probe_gpu_torch",
-        lambda: {"accel": "cuda", "name": "T", "vram_total_mb": 1, "vram_free_mb": 1},
+        device, "probe_gpu_windows",
+        lambda: {"accel": "cpu", "name": "AMD Radeon RX 7900 XTX",
+                 "vram_total_mb": 24560, "vram_free_mb": 0},
     )
-    assert device.probe_gpu()["accel"] == "cuda"
+    assert device.probe_gpu()["name"] == "AMD Radeon RX 7900 XTX"
     device.probe_gpu.cache_clear()
 
 
 def test_どこからも取れなければcpu(monkeypatch):
     device.probe_gpu.cache_clear()
     monkeypatch.setattr(device, "probe_gpu_cli", lambda: {})
-    monkeypatch.setattr(device, "_probe_gpu_torch", lambda: {})
     # OSへの問い合わせも塞ぐ(実機のWindowsで動かすとGPUが見つかってしまう)
     monkeypatch.setattr(device, "probe_gpu_windows", lambda: {})
     assert device.probe_gpu() == {
         "accel": "cpu", "name": "", "vram_total_mb": 0, "vram_free_mb": 0
     }
-    device.probe_gpu.cache_clear()
-
-
-# ---- エンジン選択への影響 ----
-def test_torch無しでもROCmと判定できる(monkeypatch):
-    """ここが"cpu"になると、whisper.cppがあっても選ばれなくなる"""
-    monkeypatch.setattr(device, "_torch", lambda m=None: None)
-    monkeypatch.setattr(device, "probe_gpu_cli", lambda: {"accel": "rocm", "name": "AMD",
-                                                          "vram_total_mb": 24560,
-                                                          "vram_free_mb": 20000})
-    device.probe_gpu.cache_clear()
-    assert device.detect_accel() == "rocm"
     device.probe_gpu.cache_clear()

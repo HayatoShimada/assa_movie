@@ -255,11 +255,31 @@ export interface paths {
         };
         /**
          * Get Environment
-         * @description 環境スキャン結果と、割当VRAMに収まるASR/LLMの推奨を返す(設定タブの環境パネル用)
+         * @description 確定済みプロファイルと、VRAMに収まるASR/LLMモデルの推奨(設定タブの環境パネル用)
          */
         get: operations["get_environment_api_environment_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/environment/redetect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Redetect Environment
+         * @description 実行環境の再検出(GPU増設・ドライバ導入後の唯一の追従手段)
+         */
+        post: operations["redetect_environment_api_environment_redetect_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1123,8 +1143,6 @@ export interface components {
             aizuchi_max_duration?: number | null;
             /** Asr Beam Size */
             asr_beam_size?: number | null;
-            /** Asr Engine */
-            asr_engine?: string | null;
             /** Asr Language */
             asr_language?: string | null;
             /** Asr Model */
@@ -1137,8 +1155,6 @@ export interface components {
             convert_method?: string | null;
             /** Diarization Enabled */
             diarization_enabled?: boolean | null;
-            /** Diarization Engine */
-            diarization_engine?: string | null;
             /** Female Name */
             female_name?: string | null;
             /** Filler Level */
@@ -1183,8 +1199,6 @@ export interface components {
             subtitle_speaker_colors?: boolean | null;
             /** Subtitle Text Color */
             subtitle_text_color?: string | null;
-            /** Vram Budget Mb */
-            vram_budget_mb?: number | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -1793,6 +1807,28 @@ export interface operations {
         };
     };
     get_environment_api_environment_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    redetect_environment_api_environment_redetect_post: {
         parameters: {
             query?: never;
             header?: never;

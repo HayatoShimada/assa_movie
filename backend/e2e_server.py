@@ -184,6 +184,11 @@ def reset(request: Request) -> dict:
     db.execute("DELETE FROM app_settings")
     db.commit()
     apply_e2e_defaults()
+    # 実行環境プロファイルもcpu既定に戻す(specが差し替えたものを持ち越さない)
+    from backend.core import hwprofile
+
+    hwprofile.set_current(None)
+    hwprofile.ensure_profile(db)
     return {"status": "reset"}
 
 
@@ -210,6 +215,25 @@ def seed(request: Request, output_orientation: str = "landscape") -> dict:
     return {"project_id": project_id, "media_id": cur.lastrowid}
 
 
+@router.post("/profile")
+def set_profile(request: Request, gpu: str = "cpu") -> dict:
+    """実行環境プロファイルを差し替える(GPU機の挙動を見るspec用)。
+
+    実機のGPUに依存させないため、E2Eの既定はcpu。必須モデルの案内や
+    構成が壊れているときのエラーはGPU機でしか出ないので、ここで作る。
+    """
+    from backend.core import hwprofile
+
+    profile = hwprofile.HwProfile(
+        os="linux", gpu=gpu, gpu_name="E2E GPU" if gpu != "cpu" else "",
+        vram_total_mb=24000 if gpu != "cpu" else 0,
+        whispercpp_ok=gpu != "cpu", detected_at="2026-08-10T00:00:00",
+    )
+    hwprofile.save_profile(request.app.state.db, profile)
+    hwprofile.set_current(profile)
+    return profile.to_dict()
+
+
 @router.post("/license-key")
 def issue_license_key() -> dict:
     """テスト用の正規キーを1本発行する。
@@ -231,6 +255,14 @@ def build_app():
     tmp.unlink(missing_ok=True)
     settings.db_path = tmp
     apply_e2e_defaults()
+
+    # 実行環境プロファイルは実機に依存させない(GPUの有無でE2Eの結果が変わらないように)。
+    # cpuプロファイルなら警告も必須モデルも出ず、確定構成はfaster-whisper(CPU)になる
+    from backend.core import hwprofile
+
+    hwprofile.detect = lambda now, runner=None, os_name=None: hwprofile.HwProfile(
+        os="linux", gpu="cpu", detected_at=now
+    )
 
     from backend.api import license_api
     from backend.app import app

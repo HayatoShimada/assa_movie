@@ -41,9 +41,10 @@ export function SettingsForm() {
 
   return (
     <div className="p-4">
-      <LicensePanel />
-      <SetupPanel />
+      {/* 上から「この端末の状態」→「全体設定」の順。まず動く状態かを示す */}
       <EnvironmentPanel />
+      <SetupPanel />
+      <LicensePanel />
       <ApiKeysPanel />
       <p className="mb-2 text-xs text-neutral-500">
         全体設定。新規プロジェクトの既定値になります(プロジェクト単位で上書き可能)。

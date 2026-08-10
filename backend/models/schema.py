@@ -195,33 +195,25 @@ def init_db(db_path: Path) -> sqlite3.Connection:
         cols = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})")}
         if column not in cols:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {coltype}")
-    _release_pinned_asr_engine(conn)
+    _drop_removed_settings(conn)
     conn.commit()
     return conn
 
 
-# 一度だけ行う移行の記録に使うキー(app_settingsに置く)
-_ASR_ENGINE_MIGRATION = "_migrated_asr_engine_auto"
+# 廃止した設定キー。プロファイル固定方式(DESIGN.md 2026-08-10)への移行で
+# 意味を失った。MUTABLE_FIELDS からも外れているので二度と書き込まれないが、
+# 旧DBの残骸が読み込まれないよう毎起動で冪等に消す
+# (v0.9.5の「エンジン名の固定保存」事故の残骸掃除も兼ねる)
+_REMOVED_SETTING_KEYS = (
+    "asr_engine",
+    "asr_compute_type",
+    "diarization_engine",
+    "_migrated_asr_engine_auto",  # 旧移行の記録キー(役割を終えた)
+)
 
 
-def _release_pinned_asr_engine(conn: sqlite3.Connection) -> None:
-    """初回セットアップが固定した asr_engine を外し、autoに戻す(一度だけ)。
-
-    v0.9.5のウィザードは「推奨設定を適用」で asr_engine を具体名で保存していた。
-    その後 whisper.cpp を同梱してもエンジンの選択がその値に固定されたままになり、
-    GPUがあっても遅いエンジンが使われ続ける(実機で確認)。
-    利用者が選んだ値ではなくこちらが書いた値なので、一度だけ解除する。
-
-    以降に利用者が明示的に選んだ値は残る(記録キーがあるので再実行しない)。
-    """
-    done = conn.execute(
-        "SELECT 1 FROM app_settings WHERE key=?", (_ASR_ENGINE_MIGRATION,)
-    ).fetchone()
-    if done:
-        return
-    conn.execute("DELETE FROM app_settings WHERE key='asr_engine'")
+def _drop_removed_settings(conn: sqlite3.Connection) -> None:
+    placeholders = ",".join("?" * len(_REMOVED_SETTING_KEYS))
     conn.execute(
-        "INSERT INTO app_settings (key, value_json) VALUES (?, 'true')"
-        " ON CONFLICT(key) DO NOTHING",
-        (_ASR_ENGINE_MIGRATION,),
+        f"DELETE FROM app_settings WHERE key IN ({placeholders})", _REMOVED_SETTING_KEYS
     )

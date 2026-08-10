@@ -171,6 +171,20 @@ else
     env_json="$(curl -s --max-time 60 "$BASE/api/environment")"
     info "環境: $(echo "$env_json" | head -c 400)"
 
+    # 初回起動で実行環境プロファイルが確定していること。
+    # ここが空だと、以後どのエンジンで動くかが決まらない
+    case "$env_json" in
+      *'"detected_at":"'*) ok "実行環境プロファイルが保存されている" ;;
+      *) ng "実行環境プロファイルが確定していない" ;;
+    esac
+    # GPUを検出した機体では、同梱のwhisper.cppが構成に選ばれること
+    # (選ばれないなら同梱した意味がない。ggmlモデル未取得でも構成は決まる)
+    case "$env_json" in
+      *'"gpu":"cpu"'*) info "GPUを検出していないのでCPU実行(faster-whisper)" ;;
+      *'"engine":"whispercpp"'*) ok "GPU機でwhisper.cppが選ばれている" ;;
+      *) ng "GPU機なのにwhisper.cppが選ばれていない(同梱物を起動できていない)" ;;
+    esac
+
     # **ffmpegはLinux/macOSには同梱していない**(.debは依存宣言、macOSはbrew)。
     # 検証機に入っているかどうかは配布物の問題ではないので、NGにはしない。
     # ここで見たいのは「同梱していないものを同梱物として探していないか」だけ

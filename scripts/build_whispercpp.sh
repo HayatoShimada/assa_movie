@@ -26,16 +26,17 @@ case "$(uname -s)" in
     BACKEND_NAME="Metal"
     ;;
   *)
-    if command -v glslc > /dev/null; then
-      BACKEND_FLAGS="-DGGML_VULKAN=ON"
-      BACKEND_NAME="Vulkan"
-    else
-      # SDKが無い環境ではCPUで作る(遅いが動かないよりよい)
-      echo "⚠ Vulkanのビルドツールが無いのでCPUビルドにします。" >&2
+    if ! command -v glslc > /dev/null; then
+      # ここでCPUビルドに落とすと、GPU機に「GPUで動く」と言いながら
+      # CPUのバイナリを配ることになる(実行環境の対応表がwhisper.cpp=GPUを前提に
+      # しているため)。黙って遅くなるより、ビルドを失敗させて気付かせる
+      echo "✗ Vulkanのビルドツール(glslc)がありません。" >&2
+      echo "  同梱するwhisper.cppはGPU実行が前提なので、CPUビルドは作りません。" >&2
       echo "  Linuxなら: sudo apt install libvulkan-dev glslc glslang-tools spirv-headers" >&2
-      BACKEND_FLAGS=""
-      BACKEND_NAME="CPU"
+      exit 1
     fi
+    BACKEND_FLAGS="-DGGML_VULKAN=ON"
+    BACKEND_NAME="Vulkan"
     ;;
 esac
 echo "=== whisper.cpp を $BACKEND_NAME でビルドします ==="
@@ -66,6 +67,24 @@ else
   echo "whisper-cli が見つかりません: $BUILD_DIR/bin" >&2
   exit 1
 fi
+
+# 目的のバックエンドが本当に入ったかを、できあがったバイナリのリンク先で確かめる。
+# 「GPU機なのにCPU速度」という配布物は実行するまで気付けないので、ここで止める
+case "$(uname -s)" in
+  Darwin)
+    if ! otool -L "$OUT" | grep -q Metal; then
+      echo "✗ Metalがリンクされていません: $OUT" >&2
+      exit 1
+    fi
+    ;;
+  Linux)
+    if ! ldd "$OUT" | grep -qi vulkan; then
+      echo "✗ Vulkanがリンクされていません: $OUT" >&2
+      exit 1
+    fi
+    ;;
+esac
+echo "確認: $BACKEND_NAME バックエンドがリンクされています"
 
 # MITなので著作権表示とライセンス文を添えれば足りる。
 # これを忘れると再配布の条件を満たさない(.ps1 にしか無く、

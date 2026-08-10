@@ -51,7 +51,7 @@ UIで実行・操作できる、自動切り抜き動画作成アプリ。
 │   ・動画プレビュー: HTML5 <video> + CSSオーバーレイ字幕
 │   ・進捗表示: SSEでバックエンドから受信
 ├─ バックエンド: Python + FastAPI(配布時はPyInstallerで1ファイル)
-│   ・文字起こし: whisper.cpp / faster-whisper(GPUで自動選択)
+│   ・文字起こし: whisper.cpp(GPU機)/ faster-whisper(CPU機)
 │   ・話者分離: sherpa-onnx(ONNX。torch不要・トークン不要)
 │   ・指示語置換: ローカルLLM(Ollama)/ クラウドAPIを切替可能
 │   ・書き出し: ffmpeg(Windowsは同梱、他OSはシステムのもの)
@@ -71,18 +71,50 @@ Tauriを選んだのはElectronよりバイナリが小さく、Rust側で子プ
 
 MVPをGradioで先行実装する案もあったが、結局Reactに作り直すことになるので採らなかった。
 
-### 2026-08-07 ASRエンジンをGPUで自動選択する
+### 2026-08-07 ASRエンジンをGPUで自動選択する(→ 2026-08-10の決定で置き換え)
 
-faster-whisper(CTranslate2)はCUDA専用ビルドなので、AMD環境では初期化に失敗する。
-かといってエンジンを利用者に選ばせると、選択を誤ったまま「遅い」「動かない」になる。
-`asr_engine=auto` で環境から決める:
+エンジンを利用者に選ばせると、選択を誤ったまま「遅い」「動かない」になる。
+そのため `asr_engine=auto` で実行時に環境から決めていた。この方針自体は残すが、
+「実行のたびに判定する」のをやめた(下記2026-08-10)。
 
-| 環境 | 選ぶもの | 理由 |
-|---|---|---|
-| CUDA | faster-whisper (float16) | CUDA版CTranslate2が最速 |
-| ROCm | whisper.cpp | CTranslate2が使えない |
-| GPUあり・CUDA/ROCmでない | whisper.cpp (Vulkan) | AMDのWindows機が該当。実測でCPUの11倍 |
-| GPUなし | faster-whisper (int8) | CPUでint8は安全(int8クラッシュはBlackwell GPU限定) |
+### 2026-08-10 実行環境は初回に1回検出して固定する
+
+実行時の多段フォールバック(accel検出 → CUDAライブラリ検査 → whisper.cppの有無 →
+torchの有無…)は、条件が増えるほど「設定と実際の挙動が噛み合わない」状態を生んだ。
+実際にNVIDIAドライバだけの機体で `libcublas.so.12` が見つからず文字起こしが失敗し、
+その対策を足すたびに分岐が増えていた。
+
+**初回起動時にOS×GPUクラスを1回だけ検出して固定する。**
+
+| 保存するもの | 例 |
+|---|---|
+| os | linux / windows / mac |
+| gpu | nvidia / radeon / apple / cpu |
+| gpu_name・vram_total_mb | 表示用 |
+| whispercpp_ok | 同梱whisper-cliを実際に起動できたか |
+
+保存先は `app_settings` の `hw_profile`(JSON)1件だけ。**エンジン名は保存しない。**
+「プロファイル → 実行構成」の対応表はコード(`backend/core/hwprofile.py`)が持つ:
+
+| os | gpu | 構成 | 追加で要るもの |
+|---|---|---|---|
+| linux / windows | nvidia / radeon | whisper.cpp (Vulkan) | ggmlモデル3.1GB |
+| mac | apple | whisper.cpp (Metal) | ggmlモデル3.1GB |
+| 全OS | cpu(または検証失敗) | faster-whisper (CPU int8) | なし |
+
+**GPU機はベンダーを問わずwhisper.cppに統一した。** faster-whisperのCUDA実行は
+最速だがCUDAランタイムの導入状況に左右され、そこが事故の発生源だった。Vulkan/Metalは
+GPUドライバだけで動き、1つのビルドでAMD/NVIDIA/Intelを賄える(HIP比-13%)。
+
+対応表をコードに置くのは、v0.9.5でエンジン名をDBに保存した結果、
+whisper.cppを同梱してもGPUが使われないままになった事故の再発防止でもある。
+アプリを更新すれば対応表も一緒に更新され、保存済みプロファイルは自動で追従する。
+
+**構成が壊れていたらフォールバックせずエラーで止める。** 従来は「クラッシュより
+遅い成功」を選んでいたが、GPU機がCPUに落ちると数十分待たされたうえに原因が分からない。
+モデルが無い・バイナリが起動しない場合は、直し方(再検出/セットアップ)を添えて失敗させる。
+
+環境が変わったときの追従は設定タブの「再検出」だけが行う(`POST /api/environment/redetect`)。
 
 モデルは large-v3 が既定(精度優先・単語タイムスタンプ必須)。
 
@@ -104,6 +136,12 @@ torchだけで11.5GB、入れなければ644MB。`[project.dependencies]` はtor
 
 **2026-08-09に、torchを使う2エンジン(transformers版Whisper / pyannote)を削除した。**
 配布版では一度も動かず「選べるのに選ぶと落ちる」選択肢になっていたため。
+
+**2026-08-10に、開発環境からもtorchを外した。** 残っていた公式Whisper
+(ROCm開発機向けの保険)を削除し、依存グループごと廃止。ASRはwhisper.cppと
+faster-whisper、話者分離はsherpa-onnx、ピッチ推定は自前numpy実装で、どれもtorchを
+使わない。開発環境が14GB→0.67GBになり、**開発機と配布物の構成が完全に一致した**
+(「開発機では再現しない」型の不具合が構造的に減る)。
 
 ### 2026-08-09 ffmpegはWindowsだけ同梱する
 

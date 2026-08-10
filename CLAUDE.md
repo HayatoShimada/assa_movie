@@ -18,6 +18,8 @@ Tauri(Rust)+ React + Python/FastAPI で、3OS向けのインストーラを配�
                       # (tauri build 単体ではPythonサイドカーが再ビルドされない)
 ./dev.sh check        # コミット前の全チェック(pytest + typecheck + lint + vitest + build)
 ./dev.sh e2e          # E2E(FakeLLM・一時DBなのでGPUもOllamaも不要)
+./dev.sh whispercpp   # GPU機のASR本体(Vulkan/Metal)をビルド+ggmlモデル取得
+                      # 要 build-essential / libvulkan-dev / glslc
 
 # Windows
 ./scripts/build_ffmpeg.sh                         # 同梱ffmpegをビルド(MSYS2のmingw64シェル)
@@ -55,20 +57,26 @@ cd frontend && npm run gen:api    # バックエンドのAPIを変えたら必�
 
 ## 設計上の重要な決定(変えるときは相談)
 
-- **ASRエンジンはGPUで自動選択(`asr_engine=auto`)。** CUDA→faster-whisper /
-  ROCm→whisper.cpp(ビルド済みなら。無ければ公式Whisper)/ GPUなし→faster-whisper CPU。
-  CTranslate2はCUDA専用ビルドなのでROCmでは使えない。モデルは large-v3 が既定
-  (精度優先・単語タイムスタンプ必須。BACKEND_DESIGN.md)。
-  GPUはあるがCUDA/ROCmでない機体(AMDのWindows等)では同梱のwhisper.cpp(Vulkan)を選ぶ。
+- **実行環境は初回起動で1回検出して固定する(`backend/core/hwprofile.py`)。**
+  OS(linux/windows/mac)×GPU(nvidia/radeon/apple/cpu)だけをDBに保存し、
+  「プロファイル→実行構成」の対応表はコードが持つ(アプリ更新で自動追従する)。
+  GPU機はベンダーを問わず whisper.cpp(Vulkan / macOSはMetal)、CPU機は
+  faster-whisper(int8)。**実行時に環境を判定しない・フォールバックしない。**
+  構成が壊れていたら直し方を添えてエラーで止める。環境が変わったときの追従は
+  設定タブの「再検出」だけ。エンジン名を設定に保存してはいけない
+  (v0.9.5でそれをやり、whisper.cpp同梱後もGPUが使われないままになった)。
+  モデルは large-v3 が既定(精度優先・単語タイムスタンプ必須。BACKEND_DESIGN.md)。
 - **whisper.cppは `--output-json-full` で呼ぶ(`-ml` を付けない)。**
   句読点・トークンのタイムスタンプ・確率が一度に取れる。`-ml` を付けると
   句読点が落ちる(実測)。セグメント分割は `engines/asr/segmenting.py` で自前に行う。
-- **torchはdependency-groupsで切替。** 既定は rocm(RX 7900系)。NVIDIA機は
-  `KS_TORCH_GROUP=cu128 ./dev.sh sync`。依存バージョンは固定
-  (torch 2.8 / TypeScript 5.9)。上げない。
-  **ROCmのwheelはLinuxにしか無い**ので、グループにはプラットフォームマーカーを付ける
-  (付けないとWindows/macOSで `uv sync` 自体が失敗する)。
-- **Blackwell GPUでは compute_type="float16" 固定。** int8はクラッシュする(CPUのint8は安全)。
+- **torchは使わない(2026-08-10に完全に外した)。** ASRはwhisper.cppと
+  faster-whisper(CTranslate2)、話者分離はsherpa-onnx、ピッチ推定は自前numpy実装。
+  開発環境と配布物の構成が一致していること自体が仕様。torchを足すと
+  「開発機では再現しない」不具合が戻ってくるので、入れるときは相談。
+  依存バージョンは固定(TypeScript 5.9)。上げない。
+- **同梱するwhisper.cppは必ずGPUバックエンド(Vulkan/Metal)。**
+  ビルドスクリプトはglslcが無ければ失敗し、できたバイナリのリンク先も確認する。
+  CPUビルドが混ざると「GPU機なのに遅い」配布物になり、実行するまで気付けない。
 - **設定は3層(グローバル→プロジェクト→クリップ)。** ジョブ・APIは
   `resolve_settings()`(backend/core/project_settings.py)経由で読む。
   ジョブ層でグローバルsettingsを直接importしない(テストで担保)。

@@ -1,14 +1,14 @@
 # KirinukiStudio
 
 対談・イベント動画から **文字起こし → 話者分離 → 指示語の解決 → 字幕生成 → 切り抜き動画作成** までを、
-すべてローカルGPUで行うアプリケーションです。バージョン **0.9.8**。
+すべてローカルGPUで行うアプリケーションです。バージョン **0.11.1**。
 
 <https://github.com/HayatoShimada/assa_movie>
 
 ## 何ができるか
 
 - **文字起こし**: Whisper large-v3 による高精度な日本語文字起こし。単語タイムスタンプ・単語確率付き
-  (GPUに応じて faster-whisper / whisper.cpp / 公式Whisper を自動選択)
+  (GPU機は同梱の whisper.cpp、GPUが無い機体は faster-whisper。初回起動時に決まります)
 - **話者分離**: sherpa-onnx(ONNX)+ 声の高さによる話者名の自動割り当て(男女2人の対談に最適化。torchもHFトークンも要りません)
 - **相槌・フィラー処理**: 「うん」「なるほど」等の相槌除外、「あのー」「なんか」等の言い淀みを
   字幕からだけ除去(原文は常に保持)。曖昧なものはAIがユーザーに質問する
@@ -26,8 +26,9 @@
   マウス操作のトリム、ジェットカット(無音・相槌の中抜き)、タイトル・フック・ハッシュタグ生成
 - **書き出し**: ASS字幕焼き込み+ハードウェアエンコード(NVENC / VAAPI / Media Foundation を
   自動検出。使えない機体はソフトウェアエンコードに切り替え)
-- **環境スキャン**: 起動時にGPU・VRAM・エンコーダ・Ollamaを自動検出。設定タブの環境パネルで
-  VRAM割当を調整でき、割当に収まる最良のASRモデル・LLMをワンクリックで適用できる
+- **実行環境の自動設定**: 初回起動時にOSとGPUを1回だけ検出し、その機体で最速かつ確実に
+  動く構成に固定します(以後は毎回同じ動作)。設定タブの「実行環境」で確定内容を確認でき、
+  GPUを増設したときは「再検出」で更新できます。VRAMに収まる最良のモデルもワンクリックで適用可能
 - **初回セットアップ**: 初めて起動したときだけ、環境の確認 → 使うAIの選択とAPIキー登録
   (Gemini / Claude / Ollama)→ 話者分離モデルの取得、を順に案内。
   決めた内容はあとから設定タブで変更でき、設定タブから何度でもやり直せる
@@ -40,15 +41,14 @@ LLMはローカル(Ollama)とクラウド(Gemini API)を切り替え可能。ロ
 | 項目 | 要件 |
 |---|---|
 | OS | Ubuntu 24.04+ / macOS 11+ (Apple Silicon) / Windows 10+ |
-| GPU | NVIDIA GPU(CUDA 12.x)または AMD GPU(ROCm 6.4+。RX 7900系で検証)。VRAM 8GB以上推奨 |
+| GPU | NVIDIA / AMD / Intel(Vulkan対応)または Apple Silicon(Metal)。VRAM 8GB以上推奨。GPUが無くてもCPUで動きます(低速) |
 | Python | 3.12(uvが自動で管理) |
 | Node.js | 20以上(フロントエンド用) |
 | ffmpeg | 必須(動画のデコード・書き出し。`apt install ffmpeg`) |
 | [uv](https://docs.astral.sh/uv/) | Pythonパッケージ管理 |
 | [Ollama](https://ollama.com/)(任意) | ローカルLLM用。`qwen3:32b` 推奨(VRAM 24GB以上) |
 
-- **注意: Blackwell世代GPU(RTX 50シリーズ / RTX PRO 6000)** では int8 が
-  クラッシュするため float16 固定です(設定済み・変更不要)
+- GPUベンダー固有のランタイム(CUDA / ROCm)は要りません。GPUドライバがあれば動きます
 - Ollamaを使わない場合は Gemini API キーで代替できます(後述)
 
 ## インストール(使うだけの人向け)
@@ -148,21 +148,13 @@ echo "あなたのAPIキー" > gemini_api_key.txt
    - **クリップタブ**で「切り抜き候補を探す」→ 候補を選んでトリム・中抜き→「書き出し」
 4. 書き出された動画は動画と同じ場所の `exports/` に保存されます
 
-CLIだけでも使えます:
-
-```bash
-uv run python transcribe.py 動画.mov ja          # 文字起こし(.srt/.txt生成)
-uv run python resolve_pronouns.py 動画 --form annotate  # 指示語の注釈付け
-```
-
 ## ライブラリのバージョン制約(重要)
 
 以下の組み合わせは**互換性を実機検証して固定**しています。**個別にアップグレードしないでください**。
 
 | ライブラリ | 制約 | 理由 |
 |---|---|---|
-| torch / torchaudio | `==2.8.*` | 開発グループのみ(配布物には入れない)。2.8はBlackwell(sm_120)とgfx1100の両方に対応済み。**ROCm版はLinuxにしかwheelが無い**ためプラットフォームマーカー必須 |
-| faster-whisper | `>=1.1.0` | torch非依存(CTranslate2)。CUDA 12系で動作 |
+| faster-whisper | `>=1.1.0` | torch非依存(CTranslate2)。CPU実行(int8)に使う |
 | TypeScript | `~5.9` | 6系は openapi-typescript(API型自動生成)と非互換 |
 | ffmpeg | 6.x で検証 | select式フィルタに不具合があるため trim+concat 方式を採用済み(対応不要) |
 

@@ -28,9 +28,9 @@ class Settings(BaseSettings):
     # ---- ASR ----
     # 既定はlarge-v3(精度優先・単語タイムスタンプ必須の要件による。BACKEND_DESIGN.md参照)
     asr_model: str = "large-v3"
-    # auto: CUDA→faster-whisper / ROCm→whisper.cpp / CPU→faster-whisper(int8)
-    asr_engine: str = "auto"  # auto | faster_whisper | whispercpp
-    asr_compute_type: str = "float16"  # Blackwellではint8がクラッシュするため固定
+    # エンジンはハードウェアプロファイル(core/hwprofile.py)で決まり、UIでは選べない。
+    # 空=プロファイルに従う。KS_ASR_ENGINE 環境変数だけが上級者向けの上書き手段
+    asr_engine: str = ""  # "" | faster_whisper | whispercpp
     asr_language: str = "ja"
     asr_beam_size: int = 5
     asr_vad_filter: bool = True
@@ -38,9 +38,8 @@ class Settings(BaseSettings):
     asr_verbatim_style: bool = True
 
     # ---- 話者分離 ----
+    # エンジンはONNX(sherpa-onnx)のみ。選択肢が1つなので設定は置かない
     diarization_enabled: bool = True
-    # 実装はONNXだけ。torchを使うpyannoteは配布物で動かないため削除した
-    diarization_engine: str = "auto"  # auto | onnx
     num_speakers: int | None = 2
     male_name: str = "話者A"
     female_name: str = "話者B"
@@ -97,11 +96,6 @@ class Settings(BaseSettings):
     )
     llm_chunk_size: int = 30
     llm_context_size: int = 15
-
-    # ---- リソース ----
-    # torch系コンポーネントのVRAM使用上限(MB)。0=無制限。
-    # ASR/LLMモデルの推奨判定にも使う(設定タブの環境パネル)
-    vram_budget_mb: int = 0
 
     # ---- ジョブ ----
     # 置換の長さ上限は積極性(pronoun_level)ごとに違うので pipeline/pronoun.py の

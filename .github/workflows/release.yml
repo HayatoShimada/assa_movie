@@ -76,10 +76,10 @@ jobs:
         shell: bash
         run: ./scripts/build_sidecar.sh
 
-      # whisper.cppはOSごとにバックエンドが違う。
-      # macOSはMetal(Apple純正・追加の依存なし)、LinuxはVulkan。
-      # WindowsはVulkan SDKの導入が要るので、まずは同梱せずに出す
-      # (faster-whisperで動く。docs/verify_rocm.md の比較を参照)
+      # whisper.cppはGPU機の文字起こし本体(実行環境の対応表がそう決めている)。
+      # OSごとにバックエンドが違う: macOSはMetal(Apple純正・追加の依存なし)、
+      # Linux/WindowsはVulkan。CPUビルドに落ちると「GPU機なのに遅い」配布物に
+      # なるので、ビルドスクリプト側でVulkan必須・リンク確認を強制している
       # Vulkanのシェーダ生成が重い(Linuxで実測2分半)。commitが変わるまで使い回す
       # キャッシュ対象はソースとビルドツリー(build-bundled はSRCの下にある)。
       # 以前はスクリプトが使う場所と別のパスを指していたため一度も当たらず、
@@ -167,7 +167,7 @@ jobs:
         shell: msys2 {0}
         run: ./scripts/build_ffmpeg.sh
 
-      # 話者分離モデル(77MB)。配布物にtorchを入れていないためpyannoteは動かず、
+      # 話者分離モデル(77MB)。配布物にtorchは入れていないのでpyannoteは動かず、
       # ONNXが唯一使えるエンジンになる。同梱しないと話者分離が全く使えない
       - name: 話者分離モデルのキャッシュ
         id: diarize-cache

@@ -103,6 +103,10 @@ def fetch_whispercpp_model(progress) -> None:
 
 def status() -> dict:
     """セットアップの状態(設定タブのセットアップパネル用)"""
+    from backend.core import hwprofile
+
+    # この機体の確定構成でwhisper.cppモデルが必須か(GPU機は取得しないと文字起こし不可)
+    model_required = hwprofile.resolve_spec(hwprofile.current()).needs_whispercpp_model
     return {
         "diarization": {
             "label": "話者分離モデル",
@@ -110,26 +114,29 @@ def status() -> dict:
             "ready": onnx.is_available(),
             "size_mb": DIARIZATION_SIZE_MB,
             "installable": True,
+            "required": False,
             "note": "話者を自動で見分けます。無くても文字起こしはできます。",
         },
         "whispercpp": {
-            "label": "高速な文字起こし(whisper.cpp)",
+            "label": "文字起こしモデル(whisper.cpp)",
             "ready": whispercpp.is_available(),
             "size_mb": WHISPERCPP_SIZE_MB,
             # バイナリが無ければモデルだけ3.1GB落としても使えないので取得させない
             "installable": whispercpp.resolve_binary() is not None,
-            "note": _whispercpp_note(),
+            "required": model_required,
+            "note": _whispercpp_note(model_required),
         },
     }
 
 
-def _whispercpp_note() -> str:
+def _whispercpp_note(required: bool) -> str:
     if whispercpp.resolve_binary() is None:
         return (
-            "本体が見つかりません。`./dev.sh whispercpp` でビルドすると、"
-            "文字起こしが数倍速くなります。"
+            "本体が見つかりません。`./dev.sh whispercpp` でビルドしてください。"
         )
-    return "文字起こしが数倍速くなります。モデルが大きいので時間がかかります。"
+    if required:
+        return "この機体の文字起こしに必須です。取得しないと文字起こしを開始できません。"
+    return "この機体(CPU実行)では使いません。"
 
 
 @register("setup_diarization")

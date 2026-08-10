@@ -148,6 +148,8 @@ export const api = {
   registerLicense: (key: string) =>
     request<LicenseStatus>('/api/license', { method: 'POST', body: JSON.stringify({ key }) }),
   getEnvironment: () => request<EnvironmentResponse>('/api/environment'),
+  /** 実行環境の再検出(GPU増設・ドライバ導入後の追従手段) */
+  redetectEnvironment: () => post<EnvironmentResponse>('/api/environment/redetect'),
 }
 
 /**
@@ -165,6 +167,8 @@ export interface SetupItem {
   size_mb: number
   /** falseならアプリからは入れられない(手順を案内するだけ) */
   installable: boolean
+  /** trueならこの機体では取得しないと文字起こしができない */
+  required: boolean
   note: string
 }
 
@@ -190,20 +194,51 @@ export interface LicenseStatus {
   expiring_soon: boolean
 }
 
+/** 初回起動で確定した実行環境(backend/core/hwprofile.py)。再検出でのみ変わる */
+export interface HwProfile {
+  os: 'linux' | 'windows' | 'mac'
+  gpu: 'nvidia' | 'radeon' | 'apple' | 'cpu'
+  gpu_name: string
+  vram_total_mb: number
+  whispercpp_ok: boolean
+  detected_at: string
+}
+
+/** プロファイルから決まる文字起こしの構成(コード内の静的対応表が決める) */
+export interface ResolvedEngine {
+  engine: 'whispercpp' | 'faster_whisper'
+  device: 'vulkan' | 'metal' | 'cpu'
+  compute_type: string
+  label: string
+  /** trueならwhisper.cppモデル(3.1GB)の取得が文字起こしに必須 */
+  needs_whispercpp_model: boolean
+}
+
 export interface EnvironmentResponse {
-  accel: 'cuda' | 'rocm' | 'cpu'
-  gpu: { name?: string; vram_total_mb?: number; vram_free_mb?: number }
-  /** GPUを計算に使えるか。搭載していてもCUDA/ROCmが無ければfalse(書き出しには使える) */
-  gpu_compute: boolean
-  /** NVIDIAドライバはあるのにCUDAランタイムが無い機体で、見つからなかったライブラリ名 */
-  cuda_libs_missing: string[]
+  profile: HwProfile
+  resolved: ResolvedEngine
+  /** 検出時に見つかった問題(GPUがあるのにwhisper.cppを起動できない等) */
+  warnings: string[]
+  gpu: { name?: string; vram_total_mb?: number }
   ffmpeg: boolean
   encoder: string | null
   ollama: { reachable: boolean; models: { name: string; vram_mb: number }[] }
-  vram_budget_mb: number
-  effective_vram_mb: number
-  recommendations: { asr_engine: string; asr_model: string; ollama_model: string | null }
+  recommendations: { asr_model: string; ollama_model: string | null }
   ollama_options: { name: string; vram_mb: number; fits: boolean }[]
+}
+
+/** GPUクラスの表示名 */
+export const GPU_LABELS: Record<HwProfile['gpu'], string> = {
+  nvidia: 'NVIDIA',
+  radeon: 'AMD Radeon',
+  apple: 'Apple Silicon',
+  cpu: 'GPUなし',
+}
+
+export const OS_LABELS: Record<HwProfile['os'], string> = {
+  linux: 'Linux',
+  windows: 'Windows',
+  mac: 'macOS',
 }
 
 export interface AssistResponse {
@@ -214,9 +249,8 @@ export interface AssistResponse {
 
 export interface SettingsResponse {
   values: Record<string, unknown>
-  asr_engines: { id: string; label: string }[]
-  /** ready=false はモデル未取得/HFトークン未設定で選べないエンジン */
-  diarization_engines: { id: string; label: string; ready: boolean }[]
+  /** falseならモデル未取得で話者分離を使えない */
+  diarization_ready: boolean
   asr_models: { id: string; label: string; rtf: number; word_timestamps: boolean; note: string }[]
   llm_providers: {
     id: string

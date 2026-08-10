@@ -23,21 +23,13 @@ def with_models(monkeypatch):
     monkeypatch.setattr(registry.onnx, "is_available", lambda: True)
 
 
-def test_autoはONNXを選ぶ(with_models):
-    assert registry.resolve_engine("auto") == "onnx"
+def test_モデルがあれば使える(with_models):
+    assert registry.available() is True
 
 
-def test_モデルが無ければNone(no_models):
+def test_モデルが無ければ使えない(no_models):
     """話者分離なしで文字起こしを続ける(必須ではない)"""
-    assert registry.resolve_engine("auto") is None
-    assert registry.resolve_engine("onnx") is None
-
-
-def test_pyannoteはもう選べない():
-    """設定に残っていても弾く。動かないものを受け付けない"""
-    assert "pyannote" not in registry.ENGINES
-    with pytest.raises(ValueError, match="未知の話者分離エンジン"):
-        registry.run_diarization(np.zeros(16), Settings(diarization_engine="pyannote"))
+    assert registry.available() is False
 
 
 def test_ONNXへ渡す人数は設定から取る(monkeypatch, with_models):
@@ -83,6 +75,7 @@ def test_sherpaの進捗コールバック変換():
     assert onnx.sherpa_progress(seen.append)(1, 0) == 0  # 総数0でも割らない
 
 
-def test_未知のエンジンは弾く():
-    with pytest.raises(ValueError, match="未知の話者分離エンジン"):
-        registry.run_diarization(np.zeros(16), Settings(diarization_engine="whisper"))
+def test_エンジン選択の設定はもう無い():
+    """実装はONNXの1つだけ。選べない設定をUIにも設定にも置かない"""
+    assert not hasattr(Settings(), "diarization_engine")
+    assert not hasattr(registry, "ENGINES")

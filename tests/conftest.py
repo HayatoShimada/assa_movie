@@ -10,39 +10,6 @@ def pytest_addoption(parser):
 
 def pytest_configure(config):
     config.addinivalue_line("markers", "gpu: GPUを使うテスト(既定でスキップ)")
-    config.addinivalue_line(
-        "markers",
-        "torch: 公式Whisper(torch依存)が要るテスト。"
-        "配布物にtorchは入れないので、入っていない環境では自動でスキップする",
-    )
-
-
-# マーカー名 → 実際に import できるかを見るモジュール名
-_TORCH_MODULES = ("torch", "whisper")
-
-
-def pytest_collection_modifyitems(config, items):
-    """torchマーカーの付いたテストは、依存が入っていなければスキップする。
-
-    torch系は開発グループにしか無く(配布物に入れると11.5GB)、Windows機や
-    CIの多くには入っていない。`-m "not torch"` を毎回指定させると忘れるので、
-    実際に import できるかで判断する。
-    """
-    from importlib.util import find_spec
-
-    missing = []
-    for name in _TORCH_MODULES:
-        try:
-            if find_spec(name) is None:
-                missing.append(name)
-        except (ImportError, ValueError):
-            missing.append(name)
-    if not missing:
-        return
-    skip = pytest.mark.skip(reason=f"torch系が入っていない({', '.join(missing)})")
-    for item in items:
-        if "torch" in item.keywords:
-            item.add_marker(skip)
 
 
 @pytest.fixture
@@ -73,6 +40,7 @@ def _isolate_module_state():
     テストの収集順はファイル名順(=マイルストーン番号順)なので、
     番号の若いテストが実機を叩いた結果を、後のテストが掴んでいた。
     """
+    from backend.core import hwprofile
     from backend.core.device import probe_gpu
     from backend.jobs import resolve_job
     from backend.pipeline.export import detect_encoder
@@ -82,10 +50,30 @@ def _isolate_module_state():
     # 実機を1回だけ叩くキャッシュ。テスト間で共有すると注入が効かなくなる
     probe_gpu.cache_clear()
     detect_encoder.cache_clear()
+    hwprofile.set_current(None)
     yield
     resolve_job.set_client_factory(saved_factory)
     probe_gpu.cache_clear()
     detect_encoder.cache_clear()
+    hwprofile.set_current(None)
+
+
+@pytest.fixture(autouse=True)
+def _fixed_hw_profile(monkeypatch):
+    """実行環境の検出結果を固定する。
+
+    開発機にGPUがあるかどうかでテストの結果が変わってはいけない。既定は
+    CPU機(faster-whisper・追加モデル不要)。GPU機の挙動を見るテストは
+    hwprofile.set_current() で明示的に差し替える。
+    """
+    from backend.core import hwprofile
+
+    monkeypatch.setattr(
+        hwprofile, "detect",
+        lambda now, runner=None, os_name=None: hwprofile.HwProfile(
+            os="linux", gpu="cpu", detected_at=now
+        ),
+    )
 
 
 @pytest.fixture

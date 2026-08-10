@@ -48,7 +48,14 @@ export function SetupItemRow({ id, item }: { id: string; item: SetupItem }) {
       className="border-t border-neutral-200 py-2 first:border-t-0 dark:border-neutral-800"
     >
       <div className="flex items-center justify-between gap-3 text-sm">
-        <span className="font-medium">{item.label}</span>
+        <span className="font-medium">
+          {item.label}
+          {item.required && !item.ready && (
+            <span className="ml-1 rounded bg-amber-200 px-1 text-xs text-amber-900 dark:bg-amber-800 dark:text-amber-100">
+              必須
+            </span>
+          )}
+        </span>
         <span
           data-testid={`setup-state-${id}`}
           className={item.ready ? 'text-xs text-green-700 dark:text-green-400' : 'text-xs text-neutral-500'}
@@ -81,8 +88,10 @@ export function SetupItemRow({ id, item }: { id: string; item: SetupItem }) {
 export function SetupPanel() {
   const setup = useQuery({ queryKey: ['setup'], queryFn: api.getSetupStatus })
   if (!setup.data) return null
+  const items = Object.values(setup.data)
   // 全部そろっていれば出す必要が無い
-  if (Object.values(setup.data).every((item) => item.ready)) return null
+  if (items.every((item) => item.ready)) return null
+  const blocking = items.some((item) => item.required && !item.ready)
 
   return (
     <section
@@ -91,7 +100,9 @@ export function SetupPanel() {
     >
       <h3 className="mb-1 text-sm font-semibold">セットアップ</h3>
       <p className="mb-2 text-xs text-neutral-600 dark:text-neutral-400">
-        足りていないものがあります。無くても文字起こしはできますが、揃えると精度と速度が上がります。
+        {blocking
+          ? 'この機体で文字起こしを始めるには、下の「必須」の項目を取得してください。'
+          : '足りていないものがあります。無くても文字起こしはできますが、揃えると精度が上がります。'}
       </p>
       {Object.entries(setup.data).map(([id, item]) => (
         <SetupItemRow key={id} id={id} item={item} />

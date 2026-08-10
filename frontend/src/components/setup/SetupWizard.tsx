@@ -11,7 +11,7 @@
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { api, machineQueryOptions } from '../../api/client'
+import { GPU_LABELS, OS_LABELS, api, machineQueryOptions } from '../../api/client'
 import { SetupItemRow } from '../settings/SetupPanel'
 import { Button, selectCls } from '../ui'
 
@@ -37,13 +37,20 @@ function Line({ label, value, ok }: { label: string; value: string; ok?: boolean
   )
 }
 
-/** 1. 環境を見て、この機体に合う設定を当てる */
+/** 1. 確定した実行環境を見せて、この機体に合うモデルを当てる */
 function EnvironmentStep() {
   const queryClient = useQueryClient()
   const env = useQuery({ queryKey: ['environment'], queryFn: api.getEnvironment, ...machineQueryOptions })
   const apply = useMutation({
     mutationFn: (patch: Record<string, unknown>) => api.updateSettings(patch),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['settings'] }),
+  })
+  const redetect = useMutation({
+    mutationFn: api.redetectEnvironment,
+    onSuccess: (data) => {
+      queryClient.setQueryData(['environment'], data)
+      queryClient.invalidateQueries({ queryKey: ['setup'] })
+    },
   })
 
   if (!env.data) return <p className="text-sm text-neutral-500">環境を調べています…</p>
@@ -54,12 +61,15 @@ function EnvironmentStep() {
     <Section title="この機体の環境">
       <div data-testid="wizard-env">
         <Line
-          label="GPU"
-          value={e.gpu.name || '見つかりません'}
-          ok={Boolean(e.gpu.name) && e.gpu_compute}
+          label="この端末"
+          value={`${OS_LABELS[e.profile.os]} / ${GPU_LABELS[e.profile.gpu]}${
+            e.profile.gpu_name ? `(${e.profile.gpu_name})` : ''
+          }`}
+          ok={e.profile.gpu !== 'cpu'}
         />
-        {e.gpu.vram_total_mb ? (
-          <Line label="VRAM" value={`${(e.gpu.vram_total_mb / 1024).toFixed(1)}GB`} />
+        <Line label="文字起こし" value={e.resolved.label} ok />
+        {e.profile.vram_total_mb ? (
+          <Line label="VRAM" value={`${(e.profile.vram_total_mb / 1024).toFixed(1)}GB`} />
         ) : null}
         <Line
           label="ffmpeg"
@@ -67,6 +77,11 @@ function EnvironmentStep() {
           ok={e.ffmpeg}
         />
       </div>
+      {e.warnings.map((warning) => (
+        <p key={warning} className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+          {warning}
+        </p>
+      ))}
       {!e.ffmpeg && (
         <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
           書き出しにffmpegが必要です。Windows版は同梱していますが、見つからない場合は
@@ -74,19 +89,28 @@ function EnvironmentStep() {
         </p>
       )}
       <p className="mt-2 text-xs text-neutral-500">
-        この環境なら <b>{rec.asr_model}</b>({rec.asr_engine})が適しています。
+        この環境なら文字起こしモデルは <b>{rec.asr_model}</b> が適しています。
       </p>
-      <div className="mt-2">
+      <div className="mt-2 flex gap-2">
         <Button
           data-testid="wizard-apply-recommended"
           type="button"
-          // エンジンは固定しない。autoのままにしておくと、GPUや同梱物が変わったとき
-          // 実行時に選び直される。以前ここで固定していたため、あとから
-          // whisper.cppを同梱してもfaster-whisperのまま使われ続けていた
-          onClick={() => apply.mutate({ asr_model: rec.asr_model, asr_engine: 'auto' })}
+          // エンジンは書かない。実行環境の対応表(backend/core/hwprofile.py)が決める。
+          // 以前ここで固定していたため、あとからwhisper.cppを同梱しても
+          // faster-whisperのまま使われ続けていた
+          onClick={() => apply.mutate({ asr_model: rec.asr_model })}
           disabled={apply.isPending}
         >
           {apply.isSuccess ? '適用しました' : '推奨設定を適用'}
+        </Button>
+        <Button
+          data-testid="wizard-redetect"
+          type="button"
+          variant="ghost"
+          onClick={() => redetect.mutate()}
+          disabled={redetect.isPending}
+        >
+          {redetect.isPending ? '検出中…' : '再検出'}
         </Button>
       </div>
     </Section>

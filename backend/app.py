@@ -1,6 +1,5 @@
 """FastAPIアプリ本体。"""
 
-import threading
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -16,7 +15,7 @@ from backend.api import projects as projects_api
 from backend.api import questions as questions_api
 from backend.api import settings_api
 from backend.api import transcripts as transcripts_api
-from backend.core import paths, project_settings
+from backend.core import hwprofile, paths, project_settings
 from backend.core.config import settings
 from backend.jobs import attention_job  # noqa: F401  ジョブハンドラの登録に必要
 from backend.jobs import export_job  # noqa: F401
@@ -45,14 +44,8 @@ LOCAL_ORIGIN_PATTERN = r"^http://(localhost|127\.0\.0\.1)(:\d+)?$"
 
 
 def _report_startup_checks() -> None:
-    """起動時の軽い確認だけを行う。
-
-    GPU情報(torchの初期化)は実測5秒かかり、その間GILを握るため別スレッドに
-    逃がしても起動が止まる。GPU・VRAM・Ollamaの詳細は GET /api/environment
-    (設定タブの環境パネルが初回に1回だけ呼ぶ)に任せる。
-    """
+    """起動時の軽い確認だけを行う(GPU検出はlifespanのプロファイル確定が担う)"""
     from backend.core.console import force_utf8_stdio
-    from backend.core.device import probe_gpu
     from backend.pipeline.export import FFMPEG_MISSING_MSG, detect_encoder
 
     # 以下のprintには「⚠」が混ざる。日本語Windowsの既定(cp932)では出力できず、
@@ -72,18 +65,6 @@ def _report_startup_checks() -> None:
     else:
         print(f"起動: 動画エンコーダ={encoder}")
 
-    def warm_gpu_probe() -> None:
-        """GPU情報を先に取っておく(子プロセスなのでGILを握らず起動を止めない)"""
-        gpu = probe_gpu()
-        if gpu.get("name"):
-            print(f"環境: {gpu['name']} ({gpu['accel']}, VRAM {gpu['vram_total_mb'] / 1024:.0f}GB)")
-        else:
-            print(
-                "⚠ torchがGPUを認識していません。`./dev.sh sync`(AMD)または "
-                "KS_TORCH_GROUP=cu128(NVIDIA)で入れ直してください。CPUでも動きますが低速です。"
-            )
-
-    threading.Thread(target=warm_gpu_probe, daemon=True).start()
 
 
 @asynccontextmanager
@@ -91,6 +72,11 @@ async def lifespan(app: FastAPI):
     _report_startup_checks()
     app.state.db = schema.init_db(settings.db_path)
     project_settings.load_global_overrides(app.state.db)  # UI変更値の復元
+    # 実行環境の確定(初回のみ検出、以後は保存値。検出はCLIベースで実測55ms)
+    profile = hwprofile.ensure_profile(app.state.db)
+    spec = hwprofile.resolve_spec(profile)
+    print(f"実行環境: {profile.os}/{profile.gpu}"
+          f"{f'({profile.gpu_name})' if profile.gpu_name else ''} → {spec.label}")
     app.state.jobs = JobQueue(app.state.db)
     orphaned = app.state.jobs.recover_orphans()  # 前回中断分の整理(--reload対策)
     if orphaned:

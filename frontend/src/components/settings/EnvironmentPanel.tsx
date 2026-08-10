@@ -1,11 +1,13 @@
 /**
- * 環境パネル(設定タブ先頭)。
+ * 実行環境パネル(設定タブ先頭)。
  *
- * 起動時にスキャンした GPU / VRAM / エンコーダ / Ollama の状態を表示し、
- * VRAM割当の変更と「VRAMに収まる最良のASR・LLM」のワンクリック適用を提供する。
+ * 実行環境(OS×GPU)は初回起動で1回検出して固定される(backend/core/hwprofile.py)。
+ * ここではその確定内容と、そこから決まる文字起こしの構成を表示し、
+ * 環境が変わったとき用の「再検出」を提供する。
+ * エンジンは選ばせない(選択を誤ると「遅い」「動かない」になるため)。
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { api, machineQueryOptions } from '../../api/client'
+import { GPU_LABELS, OS_LABELS, api, machineQueryOptions } from '../../api/client'
 import { Button } from '../ui'
 
 const GB = (mb: number) => `${(mb / 1024).toFixed(1)}GB`
@@ -26,14 +28,17 @@ export function EnvironmentPanel() {
     queryFn: api.getEnvironment,
     ...machineQueryOptions,
   })
-  const settings = useQuery({ queryKey: ['settings'], queryFn: api.getSettings })
-  const update = useMutation({
-    mutationFn: api.updateSettings,
+  const redetect = useMutation({
+    mutationFn: api.redetectEnvironment,
     onSuccess: (data) => {
-      queryClient.setQueryData(['settings'], data)
-      // 割当VRAMを変えると推奨も変わるので、この操作の後だけ再スキャンする
-      queryClient.invalidateQueries({ queryKey: ['environment'] })
+      queryClient.setQueryData(['environment'], data)
+      // 構成が変われば必要なモデルも変わる
+      queryClient.invalidateQueries({ queryKey: ['setup'] })
     },
+  })
+  const applyModel = useMutation({
+    mutationFn: api.updateSettings,
+    onSuccess: (data) => queryClient.setQueryData(['settings'], data),
   })
 
   if (env.isPending)
@@ -49,32 +54,44 @@ export function EnvironmentPanel() {
   if (env.isError) return null
   const e = env.data
   const rec = e.recommendations
-  const hasGpu = Boolean(e.gpu.name)
-  const total = e.gpu.vram_total_mb ?? 0
-  // エンジン名はバックエンドが返すラベルを使う(選択UIと表記を揃える)
-  const engineLabel =
-    settings.data?.asr_engines.find((x) => x.id === rec.asr_engine)?.label ?? rec.asr_engine
+  const hasGpu = e.profile.gpu !== 'cpu'
 
   return (
     <div
       data-testid="environment-panel"
       className="mb-3 space-y-2 rounded-lg border border-neutral-200 p-3 dark:border-neutral-800"
     >
-      <h3 className="text-sm font-semibold">実行環境</h3>
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold">実行環境</h3>
+        <Button
+          data-testid="env-redetect"
+          variant="ghost"
+          disabled={redetect.isPending}
+          onClick={() => redetect.mutate()}
+        >
+          {redetect.isPending ? '検出中…' : '再検出'}
+        </Button>
+      </div>
+      <p className="text-xs text-neutral-500">
+        この端末の構成は初回起動時に確定しています。GPUを増設したり
+        ドライバを入れ直したときは「再検出」してください。
+      </p>
+
       <Item
-        label="GPU"
+        label="この端末"
         value={
-          hasGpu ? `${e.gpu.name}(${e.accel.toUpperCase()})` : 'なし(CPU実行・低速)'
+          <span data-testid="env-profile">
+            {OS_LABELS[e.profile.os]} / {GPU_LABELS[e.profile.gpu]}
+            {e.profile.gpu_name ? `(${e.profile.gpu_name})` : ''}
+          </span>
         }
       />
-      {e.cuda_libs_missing?.length > 0 && (
-        <p data-testid="env-cuda-missing" className="text-xs text-amber-700 dark:text-amber-400">
-          CUDAライブラリが見つからないため({e.cuda_libs_missing.join(', ')})、
-          文字起こしはwhisper.cpp(Vulkan)またはCPUで実行します。
-        </p>
-      )}
-      {hasGpu && (
-        <Item label="VRAM" value={`${GB(total)}(空き ${GB(e.gpu.vram_free_mb ?? 0)})`} />
+      <Item
+        label="文字起こし"
+        value={<span data-testid="env-resolved">{e.resolved.label}</span>}
+      />
+      {hasGpu && e.profile.vram_total_mb > 0 && (
+        <Item label="VRAM" value={GB(e.profile.vram_total_mb)} />
       )}
       <Item
         label="動画エンコード"
@@ -93,50 +110,29 @@ export function EnvironmentPanel() {
         }
       />
 
-      {hasGpu && (
-        <div className="pt-1">
-          <label className="flex items-center justify-between text-sm">
-            <span className="text-neutral-500">
-              割当VRAM: {e.vram_budget_mb > 0 ? GB(e.vram_budget_mb) : `自動(全${GB(total)})`}
-            </span>
-            <input
-              data-testid="env-vram-budget"
-              type="range"
-              min={0}
-              max={total}
-              step={1024}
-              defaultValue={e.vram_budget_mb}
-              onMouseUp={(ev) =>
-                update.mutate({ vram_budget_mb: Number((ev.target as HTMLInputElement).value) })
-              }
-            />
-          </label>
-          <p className="text-xs text-neutral-500">
-            0=自動。他のアプリとGPUを共有する場合に上限を下げます(ASR・話者分離に適用。
-            Ollamaは目安表示のみ)。
-          </p>
-        </div>
-      )}
+      {e.warnings.map((warning) => (
+        <p
+          key={warning}
+          data-testid="env-warning"
+          className="text-xs text-amber-700 dark:text-amber-400"
+        >
+          {warning}
+        </p>
+      ))}
 
       <div className="rounded bg-neutral-50 p-2 text-sm dark:bg-neutral-900">
-        <p className="text-xs text-neutral-500">
-          この環境(利用可能 {hasGpu ? GB(e.effective_vram_mb) : 'CPU'})でのおすすめ:
-        </p>
+        <p className="text-xs text-neutral-500">この構成でのおすすめモデル:</p>
         <p data-testid="env-recommendation" className="mt-0.5">
-          ASR: {rec.asr_model}({engineLabel})
+          文字起こし: {rec.asr_model}
           {rec.ollama_model ? ` / LLM: ${rec.ollama_model}` : ''}
         </p>
         <Button
           data-testid="env-apply-recommendation"
           variant="ghost"
-          disabled={update.isPending}
+          disabled={applyModel.isPending}
           onClick={() =>
-            update.mutate({
+            applyModel.mutate({
               asr_model: rec.asr_model,
-              // 具体名で固定すると、同梱物が増えて推奨が変わっても追従しない。
-              // v0.9.5がここでfaster_whisperを書き込み、whisper.cppを同梱した
-              // あともGPUが使われないままだった。表示はrec.asr_engine、保存はauto
-              asr_engine: 'auto',
               ...(rec.ollama_model
                 ? { llm_provider: 'ollama', ollama_model: rec.ollama_model }
                 : {}),
@@ -146,8 +142,10 @@ export function EnvironmentPanel() {
           おすすめ設定を適用
         </Button>
       </div>
-      {update.isError && (
-        <p className="text-xs text-red-600">適用に失敗しました: {String(update.error)}</p>
+      {(applyModel.isError || redetect.isError) && (
+        <p className="text-xs text-red-600">
+          失敗しました: {String(applyModel.error ?? redetect.error)}
+        </p>
       )}
     </div>
   )

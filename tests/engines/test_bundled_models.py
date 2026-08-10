@@ -87,7 +87,7 @@ def test_モデルが無ければ話者分離は使えない(monkeypatch):
     from backend.engines.diarize import registry
 
     monkeypatch.setattr(onnx, "is_available", lambda *a, **k: False)
-    assert registry.resolve_engine("auto") is None
+    assert registry.available() is False
 
 
 def test_同梱モデルがあればトークン無しで動く(monkeypatch):
@@ -95,59 +95,13 @@ def test_同梱モデルがあればトークン無しで動く(monkeypatch):
     from backend.engines.diarize import registry
 
     monkeypatch.setattr(onnx, "is_available", lambda *a, **k: True)
-    assert registry.resolve_engine("auto") == "onnx"
-
-
-# ---- CUDA/ROCmが無いGPU機でwhisper.cppを選ぶ ----
-def test_GPUはあるがCUDAもROCmも無ければwhispercppを選ぶ(monkeypatch):
-    """AMDのWindows機。accelは"cpu"になるがVulkanは動く。
-
-    同梱してあっても選ばれなければ意味がない。実測(RX 7900 XTX)で
-    60秒の音声が faster-whisper CPU 52秒 → whisper.cpp Vulkan 4.8秒。
-    """
-    from backend.engines.asr import registry
-
-    monkeypatch.setattr(registry, "whispercpp_available", lambda: True)
-    assert registry.resolve_engine("auto", "cpu", has_gpu=True) == "whispercpp"
-
-
-def test_同梱が無ければ従来どおりfaster_whisper(monkeypatch):
-    from backend.engines.asr import registry
-
-    monkeypatch.setattr(registry, "whispercpp_available", lambda: False)
-    assert registry.resolve_engine("auto", "cpu", has_gpu=True) == "faster_whisper"
-
-
-def test_GPUが無ければfaster_whisper(monkeypatch):
-    """CPUしか無い機体でwhisper.cppに振ってもGPUの利点が無い"""
-    from backend.engines.asr import registry
-
-    monkeypatch.setattr(registry, "whispercpp_available", lambda: True)
-    assert registry.resolve_engine("auto", "cpu", has_gpu=False) == "faster_whisper"
-
-
-def test_CUDAは従来どおりfaster_whisper(monkeypatch):
-    """CUDA版CTranslate2が最速。既存の選択を変えない"""
-    from backend.engines.asr import registry
-
-    monkeypatch.setattr(registry, "whispercpp_available", lambda: True)
-    assert registry.resolve_engine("auto", "cuda", has_gpu=True) == "faster_whisper"
-
-
-def test_ROCmは従来どおりwhispercpp優先(monkeypatch):
-    from backend.engines.asr import registry
-
-    monkeypatch.setattr(registry, "whispercpp_available", lambda: True)
-    assert registry.resolve_engine("auto", "rocm", has_gpu=True) == "whispercpp"
-    monkeypatch.setattr(registry, "whispercpp_available", lambda: False)
-    # torchの有無で落ちる先が変わる。開発機の状態に依存させない
-    monkeypatch.setattr(registry, "openai_whisper_available", lambda: True)
-    assert registry.resolve_engine("auto", "rocm", has_gpu=True) == "openai_whisper"
-    monkeypatch.setattr(registry, "openai_whisper_available", lambda: False)
-    assert registry.resolve_engine("auto", "rocm", has_gpu=True) == "faster_whisper"
+    assert registry.available() is True
 
 
 # ---- whisper.cpp ----
+# エンジン選択の規則そのものは tests/core/test_hwprofile.py が持つ。
+# ここでは「同梱物を見つけられること」だけを見る(見つからないとGPU機でも
+# 検出時の検証に失敗し、CPU実行のプロファイルに確定してしまう)。
 def test_Windowsのwhisper_cliは拡張子付きで探す():
     """.exe を付けずに探すと、同梱してあっても見つからず遅いエンジンに落ちる"""
     expected = "whisper-cli.exe" if platform.system() == "Windows" else "whisper-cli"

@@ -4,8 +4,8 @@
 #   ./dev.sh          バックエンド(8000)とフロント(5173)を同時起動
 #   ./dev.sh api      バックエンドのみ
 #   ./dev.sh web      フロントのみ
-#   ./dev.sh sync     Python依存の同期(既定はROCm。KS_TORCH_GROUP=cu128 でNVIDIA向け)
-#   ./dev.sh whispercpp  whisper.cppをROCm向けにビルド(任意・ASRが約2.6倍速くなる)
+#   ./dev.sh sync     Python依存の同期(配布物と同じ構成。GPUベンダーに依らない)
+#   ./dev.sh whispercpp  whisper.cpp(Vulkan/Metal)をビルド+モデル取得。GPU機のASR本体
 #   ./dev.sh diarize-models  話者分離のONNXモデルを取得(pyannoteより約4倍速い・HFトークン不要)
 #   ./dev.sh check    型・lint・テスト・ビルドを全部走らせる(コミット前用)
 #   ./dev.sh e2e      E2Eテスト(FakeLLM・一時DBなのでGPU/LLM不要)
@@ -49,31 +49,18 @@ case "${1:-all}" in
     cd frontend && exec npm run app
     ;;
   whispercpp)
-    # ROCmで最速のASR(公式Whisperの約2.6倍)。外部ビルドなので任意。
-    # 用意されていればエンジン自動選択がこれを使い、無ければ公式版に落ちる。
+    # GPU機のASR本体。配布物と同じVulkan(macOSはMetal)ビルドを作り、
+    # 開発機でも本番と同じものが動くようにする。
+    # ベンダー別ビルド(HIP等)は作らない: 配布物と違うものを開発機だけで
+    # 動かすと、実測も不具合も本番に当てはまらなくなる。
     # 置き場所は KS_WHISPERCPP_HOME で変更できる(既定: ~/.cache/kirinuki-studio)
-    if ! command -v hipconfig > /dev/null; then
-      # hipconfig無しで進むとHIPCXXが壊れた値になり、cmakeの分かりにくい
-      # エラー(No CMAKE_CXX_COMPILER)まで到達してしまう
-      echo "hipconfig が見つかりません。このターゲットは ROCm(AMD GPU)機専用です。" >&2
-      echo "  - NVIDIA機では不要: エンジン自動選択が faster-whisper(CUDA・最速)を使います" >&2
-      echo "  - 配布用の同梱whisper.cpp(Vulkan)は ./dev.sh package が作ります" >&2
-      exit 1
-    fi
     HOME_DIR="${KS_WHISPERCPP_HOME:-$(cache_dir)}"
-    GPU_ARCH="${KS_GPU_ARCH:-gfx1100}"
     MODEL_NAME="${KS_GGML_MODEL:-ggml-large-v3.bin}"
-    set -x
-    mkdir -p "$HOME_DIR/bin" "$HOME_DIR/models" "$HOME_DIR/src"
-    if [ ! -d "$HOME_DIR/src/whisper.cpp" ]; then
-      git clone --depth 1 https://github.com/ggml-org/whisper.cpp "$HOME_DIR/src/whisper.cpp"
-    fi
-    cd "$HOME_DIR/src/whisper.cpp"
-    HIPCXX="$(hipconfig -l)/clang" HIP_PATH="$(hipconfig -R)" \
-      cmake -S . -B build -DGGML_HIP=ON -DAMDGPU_TARGETS="$GPU_ARCH" -DCMAKE_BUILD_TYPE=Release
-    cmake --build build -j "$(nproc)"
-    cp build/bin/whisper-cli "$HOME_DIR/bin/"
-    cp build/bin/libggml*.so* build/bin/libwhisper.so* "$HOME_DIR/bin/" 2>/dev/null || true
+    mkdir -p "$HOME_DIR/bin" "$HOME_DIR/models"
+    # ビルド本体は配布と同じスクリプトを使う(Vulkan必須・リンク確認つき)
+    ./scripts/build_whispercpp.sh
+    cp frontend/src-tauri/resources/bin/whisper-cli "$HOME_DIR/bin/"
+    chmod +x "$HOME_DIR/bin/whisper-cli"
     # 途中で止めても壊れたモデルが残らないよう、完了してから置き換える
     # (中途半端なファイルがあるとエンジンが「使える」と誤判定してしまう)
     if [ ! -f "$HOME_DIR/models/$MODEL_NAME" ]; then
@@ -81,8 +68,8 @@ case "${1:-all}" in
         "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/$MODEL_NAME"
       mv "$HOME_DIR/models/$MODEL_NAME.part" "$HOME_DIR/models/$MODEL_NAME"
     fi
-    set +x
     echo "=== whisper.cpp の準備ができました: $HOME_DIR ==="
+    echo "設定タブの「実行環境」で「再検出」すると反映されます"
     ;;
   diarize-models)
     # 話者分離のONNXモデル(計76MB)。pyannote(torch 14GB・HFトークン必須)の代わりで、
@@ -92,13 +79,9 @@ case "${1:-all}" in
       --home "${KS_MODELS_HOME:-$(cache_dir)}" "${@:2}"
     ;;
   sync)
-    # torchのwheelはGPUベンダーごとにindexが違う(pyproject.tomlのグループ参照)。
-    # 既定はrocm(default-groups)。NVIDIA機: KS_TORCH_GROUP=cu128 ./dev.sh sync
-    if [ "${KS_TORCH_GROUP:-rocm}" = "rocm" ]; then
-      exec uv sync
-    else
-      exec uv sync --no-default-groups --group dev --group "${KS_TORCH_GROUP}"
-    fi
+    # 依存はGPUベンダーに依らない(torchを使わなくなったため)。
+    # 実行構成は backend/core/hwprofile.py の対応表が決める
+    exec uv sync
     ;;
   check)
     # CI(.github/workflows/ci.yml)と同じものを手元で流す。

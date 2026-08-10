@@ -1,102 +1,27 @@
-"""GPUアクセラレータの検出と、ROCm固有の設定。
+"""GPU搭載情報の検出(ハードウェアプロファイル確定時に1回だけ使う)。
 
-検出はベンダーのCLI(nvidia-smi / rocm-smi)を第一手にする。torchに聞くと
-初期化に実測5秒かかるうえ、配布物からtorchを外すとROCm機でも "cpu" と判定され、
-whisper.cppがあるのに遅いエンジンが黙って選ばれてしまう(rocm-smiは実測55ms)。
-
-torchが要るのはASRエンジン側だけなので、そこでは従来どおり
-torch.version.hip の有無で cuda / rocm を見分ける
-(ROCm版torchはHIPがCUDA APIを名乗るため)。
-
-ベンダーCLIが無い環境ではOSに聞く(Windowsはレジストリ)。nvidia-smiはドライバ
-同梱物、rocm-smiはROCmスタックの一部でLinux専用なので、AMDのWindows機には
+検出はベンダーのCLI(nvidia-smi / rocm-smi / system_profiler)を第一手にする
+(rocm-smiは実測55ms)。CLIが無い環境ではOSに聞く(Windowsはレジストリ)。
+nvidia-smiはドライバ同梱物、rocm-smiはLinux専用なので、AMDのWindows機には
 どちらも存在せず、CLIだけに頼ると「GPUなし」と誤判定する。ただしOSから分かるのは
-搭載の有無だけで、計算に使えるかは別問題(accelは"cpu"のまま)。
+搭載の有無だけで、accelは"cpu"のまま(GPUクラスの分類は hwprofile.classify が
+アダプタ名から行う)。
+
+結果の解釈(OS×GPUクラスへの分類・エンジン選択)は backend/core/hwprofile.py が
+持つ。ここは情報を取るだけ。torchへの問い合わせは2026-08-10に削除した
+(配布物にtorchが無く、CLI+レジストリで全クラスを判定できるため)。
 """
 
 import json
 import platform
 import shutil
 import subprocess
-import sys
 from functools import lru_cache
 
 from backend.core.console import SUBPROCESS_TEXT
 
 EMPTY_GPU = {"accel": "cpu", "name": "", "vram_total_mb": 0, "vram_free_mb": 0}
 CLI_TIMEOUT = 5
-
-# faster-whisper(CTranslate2 4.x)のCUDA実行に必要な動的ライブラリ。
-# nvidia-smiが通る(=ドライバはある)のにCUDAランタイムが入っていない機体があり、
-# その場合モデル読み込みが「Library libcublas.so.12 is not found」で必ず落ちる
-CUDA_RUNTIME_LIBS = ("libcublas.so.12", "libcudnn.so.9")
-
-
-def missing_cuda_libs(loader=None, search_roots=None) -> list[str]:
-    """CUDA実行に必要なライブラリのうち、プロセスへ読み込めなかったものを返す
-    (Linux以外は常に空)。
-
-    2段階で試す:
-    (1) 通常のdlopen経路(システムのCUDA・LD_LIBRARY_PATH)
-    (2) pipのnvidia系パッケージ(nvidia-cublas-cu12等)を絶対パスでロードする。
-        ctranslate2自身はrpathを持たず、通常はCUDA版torchが同梱ライブラリを
-        先にプロセスへロードしてくれることに依存している。ROCm版torchの環境や
-        torchを外した配布版では誰もロードしないため、ここでRTLD_GLOBALで
-        載せておくと ctranslate2 内部の dlopen("libcublas.so.12") が解決できる。
-
-    「ファイルがある」だけでは判定しない。存在だけ見て「使える」と返した結果、
-    faster-whisperがGPU実行を試みて落ちた実例がある。
-    loader / search_roots はテスト差し替え口。
-    """
-    if platform.system() != "Linux":
-        return []  # .soの名前も配布形態もLinux前提。他OSで誤ってGPUを諦めない
-    import ctypes
-
-    load = loader if loader is not None else (
-        lambda path: ctypes.CDLL(str(path), mode=ctypes.RTLD_GLOBAL)
-    )
-    roots = _nvidia_package_roots() if search_roots is None else list(search_roots)
-    missing = []
-    for lib in CUDA_RUNTIME_LIBS:
-        try:
-            load(lib)
-            continue
-        except OSError:
-            pass
-        bundled = next((hit for root in roots for hit in root.glob(f"*/lib/{lib}")), None)
-        try:
-            if bundled is None:
-                raise OSError(f"{lib} が見つかりません")
-            load(str(bundled))
-        except OSError:
-            missing.append(lib)
-    return missing
-
-
-def _nvidia_package_roots() -> list:
-    """pipのnvidia名前空間パッケージの場所(無ければ空)"""
-    import importlib.util
-    from pathlib import Path
-
-    try:
-        spec = importlib.util.find_spec("nvidia")
-    except (ImportError, ValueError):
-        return []
-    if spec is None:
-        return []
-    return [Path(p) for p in (spec.submodule_search_locations or [])]
-
-
-def _torch(torch_module=None):
-    """torchを返す(テスト差し替え口)。import不能ならNone"""
-    if torch_module is not None:
-        return torch_module
-    try:
-        import torch
-
-        return torch
-    except Exception:
-        return None
 
 
 def _run(cmd: list[str]) -> str:
@@ -284,92 +209,15 @@ def probe_gpu_cli(os_name: str | None = None) -> dict:
     )
 
 
-def detect_accel(torch_module=None) -> str:
-    """利用可能なアクセラレータを返す: 'cuda' | 'rocm' | 'cpu'"""
-    if torch_module is None:
-        # 通常経路。torchが無くても正しく判定できる
-        return probe_gpu()["accel"]
-    t = _torch(torch_module)
-    if t is None:
-        return "cpu"
-    try:
-        if not t.cuda.is_available():
-            return "cpu"
-        return "rocm" if getattr(t.version, "hip", None) else "cuda"
-    except Exception:
-        return "cpu"
-
-
-def apply_vram_budget(budget_mb: int, torch_module=None) -> None:
-    """torch系コンポーネント(transformers ASR・pyannote)のVRAM使用上限を設定する。
-
-    0は無制限。faster-whisper(CTranslate2)とOllama(別プロセス)には効かないため、
-    それらはUI側でVRAM目安を表示して選択を促す。
-    """
-    if budget_mb <= 0:
-        return
-    t = _torch(torch_module)
-    if t is None:
-        return
-    try:
-        if not t.cuda.is_available():
-            return
-        _, total = t.cuda.mem_get_info()
-        t.cuda.set_per_process_memory_fraction(min(1.0, budget_mb / (total / 1024**2)))
-    except Exception:
-        pass  # 上限設定の失敗で処理自体は止めない
-
-
 @lru_cache(maxsize=1)
 def probe_gpu() -> dict:
     """GPUを調べる: {accel, name, vram_total_mb, vram_free_mb}。
 
-    まずベンダーCLI(実測55ms)。無ければtorch。それも無ければOSに聞く。
+    まずベンダーCLI(実測55ms)。無ければOSに聞く。
 
-    最後のOS問い合わせで分かるのは「積んでいること」だけなので accel は "cpu" の
-    ままになる。それでも名前を出す価値はある: RX 7900 XTX を積んだWindows機に
+    OS問い合わせで分かるのは「積んでいること」だけなので accel は "cpu" の
+    ままになる(GPUクラスの分類は hwprofile.classify がアダプタ名で行う)。
+    それでも名前を出す価値はある: RX 7900 XTX を積んだWindows機に
     「GPUなし」と言うのは、事実として誤りだった。
     """
-    return probe_gpu_cli() or _probe_gpu_torch() or probe_gpu_windows() or dict(EMPTY_GPU)
-
-
-def _probe_gpu_torch() -> dict:
-    """torchに聞く(CLIが無い環境向けの保険)。
-
-    torchの初期化は実測5秒かかり、その間GILを握るのでAPIプロセス内で行うと
-    サーバー全体が固まる。子プロセスに逃がして本体を止めない。
-    """
-    code = (
-        "import json,torch\n"
-        "d={'accel':'cpu','name':'','vram_total_mb':0,'vram_free_mb':0}\n"
-        "if torch.cuda.is_available():\n"
-        "    d['accel']='rocm' if getattr(torch.version,'hip',None) else 'cuda'\n"
-        "    free,total=torch.cuda.mem_get_info()\n"
-        "    d.update(name=torch.cuda.get_device_name(0),\n"
-        "             vram_total_mb=int(total/1024**2), vram_free_mb=int(free/1024**2))\n"
-        "print(json.dumps(d))"
-    )
-    try:
-        out = subprocess.run(
-            [sys.executable, "-c", code], capture_output=True, timeout=120, **SUBPROCESS_TEXT
-        )
-        info = json.loads(out.stdout.strip().splitlines()[-1])
-        return info if info.get("accel") != "cpu" else {}
-    except Exception:
-        return {}
-
-
-def apply_rocm_workarounds(torch_module=None) -> None:
-    """ROCm環境で必要なtorchの設定を1箇所で行う(プロセス起動時に1回)。
-
-    torch(rocm wheel)同梱のMIOpenはDropoutカーネルの実行時コンパイルに失敗する
-    (rocrandヘッダ不整合)。cudnn APIを無効化するとpyannoteのLSTMが通常のHIP
-    カーネルで動く(RX 7900 XTX実測: CPU比 約2.8倍高速で結果は同一)。
-    """
-    t = _torch(torch_module)
-    if t is None or detect_accel(torch_module=t) != "rocm":
-        return
-    try:
-        t.backends.cudnn.enabled = False
-    except Exception:
-        pass
+    return probe_gpu_cli() or probe_gpu_windows() or dict(EMPTY_GPU)
