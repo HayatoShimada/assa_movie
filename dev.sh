@@ -42,6 +42,8 @@ case "${1:-all}" in
     # モデルが存在せず tauri build がリソース不足で落ちる。
     # CIは別経路(release.yml)で取っていたため、この穴を踏まなかった
     uv run --no-project python scripts/fetch_diarization_models.py
+    # macOSで署名情報があれば、同梱バイナリにも署名する(公証の要件)
+    [ "$(uname -s)" = "Darwin" ] && ./scripts/sign_macos_binaries.sh
     cd frontend && exec npm run app:build
     ;;
   app)

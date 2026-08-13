@@ -211,6 +211,40 @@ jobs:
         shell: bash
         run: uv run --no-project python scripts/fetch_diarization_models.py
 
+      # 署名と公証(macOSのみ)。Secretsが揃っているときだけ有効にする。
+      # 無署名のままブラウザ経由で配ると、Sequoia以降は「壊れているため
+      # 開けません」と出て、利用者にxattrでの回避を強いることになる。
+      # Tauriのバンドラは APPLE_CERTIFICATE 等の環境変数を見て、
+      # 一時キーチェーンへの取り込み→署名→notarytoolでの公証まで自動で行う
+      - name: 署名・公証の環境変数(macOS)
+        if: matrix.os == 'macos-14'
+        shell: bash
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -z "$APPLE_CERTIFICATE" ]; then
+            echo "::warning::署名用Secretsが無いので無署名でビルドします(利用者にxattrでの回避が必要)"
+            exit 0
+          fi
+          # 空のまま渡すとTauriが「署名しようとして失敗」する。揃ったときだけ出す。
+          # 証明書のbase64は改行を含みうるのでヒアドキュメント形式で書く
+          for name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY \
+                      APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+            { echo "$name<<__KS_EOF__"; echo "${!name}"; echo "__KS_EOF__"; } >> "$GITHUB_ENV"
+          done
+
+      # Tauriは resources/ 内のバイナリを署名しない。公証はバンドル内の
+      # 全Mach-Oに署名を要求するので、バンドル前にここで署名する
+      - name: 同梱バイナリに署名(macOS)
+        if: matrix.os == 'macos-14'
+        shell: bash
+        run: ./scripts/sign_macos_binaries.sh
+
       - name: パッケージを作る
         working-directory: frontend
         run: npm run app:build

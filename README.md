@@ -146,7 +146,25 @@ echo "あなたのAPIキー" > gemini_api_key.txt
    - **レビュータブ**で「指示語を解決」→ 提案を承認/却下(j/k/a/xキーで高速レビュー)
    - **質問タブ**で「固有名詞をスキャン」→ AIからの質問に回答
    - **クリップタブ**で「切り抜き候補を探す」→ 候補を選んでトリム・中抜き→「書き出し」
-4. 書き出された動画は動画と同じ場所の `exports/` に保存されます
+4. 書き出された動画の保存先は次の「書き出した動画の保存先」を参照
+
+## 書き出した動画の保存先
+
+書き出した切り抜きは、**元動画と同じフォルダの中の `exports/`** に保存されます。
+ファイル名は `元動画名_開始秒s-終了秒s.mp4` です。
+
+動画の取り込み方によって「元動画のあるフォルダ」が変わります:
+
+- **ファイルパスで登録した場合**: 元動画の隣に `exports/` ができます。
+  例: `~/Movies/対談.mov` → `~/Movies/exports/対談_624s-676s.mp4`
+- **アプリへドラッグ&ドロップで取り込んだ場合**: 動画はアプリのデータフォルダに
+  コピーされるため、書き出しもその中に入ります:
+
+| OS | 保存先 |
+|---|---|
+| macOS | `~/Library/Application Support/kirinuki-studio/uploads/project_<番号>/exports/` |
+| Ubuntu | `~/.local/share/kirinuki-studio/uploads/project_<番号>/exports/` |
+| Windows | `%APPDATA%\kirinuki-studio\uploads\project_<番号>\exports\` |
 
 ## ライブラリのバージョン制約(重要)
 
