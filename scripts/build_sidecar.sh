@@ -14,6 +14,16 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# cargo/rustc のパスを通す
+export PATH="$HOME/.cargo/bin:$PATH"
+
+if ! command -v rustc &> /dev/null; then
+  echo "✗ 'rustc' が見つかりません。Tauriのサイドカービルドには Rust のインストールが必要です。" >&2
+  echo "  macOS では以下を実行して Rust をインストールしてください:" >&2
+  echo "    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh" >&2
+  exit 1
+fi
+
 BUILD_DIR="${KS_BUILD_DIR:-build}"
 VENV="$BUILD_DIR/sidecar-venv"
 OUT="frontend/src-tauri/kirinuki-studio-backend"
@@ -86,8 +96,6 @@ cp "$BUILD_DIR/dist/kirinuki-studio-backend$EXE" "$OUT$EXE"
 # Tauriのサイドカーはターゲットトリプル付きの名前を要求する。
 # インストール後は実行ファイルの隣にトリプル無しの名前で置かれるので、
 # backend.rs の sidecar_path() がそのまま拾える
-# rustupは ~/.cargo/bin に入る。呼び出し元のPATH設定に依存しない
-export PATH="$HOME/.cargo/bin:$PATH"
 TRIPLE="$(rustc -vV | sed -n 's/^host: //p')"
 cp "$OUT$EXE" "$OUT-$TRIPLE$EXE"
 echo "=== できました: $OUT$EXE ($(du -h "$OUT$EXE" | cut -f1)) ==="
