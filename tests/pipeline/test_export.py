@@ -73,7 +73,7 @@ def test_clip_override_beats_project_setting(client, tmp_path, captured):
     job = client.app.state.jobs.wait(r.json()["job_id"], timeout=30)
     assert job["status"] == "completed", job["error"]
     graph = captured[-1][captured[-1].index("-filter_complex") + 1]
-    assert "boxblur=" in graph  # クリップ上書きが勝つ
+    assert "gblur=" in graph  # クリップ上書きが勝つ
 
 
 def test_crop_x_slider_moves_window(client, tmp_path, captured):
@@ -137,4 +137,4 @@ def test_face_method_falls_back_without_faces(client, tmp_path, captured, monkey
     )
     _export(client, mid, {"start": 0, "end": 10})
     graph = captured[-1][captured[-1].index("-filter_complex") + 1]
-    assert "boxblur=" in graph
+    assert "gblur=" in graph

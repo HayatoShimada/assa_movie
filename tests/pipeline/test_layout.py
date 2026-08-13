@@ -54,7 +54,7 @@ def test_landscape_to_portrait_blur_pad():
     f = build_layout_filter(1920, 1080, 1080, 1920, "blur_pad")
     # 背景: cover→crop→ぼかし、前景: contain、中央に重ねる
     assert f.startswith("[0:v]split[bg][fg];")
-    assert "boxblur=" in f
+    assert "gblur=" in f
     assert "overlay=(W-w)/2:(H-h)/2" in f
     assert f.endswith("[vlay]")
 
@@ -70,7 +70,7 @@ def test_portrait_to_landscape_crop():
 
 def test_portrait_to_landscape_blur_pad():
     f = build_layout_filter(1080, 1920, 1920, 1080, "blur_pad")
-    assert "boxblur=" in f and f.endswith("[vlay]")
+    assert "gblur=" in f and f.endswith("[vlay]")
 
 
 # ---- face ----
@@ -123,12 +123,12 @@ def test_face_single_portrait_to_landscape_uses_y_center():
 def test_face_none_falls_back_to_blur_pad():
     plan = FacePlan(mode="none", centers=())
     f = build_layout_filter(1920, 1080, 1080, 1920, "face", face_plan=plan)
-    assert "boxblur=" in f  # 顔が見つからなければ安全なぼかし背景
+    assert "gblur=" in f  # 顔が見つからなければ安全なぼかし背景
 
 
 def test_face_without_plan_falls_back_to_blur_pad():
     f = build_layout_filter(1920, 1080, 1080, 1920, "face", face_plan=None)
-    assert "boxblur=" in f
+    assert "gblur=" in f
 
 
 # ---- 奇数ソースの偶数丸め ----
@@ -139,3 +139,38 @@ def test_odd_source_produces_even_crop():
 
     m = re.search(r"crop=(\d+):(\d+):", f)
     assert m and int(m.group(1)) % 2 == 0 and int(m.group(2)) % 2 == 0
+
+
+# ---- 同梱ビルドに無いフィルタを使っていないか ----
+#
+# 同梱ffmpegはLGPLビルド(--enable-gplを付けない)。GPL専用フィルタを
+# レイアウトに使うと、開発機のフルビルドffmpegでは通るのに、配布物では
+# `No such filter` で書き出しが落ちる。boxblurでこれを踏んだ(実測)。
+# GPL専用フィルタの名前を弾いて、同じ穴を二度踏まないようにする。
+GPL_ONLY_FILTERS = frozenset({
+    "boxblur", "smartblur", "delogo", "cover_rect", "find_rect",
+    "geq", "histogram", "owdenoise", "perspective", "pp", "pp7",
+    "repeatfields", "spp", "stereo3d", "super2xsai", "tinterlace",
+    "vidstabdetect", "vidstabtransform", "mcdeint", "nnedi", "eq",
+})
+
+
+@pytest.mark.parametrize("method", ["crop", "blur_pad", "face"])
+def test_レイアウトはGPL専用フィルタを使わない(method):
+    import re
+
+    variants = [
+        build_layout_filter(1920, 1080, 1080, 1920, method,
+                            face_plan=FacePlan(mode="single", centers=(0.5,))),
+        build_layout_filter(1920, 1080, 1080, 1920, method,
+                            face_plan=FacePlan(mode="stack", centers=(0.3, 0.7),
+                                               centers_y=(0.4, 0.6))),
+        build_layout_filter(1080, 1920, 1920, 1080, method),
+    ]
+    for f in variants:
+        if f is None:
+            continue
+        used = set(re.findall(r"(?:^|[;,\]])([a-z][a-z0-9_]*)=", f))
+        used |= set(re.findall(r"(?:^|[;,\]])(vstack|hstack|overlay)(?=[;,\[])", f))
+        bad = used & GPL_ONLY_FILTERS
+        assert not bad, f"{method}: GPL専用フィルタ {bad} を使っている: {f}"
