@@ -118,5 +118,12 @@ macOS 向けのスタンドアロンアプリ (`.app` および `.dmg` インス
 
 > [!NOTE]
 > **コード署名（Code Signing）について**
-> ローカルで開発者証明書（Apple Developer Program）を設定していない場合、Ad-hoc 署名（無署名）でビルドされます。
-> 署名なしの DMG から他の Mac にインストールしたアプリを起動する際、「開発元が未確認のため開けません」という警告が出る場合があります。その場合は、Mac の `システム設定` -> `プライバシーとセキュリティ` から `このまま開く` を選択して許可してください。
+> 開発者証明書（Apple Developer Program）を設定していないため、Ad-hoc 署名でビルドされます。
+> この DMG をブラウザでダウンロードして他の Mac にインストールすると、quarantine 属性が付き、
+> 最近の macOS（Sequoia 以降）では **「"KirinukiStudio.app" は壊れているため開けません」**
+> と表示されます（ファイルは壊れていません。署名が無いだけです）。
+> インストール後にターミナルで次を実行すると起動できます。
+> ```bash
+> xattr -dr com.apple.quarantine /Applications/KirinukiStudio.app
+> ```
+> 根本対応は Apple Developer Program での署名+公証（notarization）です。
