@@ -1,6 +1,12 @@
 {
   "bundle": {
     "resources": {
+      "resources/bin/ffmpeg": "bin/ffmpeg",
+      "resources/bin/ffprobe": "bin/ffprobe",
+      "resources/licenses/ffmpeg/LICENSE.txt": "licenses/ffmpeg/LICENSE.txt",
+      "resources/licenses/ffmpeg/THIRD-PARTY-NOTICES.txt": "licenses/ffmpeg/THIRD-PARTY-NOTICES.txt",
+      "resources/licenses/ffmpeg/NOTICE.md": "licenses/ffmpeg/NOTICE.md",
+      "resources/licenses/ffmpeg/VERSION.txt": "licenses/ffmpeg/VERSION.txt",
       "resources/bin/whisper-cli": "bin/whisper-cli",
       "resources/licenses/whispercpp/LICENSE.txt": "licenses/whispercpp/LICENSE.txt",
       "resources/licenses/whispercpp/VERSION.txt": "licenses/whispercpp/VERSION.txt",

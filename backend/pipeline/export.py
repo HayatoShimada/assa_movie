@@ -24,6 +24,8 @@ VAAPI_DEVICE = "/dev/dri/renderD128"
 ENCODER_QUALITY: dict[str, list[str]] = {
     "libx264": ["-preset", "veryfast", "-crf", "20"],
     "h264_nvenc": ["-preset", "p4", "-cq", "23"],
+    # -q:v は 1〜100 の品質指定(Apple Siliconで有効)。60はCRF 20〜23相当の見た目
+    "h264_videotoolbox": ["-q:v", "60"],
     "h264_vaapi": ["-qp", "23"],
     "h264_qsv": ["-global_quality", "23"],
     "h264_amf": ["-rc", "cqp", "-qp_i", "23", "-qp_p", "23"],

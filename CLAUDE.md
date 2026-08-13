@@ -21,6 +21,11 @@ Tauri(Rust)+ React + Python/FastAPI で、3OS向けのインストーラを配�
 ./dev.sh whispercpp   # GPU機のASR本体(Vulkan/Metal)をビルド+ggmlモデル取得
                       # 要 build-essential / libvulkan-dev / glslc
 
+# macOS
+./scripts/build_ffmpeg_macos.sh                   # 同梱ffmpegをビルド(libass+VideoToolbox)
+                                                  # 要 cmake / meson / ninja。brewのffmpegは
+                                                  # libass無しで字幕焼き込みが失敗するので使わない
+
 # Windows
 ./scripts/build_ffmpeg.sh                         # 同梱ffmpegをビルド(MSYS2のmingw64シェル)
 ./scripts/build_whispercpp.ps1                    # 同梱whisper.cpp(Vulkan)をビルド

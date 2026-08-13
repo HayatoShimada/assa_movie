@@ -114,6 +114,18 @@ BUNDLED=(
   "licenses/diarization/NOTICE.md"
   "licenses/python/THIRD-PARTY-NOTICES.txt"
 )
+# macOSはffmpegも同梱する(Homebrewのffmpeg 9はlibass無しで字幕焼き込みが失敗する)。
+# Linuxは.debの依存宣言 / AppImageは案内で対応するため同梱しない
+case "$PACKAGE" in
+  *.dmg) BUNDLED+=(
+    "bin/ffmpeg"
+    "bin/ffprobe"
+    "licenses/ffmpeg/LICENSE.txt"
+    "licenses/ffmpeg/THIRD-PARTY-NOTICES.txt"
+    "licenses/ffmpeg/NOTICE.md"
+    "licenses/ffmpeg/VERSION.txt"
+  ) ;;
+esac
 for rel in "${BUNDLED[@]}"; do
   if [ -f "$ROOT/$rel" ]; then
     ok "同梱: $rel ($(du -h "$ROOT/$rel" | cut -f1))"
@@ -185,10 +197,12 @@ else
       *) ng "GPU機なのにwhisper.cppが選ばれていない(同梱物を起動できていない)" ;;
     esac
 
-    # **ffmpegはLinux/macOSには同梱していない**(.debは依存宣言、macOSはbrew)。
-    # 検証機に入っているかどうかは配布物の問題ではないので、NGにはしない。
-    # ここで見たいのは「同梱していないものを同梱物として探していないか」だけ
-    case "$env_json" in
+    # macOS(.dmg)はffmpegを同梱しているので、見つからなければ配布物の欠陥。
+    # Linuxは同梱していない(.debは依存宣言、AppImageは案内)ため、
+    # 検証機に入っているかどうかは配布物の問題ではなくNGにしない
+    case "$PACKAGE:$env_json" in
+      *.dmg:*'"ffmpeg":true'*) ok "同梱ffmpegを見つけている" ;;
+      *.dmg:*) ng "同梱したはずのffmpegが見つからない" ;;
       *'"ffmpeg":true'*) ok "ffmpeg を見つけている" ;;
       *) info "ffmpeg はこの機体に入っていない(同梱対象外。書き出し時に案内が出る)" ;;
     esac

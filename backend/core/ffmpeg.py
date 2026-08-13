@@ -73,7 +73,12 @@ def missing_message(os_name: str | None = None, appimage: bool | None = None) ->
             "インストールし直すか、公式サイトから導入してPATHを通してください"
         )
     if os_name == "Darwin":
-        return "ffmpegが見つかりません。`brew install ffmpeg` でインストールしてください"
+        # brewを案内しない: Homebrewのffmpeg 9はlibassが外されていて、
+        # 入れても字幕焼き込みが `ass` フィルタ不在で必ず失敗する(実測)
+        return (
+            "ffmpegが見つかりません。通常はアプリに同梱されています。"
+            "アプリをインストールし直してください"
+        )
     # AppImageは起動時に自身のパスを APPIMAGE 環境変数へ入れる
     if appimage is None:
         appimage = bool(os.environ.get("APPIMAGE"))

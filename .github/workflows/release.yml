@@ -167,6 +167,25 @@ jobs:
         shell: msys2 {0}
         run: ./scripts/build_ffmpeg.sh
 
+      # macOSも同梱する。Homebrewのffmpeg 9はlibassが外されていて、
+      # 「brewで入れてください」と案内しても字幕の焼き込みが必ず失敗する(実測)
+      - name: 同梱ffmpegのキャッシュ(macOS)
+        if: matrix.os == 'macos-14'
+        id: ffmpeg-cache-mac
+        uses: actions/cache@v4
+        with:
+          path: |
+            frontend/src-tauri/resources/bin/ffmpeg
+            frontend/src-tauri/resources/bin/ffprobe
+            frontend/src-tauri/resources/licenses/ffmpeg
+          key: ffmpeg-mac-${{ hashFiles('scripts/build_ffmpeg_macos.sh', 'licenses/ffmpeg-NOTICE-macos.md', 'licenses/LGPL-2.1.txt') }}
+
+      - name: ffmpegをビルドして同梱(macOS)
+        if: matrix.os == 'macos-14' && steps.ffmpeg-cache-mac.outputs.cache-hit != 'true'
+        run: |
+          brew install meson ninja
+          ./scripts/build_ffmpeg_macos.sh
+
       # 話者分離モデル(77MB)。配布物にtorchは入れていないのでpyannoteは動かず、
       # ONNXが唯一使えるエンジンになる。同梱しないと話者分離が全く使えない
       - name: 話者分離モデルのキャッシュ

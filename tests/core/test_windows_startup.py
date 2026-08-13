@@ -122,9 +122,15 @@ def test_Windows以外は拡張子を付けない(tmp_path):
 
 
 def test_見つからないときの案内はOSごとに変える():
-    """Linuxの `apt install` をWindowsやmacOSに出しても意味がない"""
+    """Linuxの `apt install` をWindowsやmacOSに出しても意味がない。
+
+    macOSはv1.0.0から同梱する。brewを案内してはいけない:
+    Homebrewのffmpeg 9はlibassが外されていて、入れても字幕の焼き込みが
+    `ass` フィルタ不在で必ず失敗する(実測)。
+    """
     assert "同梱" in ffmpeg_mod.missing_message("Windows")
-    assert "brew" in ffmpeg_mod.missing_message("Darwin")
+    assert "同梱" in ffmpeg_mod.missing_message("Darwin")
+    assert "brew" not in ffmpeg_mod.missing_message("Darwin")
     assert "apt" in ffmpeg_mod.missing_message("Linux")
 
 
@@ -171,6 +177,23 @@ def test_選ばれたエンコーダをそのまま使う(encoder, must_contain)
     assert "libx264" not in cmd
     for arg in must_contain:
         assert arg in cmd, f"{encoder} に {arg} が無い"
+
+
+def test_macOSはVideoToolboxを選ぶ():
+    """同梱するmacOS版ffmpegはLGPLビルドで、エンコーダはVideoToolboxだけ。
+
+    VideoToolboxはApple純正で全Macにあり、ハードウェアが使えない機体でも
+    OS側がソフトウェア実装に切り替えて完走する。libx264への転落は無い。
+    """
+    listed = "h264_videotoolbox hevc_videotoolbox"
+    assert _pick_encoder(listed, False, False, os_name="Darwin") == "h264_videotoolbox"
+
+
+def test_VideoToolboxに品質指定を渡す():
+    """品質指定が無いとffmpeg既定の低ビットレートになり、明らかに画質が落ちる"""
+    cmd = build_export_cmd(Path("in.mov"), Path("out.mp4"), 0, 10, encoder="h264_videotoolbox")
+    assert cmd[cmd.index("-c:v") + 1] == "h264_videotoolbox"
+    assert "-q:v" in cmd
 
 
 def test_音声は内蔵AACで足りる():

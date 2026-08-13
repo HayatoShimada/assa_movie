@@ -20,11 +20,22 @@ xcode-select --install
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 ```
 
-### ③ 必要なパッケージ (FFmpeg, CMake)
-動画編集に必要な `ffmpeg` と、`whisper.cpp` のビルドに必要な `cmake` をインストールします。
+### ③ 必要なパッケージ (CMake, Meson, Ninja)
+`whisper.cpp` のビルドに必要な `cmake` と、同梱 ffmpeg のビルドに必要な `meson` / `ninja` をインストールします。
 ```bash
-brew install ffmpeg cmake
+brew install cmake meson ninja
 ```
+
+> [!WARNING]
+> **`brew install ffmpeg` は使わないでください。** Homebrew の ffmpeg 9 系は libass
+> (字幕焼き込み) が外されており、書き出しが `ass` フィルタ不在で必ず失敗します。
+> ffmpeg は次のコマンドで配布版と同じものをビルドして使います (libass + VideoToolbox 入り)。
+> ```bash
+> ./scripts/build_ffmpeg_macos.sh
+> ```
+> 生成先は `frontend/src-tauri/resources/bin/{ffmpeg,ffprobe}` です。バックエンドは
+> PATH → 同梱の順で探すため、PATH に libass 無しの ffmpeg があるとそちらが優先されて
+> しまう点に注意してください。
 
 ### ④ Node.js (v20以上)
 フロントエンドの開発環境に必要です。

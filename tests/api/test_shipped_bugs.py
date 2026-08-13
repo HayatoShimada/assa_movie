@@ -180,10 +180,12 @@ class TestFFmpegの案内:
         )
 
     def test_既存の案内は変えない(self):
+        # macOSはv1.0.0からffmpegを同梱し、brewを案内しない
+        # (Homebrewのffmpeg 9はlibass無しで字幕焼き込みが必ず失敗する)
         from backend.core.ffmpeg import missing_message
 
         assert "同梱" in missing_message("Windows")
-        assert "brew" in missing_message("Darwin")
+        assert "同梱" in missing_message("Darwin")
         assert "apt" in missing_message("Linux")
 
 
