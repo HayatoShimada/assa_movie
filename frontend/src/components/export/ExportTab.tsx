@@ -1,5 +1,9 @@
 /**
- * 書き出しタブ: 概要(ブリーフ)の編集・字幕ジャッジ・フィラー検出・クリップ書き出し。
+ * 書き出しタブ: 字幕ジャッジ・フィラー検出と、秒指定の書き出し(詳細)。
+ *
+ * 切り抜きの書き出しはクリップタブが本線。ここにも開始秒/終了秒の書き出し欄が
+ * 並んでいて「どちらで書き出すのか」迷わせていたので、秒指定は「詳細」に畳む。
+ * 動画の概要(ブリーフ)は文字起こしタブの先頭へ移した(components/brief)。
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
@@ -8,65 +12,7 @@ import { useTrackedJob } from '../../hooks/useTrackedJob'
 import { jobSlots } from '../../lib/jobs'
 import { JobStatus } from '../JobStatus'
 import { Button, formatTime } from '../ui'
-
-function BriefEditor({ mediaId }: { mediaId: number }) {
-  const queryClient = useQueryClient()
-  const brief = useQuery({
-    queryKey: ['brief', mediaId],
-    queryFn: () =>
-      fetch(`/api/media/${mediaId}/brief`).then(
-        (r) => r.json() as Promise<{ theme: string; people: string; notes: string }>,
-      ),
-  })
-  const save = useMutation({
-    mutationFn: (patch: Record<string, string>) =>
-      fetch(`/api/media/${mediaId}/brief`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...brief.data, ...patch }),
-      }).then((r) => r.json()),
-    onSuccess: (data) => queryClient.setQueryData(['brief', mediaId], data),
-  })
-
-  if (!brief.data) return null
-  const fields = [
-    { key: 'theme', label: '動画全体の主題', placeholder: '例: AIと人の関わりについての対談' },
-    {
-      key: 'people',
-      label: '登場人物の紹介',
-      placeholder: '例: はやまる(古着店「箱ストア」店主)、高田さん(エッセイスト)',
-    },
-    {
-      key: 'notes',
-      label: '固有名詞・補足',
-      placeholder: '例: 「箱ストア」は店名。「富山変人会」は二人が出会ったイベント',
-    },
-  ] as const
-
-  return (
-    <div className="space-y-2 border-b border-neutral-200 p-3 dark:border-neutral-800">
-      <h3 className="text-xs font-semibold text-neutral-500">
-        動画の概要(すべてのAI処理のプロンプトに注入されます)
-      </h3>
-      {fields.map((f) => (
-        <label key={f.key} className="block text-xs">
-          <span className="text-neutral-500">{f.label}</span>
-          <textarea
-            data-testid={`brief-${f.key}`}
-            className="mt-0.5 w-full rounded border border-neutral-300 px-2 py-1 text-sm dark:border-neutral-700 dark:bg-neutral-900"
-            rows={2}
-            defaultValue={brief.data[f.key]}
-            placeholder={f.placeholder}
-            onBlur={(e) => {
-              if (e.target.value !== brief.data[f.key]) save.mutate({ [f.key]: e.target.value })
-            }}
-          />
-        </label>
-      ))}
-      {save.isSuccess && <p className="text-xs text-emerald-600">保存しました</p>}
-    </div>
-  )
-}
+import { ExportResult } from './ExportResult'
 
 function JobButton({
   mediaId,
@@ -111,7 +57,14 @@ function JobButton({
   )
 }
 
-export function ExportTab({ mediaId }: { mediaId: number }) {
+export function ExportTab({
+  mediaId,
+  onGoToClips,
+}: {
+  mediaId: number
+  /** クリップタブへ切り替える(切り抜きの書き出しはそちらが本線) */
+  onGoToClips?: () => void
+}) {
   const queryClient = useQueryClient()
   const media = useQuery({ queryKey: ['mediaItem', mediaId], queryFn: () => api.getMedia(mediaId) })
   const duration = media.data?.duration ?? 60
@@ -146,7 +99,19 @@ export function ExportTab({ mediaId }: { mediaId: number }) {
 
   return (
     <div className="flex h-full flex-col overflow-y-auto">
-      <BriefEditor mediaId={mediaId} />
+      <div
+        data-testid="export-guide"
+        className="space-y-1 border-b border-neutral-200 p-3 text-sm dark:border-neutral-800"
+      >
+        <p>
+          切り抜き動画は<strong>クリップタブ</strong>で範囲を選んで書き出します。
+        </p>
+        {onGoToClips && (
+          <Button variant="ghost" data-testid="export-go-clips" onClick={onGoToClips}>
+            クリップタブを開く
+          </Button>
+        )}
+      </div>
 
       <div className="space-y-2 border-b border-neutral-200 p-3 dark:border-neutral-800">
         <h3 className="text-xs font-semibold text-neutral-500">AI処理</h3>
@@ -168,8 +133,16 @@ export function ExportTab({ mediaId }: { mediaId: number }) {
         </div>
       </div>
 
-      <div className="space-y-2 p-3">
-        <h3 className="text-xs font-semibold text-neutral-500">クリップ書き出し</h3>
+      {/* この欄から書き出したことがあれば(タブを切り替えて戻っても)開いておく。
+          進捗と保存先が畳まれて見えなくならないように */}
+      <details
+        data-testid="export-advanced"
+        className="space-y-2 p-3"
+        open={exportJob.jobId !== null ? true : undefined}
+      >
+        <summary className="cursor-pointer text-xs font-semibold text-neutral-500">
+          詳細: 開始秒と終了秒を指定して書き出す
+        </summary>
         <div className="flex items-center gap-2 text-sm">
           <label>
             開始(秒)
@@ -213,12 +186,10 @@ export function ExportTab({ mediaId }: { mediaId: number }) {
           done="書き出し完了"
           data-testid="export-status"
         />
-        {resultPath && (
-          <p data-testid="export-result" className="break-all text-xs text-emerald-600">
-            出力: {resultPath}
-          </p>
+        {exportJob.jobId !== null && resultPath && (
+          <ExportResult jobId={exportJob.jobId} path={resultPath} testId="export-result" />
         )}
-      </div>
+      </details>
     </div>
   )
 }

@@ -4,14 +4,125 @@
  * 字幕の位置・サイズはバックエンド(pipeline/subtitle.py scaled_style)と
  * 同じ相対規則で描く。規則そのものは lib/subtitleLayout.ts の純関数にあり、
  * テストで期待値を固定している。
+ *
+ * 再生操作はブラウザ標準のコントロール(動画の上に重なる)を使わず、映像の枠の
+ * 下に置く。標準のコントロールは映像の下端に重なり、下配置の字幕が隠れて
+ * 読めなかった。枠(cqw/cqhの基準)は映像そのものなので、書き出しとの対応は変わらない。
  */
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { API_BASE, type Orientation, type Segment } from '../../api/client'
 import type { ConvertMethod } from '../../lib/catalogs'
 import { wrapSubtitle } from '../../lib/subtitle'
 import { hexToRgba, overlayGeometry, type SubtitlePosition } from '../../lib/subtitleLayout'
 import type { SettingsValues } from '../../lib/settings'
 import { usePlayback } from '../../stores/playback'
+import { formatTime } from '../ui'
+
+/** 映像の下に置く再生操作(再生/一時停止・シーク・時刻・ミュート) */
+function PlayerControls({
+  video,
+  currentTime,
+}: {
+  video: HTMLVideoElement | null
+  currentTime: number
+}) {
+  const [playing, setPlaying] = useState(false)
+  const [duration, setDuration] = useState(0)
+  const [muted, setMuted] = useState(false)
+
+  useEffect(() => {
+    if (!video) return
+    const sync = () => {
+      setPlaying(!video.paused && !video.ended)
+      setDuration(Number.isFinite(video.duration) ? video.duration : 0)
+      setMuted(video.muted)
+    }
+    const events = ['play', 'pause', 'ended', 'loadedmetadata', 'durationchange', 'volumechange']
+    events.forEach((e) => video.addEventListener(e, sync))
+    sync()
+    return () => events.forEach((e) => video.removeEventListener(e, sync))
+  }, [video])
+
+  const btn =
+    'flex h-8 w-8 shrink-0 items-center justify-center rounded hover:bg-neutral-200 disabled:opacity-40 dark:hover:bg-neutral-800'
+  return (
+    <div data-testid="player-controls" className="mt-2 flex items-center gap-2 text-xs">
+      <button
+        type="button"
+        data-testid="player-play"
+        className={btn}
+        disabled={!video}
+        aria-label={playing ? '一時停止' : '再生'}
+        title={playing ? '一時停止' : '再生'}
+        onClick={() => (playing ? video?.pause() : void video?.play().catch(() => {}))}
+      >
+        {playing ? (
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 14 14"
+            className="fill-current"
+            aria-hidden="true"
+          >
+            <rect x="2" y="1" width="3.5" height="12" rx="1" />
+            <rect x="8.5" y="1" width="3.5" height="12" rx="1" />
+          </svg>
+        ) : (
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 14 14"
+            className="fill-current"
+            aria-hidden="true"
+          >
+            <path d="M3 1.5v11l9.5-5.5z" />
+          </svg>
+        )}
+      </button>
+      <input
+        data-testid="player-seek"
+        type="range"
+        aria-label="再生位置"
+        className="min-w-0 flex-1"
+        min={0}
+        max={duration || 0}
+        step={0.1}
+        value={Math.min(currentTime, duration || currentTime)}
+        disabled={!video || !duration}
+        onChange={(e) => {
+          if (video) video.currentTime = Number(e.target.value)
+        }}
+      />
+      <span data-testid="player-time" className="shrink-0 font-mono tabular-nums text-neutral-500">
+        {formatTime(currentTime)} / {formatTime(duration)}
+      </span>
+      <button
+        type="button"
+        data-testid="player-mute"
+        className={btn}
+        disabled={!video}
+        aria-label={muted ? '音を出す' : '音を消す'}
+        title={muted ? '音を出す' : '音を消す'}
+        onClick={() => {
+          if (video) video.muted = !video.muted
+        }}
+      >
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 16 16"
+          className="stroke-current"
+          fill="none"
+          strokeWidth="1.5"
+          aria-hidden="true"
+        >
+          <path d="M2 6h3l4-3v10l-4-3H2z" className="fill-current" />
+          {muted ? <path d="M11 6l4 4m0-4l-4 4" /> : <path d="M11.5 5.5a3.5 3.5 0 0 1 0 5" />}
+        </svg>
+      </button>
+    </div>
+  )
+}
 
 export function VideoPlayer({
   mediaId,
@@ -35,6 +146,8 @@ export function VideoPlayer({
   cropX?: number
 }) {
   const ref = useRef<HTMLVideoElement>(null)
+  // 再生操作に要素を渡すため、マウント後に再レンダリングさせる
+  const [videoEl, setVideoEl] = useState<HTMLVideoElement | null>(null)
   const setCurrentTime = usePlayback((s) => s.setCurrentTime)
   const setSeeker = usePlayback((s) => s.setSeeker)
   const currentTime = usePlayback((s) => s.currentTime)
@@ -45,6 +158,7 @@ export function VideoPlayer({
     setSeeker((t) => {
       video.currentTime = t
     })
+    setVideoEl(video)
     return () => setSeeker(null)
   }, [setSeeker])
 
@@ -83,56 +197,66 @@ export function VideoPlayer({
         : undefined
 
   return (
-    <div
-      data-testid="player-frame"
-      data-orientation={outputOrientation}
-      className={`relative mx-auto overflow-hidden rounded-lg bg-black ${
-        isPortrait ? 'aspect-[9/16] max-h-[80vh]' : 'aspect-video w-full'
-      }`}
-      style={{ containerType: 'inline-size' }}
-    >
-      <video
-        ref={ref}
-        data-testid="video"
-        className="h-full w-full"
-        style={videoFit}
-        src={`${API_BASE}/api/media/${mediaId}/file`}
-        controls
-        onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
-      />
-      {convertMethod && convertMethod !== 'crop' && isPortrait && (
-        <p className="pointer-events-none absolute left-2 top-2 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">
-          {convertMethod === 'blur_pad' ? '書き出し時: 余白はぼかし背景' : '書き出し時: 顔検出で自動レイアウト'}
-        </p>
-      )}
-      {lines.length > 0 && (
-        <p
-          data-testid="subtitle-overlay"
-          className="pointer-events-none absolute text-center font-bold"
-          style={{
-            ...overlayStyle,
-            fontSize: fontSizeCq,
-            fontFamily: `'${fontFamily}', sans-serif`,
-            color: textColor,
-            lineHeight: 1.2,
-            textShadow: bg === 'box' ? 'none' : '0 0 4px rgba(0,0,0,.9), 0 0 8px rgba(0,0,0,.7)',
+    <div>
+      <div
+        data-testid="player-frame"
+        data-orientation={outputOrientation}
+        className={`relative mx-auto overflow-hidden rounded-lg bg-black ${
+          isPortrait ? 'aspect-[9/16] max-h-[80vh]' : 'aspect-video w-full'
+        }`}
+        style={{ containerType: 'inline-size' }}
+      >
+        <video
+          ref={ref}
+          data-testid="video"
+          className="h-full w-full"
+          style={videoFit}
+          src={`${API_BASE}/api/media/${mediaId}/file`}
+          // 映像のクリックでも再生/一時停止できるようにする(標準コントロールの代わり)
+          onClick={(e) => {
+            const v = e.currentTarget
+            if (v.paused) void v.play().catch(() => {})
+            else v.pause()
           }}
-        >
-          {lines.map((line, i) => (
-            <span
-              key={i}
-              className="mx-auto block w-fit"
-              style={
-                bg === 'box'
-                  ? { backgroundColor: hexToRgba(bgColor, bgOpacity), padding: '0 0.3em' }
-                  : undefined
-              }
-            >
-              {line}
-            </span>
-          ))}
-        </p>
-      )}
+          onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+        />
+        {convertMethod && convertMethod !== 'crop' && isPortrait && (
+          <p className="pointer-events-none absolute left-2 top-2 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">
+            {convertMethod === 'blur_pad'
+              ? '書き出し時: 余白はぼかし背景'
+              : '書き出し時: 顔検出で自動レイアウト'}
+          </p>
+        )}
+        {lines.length > 0 && (
+          <p
+            data-testid="subtitle-overlay"
+            className="pointer-events-none absolute text-center font-bold"
+            style={{
+              ...overlayStyle,
+              fontSize: fontSizeCq,
+              fontFamily: `'${fontFamily}', sans-serif`,
+              color: textColor,
+              lineHeight: 1.2,
+              textShadow: bg === 'box' ? 'none' : '0 0 4px rgba(0,0,0,.9), 0 0 8px rgba(0,0,0,.7)',
+            }}
+          >
+            {lines.map((line, i) => (
+              <span
+                key={i}
+                className="mx-auto block w-fit"
+                style={
+                  bg === 'box'
+                    ? { backgroundColor: hexToRgba(bgColor, bgOpacity), padding: '0 0.3em' }
+                    : undefined
+                }
+              >
+                {line}
+              </span>
+            ))}
+          </p>
+        )}
+      </div>
+      <PlayerControls video={videoEl} currentTime={currentTime} />
     </div>
   )
 }

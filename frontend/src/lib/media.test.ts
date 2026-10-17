@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clipStatusLabel, mediaDisplayName, mediaState } from './media'
+import { clipStatusLabel, mediaDisplayName, mediaState, splitPath } from './media'
 
 describe('mediaDisplayName(一覧に出す動画名)', () => {
   it.each([
@@ -54,5 +54,21 @@ describe('clipStatusLabel(クリップの状態)', () => {
     ['unknown_status', 'unknown_status'],
   ])('%s → %s', (status, label) => {
     expect(clipStatusLabel(status)).toBe(label)
+  })
+})
+
+describe('splitPath(書き出し先の表示)', () => {
+  it.each([
+    // [パス, フォルダ, ファイル名]
+    ['/home/user/Videos/exports/対談_0s-10s_clip1.mp4', '/home/user/Videos/exports', '対談_0s-10s_clip1.mp4'],
+    // Windowsの区切り「\」でもフォルダとファイル名に分ける
+    [
+      'C:\\Users\\山田\\AppData\\Roaming\\kirinuki-studio\\uploads\\project_3\\exports\\対談 1_0s-10s.mp4',
+      'C:\\Users\\山田\\AppData\\Roaming\\kirinuki-studio\\uploads\\project_3\\exports',
+      '対談 1_0s-10s.mp4',
+    ],
+    ['a.mp4', '', 'a.mp4'],
+  ])('%s', (path, folder, name) => {
+    expect(splitPath(path)).toEqual({ folder, name })
   })
 })

@@ -4,6 +4,7 @@ ffmpeg本体の場所は backend/core/ffmpeg.py が決める(配布版は同梱�
 """
 
 import platform
+import re
 import shutil
 import subprocess
 from functools import lru_cache
@@ -138,6 +139,29 @@ def probe_media(path: Path) -> tuple[float | None, int | None, int | None]:
             cap.release()
     except Exception:
         return None, None, None
+
+
+# アップロード時に保存名の前へ付く衝突よけ(uuid4().hex + "_")。backend/api/projects.py。
+# フロントの表示名(frontend/src/lib/media.ts の UPLOAD_PREFIX)と同じ規則
+UPLOAD_PREFIX = re.compile(r"^[0-9a-f]{32}_(?=.)")
+
+
+def export_dir(media_path: Path) -> Path:
+    """書き出し先。元動画と同じフォルダの exports/(README「書き出した動画の保存先」)"""
+    return media_path.parent / "exports"
+
+
+def export_file_name(
+    media_path: Path, start: float, end: float, clip_id: int | None = None
+) -> str:
+    """書き出しファイル名(純関数)。`元動画名_開始秒s-終了秒s[_clip番号].mp4`
+
+    取り込んだ動画の衝突よけ(32桁hex)は利用者に意味が無いので外す。
+    クリップの書き出しは番号を付けて、同じ範囲の別クリップと衝突させない。
+    """
+    stem = UPLOAD_PREFIX.sub("", media_path.stem)
+    suffix = f"_clip{clip_id}" if clip_id else ""
+    return f"{stem}_{int(start)}s-{int(end)}s{suffix}.mp4"
 
 
 def _escape_filter_path(path: Path) -> str:

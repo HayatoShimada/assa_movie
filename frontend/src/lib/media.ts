@@ -15,7 +15,15 @@ export function mediaDisplayName(path: string): string {
   return base.replace(UPLOAD_PREFIX, '')
 }
 
-export type StateTone = 'neutral' | 'busy' | 'done' | 'error'
+/** パスをフォルダとファイル名に分ける(書き出し先の表示用。「\」区切りにも対応) */
+export function splitPath(path: string): { folder: string; name: string } {
+  const cut = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
+  return cut < 0
+    ? { folder: '', name: path }
+    : { folder: path.slice(0, cut), name: path.slice(cut + 1) }
+}
+
+export type StateTone ='neutral' | 'busy' | 'done' | 'error'
 
 export interface MediaState {
   label: string

@@ -15,6 +15,8 @@ export type Edit = components['schemas']['Edit']
 export type AssistEdit = components['schemas']['AssistEdit']
 export type Question = components['schemas']['Question']
 export type UserTerm = components['schemas']['UserTerm']
+/** 動画の概要(主題・登場人物・固有名詞)。すべてのAI処理のプロンプトに入る */
+export type Brief = components['schemas']['Brief']
 
 declare global {
   interface Window {
@@ -96,12 +98,21 @@ export const api = {
     return request<Media>(`/api/projects/${projectId}/media/upload`, { method: 'POST', body: form })
   },
 
+  getBrief: (mediaId: number) => request<Brief>(`/api/media/${mediaId}/brief`),
+  updateBrief: (mediaId: number, brief: Brief) =>
+    request<Brief>(`/api/media/${mediaId}/brief`, { method: 'PATCH', body: JSON.stringify(brief) }),
+
   createJob: (mediaId: number, type: string, params: Record<string, unknown> = {}) =>
     post<Job>(`/api/media/${mediaId}/jobs`, { type, params }),
   getJob: (jobId: number) => request<Job>(`/api/jobs/${jobId}`),
   /** 待機中・実行中のジョブ(タブ切替・再読み込みの後に進捗を取り直す。lib/jobs.ts) */
   listActiveJobs: () => request<Job[]>('/api/jobs/active'),
   cancelJob: (jobId: number) => post<Job>(`/api/jobs/${jobId}/cancel`),
+  /** 書き出したファイルのあるフォルダをOSのファイラーで開く(書き出しジョブ限定) */
+  revealExport: (jobId: number) =>
+    post<components['schemas']['RevealResult']>(`/api/jobs/${jobId}/reveal`),
+  /** 書き出した動画のURL(画面内での再生用) */
+  exportOutputUrl: (jobId: number) => `${API_BASE}/api/jobs/${jobId}/output`,
 
   listSegments: (mediaId: number, includeAizuchi = true) =>
     request<Segment[]>(

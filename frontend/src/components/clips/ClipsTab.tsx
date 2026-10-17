@@ -7,6 +7,8 @@ import { useTrackedJob } from '../../hooks/useTrackedJob'
 import { CONVERT_METHOD_LABELS } from '../../lib/catalogs'
 import { jobSlots } from '../../lib/jobs'
 import { clipStatusLabel } from '../../lib/media'
+import type { SettingsValues } from '../../lib/settings'
+import { ExportResult } from '../export/ExportResult'
 import { TrashIcon } from '../icons'
 import { usePlayback } from '../../stores/playback'
 import { JobStatus } from '../JobStatus'
@@ -27,16 +29,29 @@ function effectiveDuration(clip: Clip): number {
   return clip.end - clip.start - cutTotal
 }
 
+const POSITION_LABELS: Record<Clip['subtitle_position'], string> = {
+  top: '上',
+  center: '中央',
+  bottom: '下',
+}
+
+const inputCls =
+  'w-full rounded border border-neutral-300 px-2 py-1 text-sm dark:border-neutral-700 dark:bg-neutral-900'
+
 function ClipEditor({
   clip,
   mediaId,
-  globalSubtitlePosition,
-  globalSubtitleOffsetY,
+  duration,
+  defaultSubtitlePosition,
+  defaultSubtitleOffsetY,
 }: {
   clip: Clip
   mediaId: number
-  globalSubtitlePosition: Clip['subtitle_position']
-  globalSubtitleOffsetY: number
+  /** 動画の長さ(秒)。範囲バーを動画の終わりより後ろへ広げないため */
+  duration: number | null
+  /** プロジェクト設定(未設定なら全体設定)の字幕位置 */
+  defaultSubtitlePosition: Clip['subtitle_position']
+  defaultSubtitleOffsetY: number
 }) {
   const queryClient = useQueryClient()
   const seekTo = usePlayback((s) => s.seekTo)
@@ -94,6 +109,7 @@ function ClipEditor({
     <div className="space-y-3 border-t border-neutral-200 p-3 dark:border-neutral-800">
       <ClipTimeline
         clip={clip}
+        duration={duration}
         onRangeChange={(start, end) => update.mutate({ start, end })}
         onToggleCut={(id, active) => toggleCut.mutate({ id, active })}
       />
@@ -166,10 +182,8 @@ function ClipEditor({
         done="書き出し完了"
         data-testid="clip-export-status"
       />
-      {resultPath && (
-        <p data-testid="clip-export-result" className="break-all text-xs text-emerald-600">
-          出力: {resultPath}
-        </p>
+      {exportJob.jobId !== null && resultPath && (
+        <ExportResult jobId={exportJob.jobId} path={resultPath} testId="clip-export-result" />
       )}
 
       <div className="space-y-1">
@@ -208,30 +222,43 @@ function ClipEditor({
             />
           </>
         )}
-        <div className="flex items-center justify-between">
-          <label className="block text-xs text-neutral-500">字幕位置</label>
+        <div className="flex items-center justify-between gap-2">
+          <label htmlFor={`clip-${clip.id}-subtitle-position`} className="block text-xs text-neutral-500">
+            字幕位置(このクリップだけ)
+          </label>
+          {/* クリップの字幕位置を、プロジェクト設定(未設定なら全体設定)の値へ戻す。
+              以前の「全体設定で上書き」は、全体設定を書き換えるのか戻すのか読めなかった */}
           <Button
             type="button"
             variant="ghost"
+            data-testid="clip-subtitle-reset"
+            title="字幕位置と上下微調整を、プロジェクト設定(未設定なら全体設定)の値に戻します"
+            disabled={
+              clip.subtitle_position === defaultSubtitlePosition &&
+              clip.subtitle_offset_y === defaultSubtitleOffsetY
+            }
             onClick={() =>
               update.mutate({
-                subtitle_position: globalSubtitlePosition,
-                subtitle_offset_y: globalSubtitleOffsetY,
+                subtitle_position: defaultSubtitlePosition,
+                subtitle_offset_y: defaultSubtitleOffsetY,
               })
             }
           >
-            全体設定で上書き
+            既定の位置に戻す({POSITION_LABELS[defaultSubtitlePosition]}・{defaultSubtitleOffsetY}px)
           </Button>
         </div>
         <select
+          id={`clip-${clip.id}-subtitle-position`}
           data-testid="clip-subtitle-position"
-          className="w-full rounded border border-neutral-300 px-2 py-1 text-sm dark:border-neutral-700 dark:bg-neutral-900"
+          className={inputCls}
           value={clip.subtitle_position}
           onChange={(e) => update.mutate({ subtitle_position: e.target.value as Clip['subtitle_position'] })}
         >
-          <option value="top">上</option>
-          <option value="center">中央</option>
-          <option value="bottom">下</option>
+          {Object.entries(POSITION_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
         </select>
         <label className="block text-xs text-neutral-500">上下微調整 ({clip.subtitle_offset_y}px)</label>
         <div className="flex items-center gap-2">
@@ -260,20 +287,32 @@ function ClipEditor({
             下へ
           </Button>
         </div>
-        <input
-          className="w-full rounded border border-neutral-300 px-2 py-1 text-sm dark:border-neutral-700 dark:bg-neutral-900"
-          placeholder="タイトル"
-          defaultValue={clip.title ?? ''}
-          onBlur={(e) => e.target.value !== (clip.title ?? '') && update.mutate({ title: e.target.value })}
-        />
-        <input
-          className="w-full rounded border border-neutral-300 px-2 py-1 text-sm dark:border-neutral-700 dark:bg-neutral-900"
-          placeholder="フックテキスト(冒頭テロップ)"
-          defaultValue={clip.hook_text ?? ''}
-          onBlur={(e) =>
-            e.target.value !== (clip.hook_text ?? '') && update.mutate({ hook_text: e.target.value })
-          }
-        />
+        {/* タイトルとフックは投稿用のメモ。書き出す動画には焼き込まない */}
+        <label className="block pt-1 text-xs text-neutral-500">
+          タイトル(一覧での名前・投稿用。動画には入りません)
+          <input
+            data-testid="clip-title"
+            className={`mt-0.5 ${inputCls} text-neutral-900 dark:text-neutral-100`}
+            placeholder="例: ハッカソンで見つけた答え"
+            defaultValue={clip.title ?? ''}
+            onBlur={(e) =>
+              e.target.value !== (clip.title ?? '') && update.mutate({ title: e.target.value })
+            }
+          />
+        </label>
+        <label className="block text-xs text-neutral-500">
+          フック(投稿時に冒頭へ載せるテロップ案。動画には入りません)
+          <input
+            data-testid="clip-hook"
+            className={`mt-0.5 ${inputCls} text-neutral-900 dark:text-neutral-100`}
+            placeholder="例: 去年の意外な挑戦"
+            defaultValue={clip.hook_text ?? ''}
+            onBlur={(e) =>
+              e.target.value !== (clip.hook_text ?? '') &&
+              update.mutate({ hook_text: e.target.value })
+            }
+          />
+        </label>
         {clip.meta && (
           <div className="rounded border border-neutral-200 p-2 text-xs dark:border-neutral-700">
             {clip.meta.hooks.length > 0 && (
@@ -302,15 +341,18 @@ function ClipEditor({
 
 export function ClipsTab({
   mediaId,
+  styleValues,
   onSelectedClipChange,
 }: {
   mediaId: number
+  /** プロジェクト設定を反映済みの設定値(lib/settings.ts の resolveSettings) */
+  styleValues: SettingsValues
   /** プレビュー用に選択中のクリップを親へ通知する */
   onSelectedClipChange?: (clip: Clip | null) => void
 }) {
   const queryClient = useQueryClient()
   const clips = useQuery({ queryKey: ['clips', mediaId], queryFn: () => clipsApi.list(mediaId) })
-  const settings = useQuery({ queryKey: ['settings'], queryFn: api.getSettings })
+  const media = useQuery({ queryKey: ['mediaItem', mediaId], queryFn: () => api.getMedia(mediaId) })
   const [target, setTarget] = useState(60)
   const [selectedId, setSelectedId] = useState<number | null>(null)
   // ジョブIDはタブの外に預ける(タブ切替・再読み込みで進捗を失わない)
@@ -328,9 +370,10 @@ export function ClipsTab({
 
   const running = busy || suggest.isPending
   const selected = clips.data?.find((c) => c.id === selectedId)
-  const globalSubtitlePosition =
-    (settings.data?.values.subtitle_position as Clip['subtitle_position'] | undefined) ?? 'bottom'
-  const globalSubtitleOffsetY = Number(settings.data?.values.subtitle_offset_y ?? 0)
+  // 3層設定: クリップの値 > プロジェクト設定 > 全体設定。戻す先はプロジェクト(解決済み)
+  const defaultSubtitlePosition =
+    (styleValues.subtitle_position as Clip['subtitle_position'] | undefined) ?? 'bottom'
+  const defaultSubtitleOffsetY = Number(styleValues.subtitle_offset_y ?? 0)
 
   useEffect(() => {
     onSelectedClipChange?.(selected ?? null)
@@ -427,8 +470,9 @@ export function ClipsTab({
             <ClipEditor
               clip={selected}
               mediaId={mediaId}
-              globalSubtitlePosition={globalSubtitlePosition}
-              globalSubtitleOffsetY={globalSubtitleOffsetY}
+              duration={media.data?.duration ?? null}
+              defaultSubtitlePosition={defaultSubtitlePosition}
+              defaultSubtitleOffsetY={defaultSubtitleOffsetY}
             />
           )}
         </div>

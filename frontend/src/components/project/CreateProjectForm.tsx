@@ -131,6 +131,13 @@ export function CreateProjectForm() {
         >
           {templateDescription(template, convertMethod)}
         </p>
+        {/* 縦向きの既定値はバックエンドが作成時に差分として入れる(core/project_settings.py) */}
+        {template.output === 'portrait' && (
+          <p data-testid="template-portrait-note" className="mt-1 text-xs text-neutral-500">
+            縦向きの書き出しは、字幕を縦動画向けに大きく、画面の下端から離した位置で始めます
+            (作成後にプロジェクト設定で変えられます)。
+          </p>
+        )}
       </div>
 
       <div>

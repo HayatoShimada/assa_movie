@@ -236,6 +236,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/jobs/{job_id}/reveal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reveal Export
+         * @description 書き出したファイルのあるフォルダをOSのファイラーで開く。
+         *
+         *     デスクトップ版(Tauri)でもブラウザの開発版でも同じように動くよう、
+         *     バックエンドが開く(Linux=xdg-open / macOS=open -R / Windows=explorer)。
+         */
+        post: operations["reveal_export_api_jobs__job_id__reveal_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/{job_id}/output": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Export Output
+         * @description 書き出した動画そのもの(画面内で再生して確かめる用。Range対応はFileResponse任せ)
+         */
+        get: operations["get_export_output_api_jobs__job_id__output_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/media/{media_id}/segments": {
         parameters: {
             query?: never;
@@ -1231,6 +1274,11 @@ export interface components {
             /** Created At */
             created_at: string;
         };
+        /** RevealResult */
+        RevealResult: {
+            /** Folder */
+            folder: string;
+        };
         /** Segment */
         Segment: {
             /** Id */
@@ -1919,6 +1967,68 @@ export interface operations {
         };
     };
     job_progress_events_api_jobs__job_id__events_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reveal_export_api_jobs__job_id__reveal_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevealResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_export_output_api_jobs__job_id__output_get: {
         parameters: {
             query?: never;
             header?: never;

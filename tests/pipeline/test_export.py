@@ -13,12 +13,29 @@ def captured(monkeypatch):
     """ffmpeg実行を捕捉し、組み立てられたコマンドを記録する"""
     from backend.pipeline import export as export_mod
 
-    calls: list[list[str]] = []
+    class Captured(list):
+        """組み立てられたコマンドの列。ass_texts に焼き込んだ字幕の中身も控える"""
+
+        ass_texts: list[str]
+
+    calls = Captured()
+    calls.ass_texts = []
+
+    def fake_run(cmd, duration, progress=None, timeout=0):
+        calls.append(cmd)
+        # 字幕のASSは書き出し中だけ存在する一時ファイルなので、ここで中身を控える
+        import re
+        from pathlib import Path
+
+        for arg in cmd:
+            m = re.search(r"ass='([^']+)'", arg)
+            if m:
+                calls.ass_texts.append(
+                    Path(m.group(1).replace("\\:", ":")).read_text(encoding="utf-8")
+                )
+
     monkeypatch.setattr(export_mod, "detect_encoder", lambda: "libx264")
-    monkeypatch.setattr(
-        export_mod, "run_export",
-        lambda cmd, duration, progress=None, timeout=0: calls.append(cmd),
-    )
+    monkeypatch.setattr(export_mod, "run_export", fake_run)
     from backend.api import clips as clips_api
 
     monkeypatch.setattr(clips_api, "_require_ffmpeg", lambda: None)
@@ -101,7 +118,8 @@ def test_landscape_project_same_source_is_passthrough(client, tmp_path, captured
 def test_ass_playres_matches_output_resolution(client, tmp_path, captured):
     _, mid = _make_media(
         client, tmp_path, output_orientation="portrait", width=1920, height=1080,
-        settings={"convert_method": "crop"},
+        # 縦テンプレートの既定値(字幕96)ではなく、換算規則そのものを見る
+        settings={"convert_method": "crop", "subtitle_font_size": 48},
     )
     db = client.app.state.db
     db.execute(
@@ -114,11 +132,7 @@ def test_ass_playres_matches_output_resolution(client, tmp_path, captured):
     graph = cmd[cmd.index("-filter_complex") + 1]
     assert "ass=" in graph
     # ASSファイルの中身: PlayResが縦出力(1080×1920)・フォントは幅比率で27px
-    import re
-    from pathlib import Path
-
-    m = re.search(r"ass='([^']+)'", graph)
-    ass_text = Path(m.group(1).replace("\\:", ":")).read_text(encoding="utf-8")
+    ass_text = captured.ass_texts[-1]
     assert "PlayResX: 1080" in ass_text
     assert "PlayResY: 1920" in ass_text
     assert ",27," in ass_text.splitlines()[

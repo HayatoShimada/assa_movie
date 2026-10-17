@@ -38,6 +38,48 @@ MUTABLE_FIELDS = {
 PROJECT_OVERRIDABLE = set(MUTABLE_FIELDS) - {"setup_completed"}
 
 
+# テンプレート(書き出しの向き)ごとのプロジェクト既定値。
+#
+# 字幕のpx値は1920×1080基準で、フォントは幅比率で換算する(subtitle.scaled_style)。
+# この規則は変えないので、幅1080の縦動画では同じ値が0.56倍になる。既定の48だと
+# 27pxで読めず、下余白40は画面最下部でShorts/TikTokの操作UIと重なる。
+# そこで縦向きのテンプレートは、作成時(と向きを切り替えたとき)にだけ
+# プロジェクトの差分として縦向けの値を持たせる。差分として保存するので
+# プロジェクト設定画面に「上書き中」として見え、「既定に戻す」で外せる。
+# 既存プロジェクトの保存値はマイグレーションで変えない。
+ORIENTATION_DEFAULTS: dict[str, dict] = {
+    "landscape": {},
+    "portrait": {
+        # 縦1080幅で54px(画面幅の5%)。スライダーの上限と同じ
+        "subtitle_font_size": 96,
+        # 下配置で微調整の上限まで上げる(下端から高さの約15%)
+        "subtitle_position": "bottom",
+        "subtitle_offset_y": -120,
+    },
+}
+
+
+def with_orientation_defaults(
+    overrides: dict, new_orientation: str, old_orientation: str | None = None
+) -> dict:
+    """プロジェクトの設定差分に、書き出しの向きの既定値を織り込む(純関数)。
+
+    - 作成時(old_orientation=None)と、向きが変わったときだけ働く
+    - 利用者が決めた値は上書きしない(差分に無い項目だけ足す)
+    - 向きを戻したときは、前の向きの既定値のまま残っている項目だけ外す
+      (縦→横に戻して字幕だけ縦向けの大きさ、にならないように)
+    """
+    result = dict(overrides)
+    if old_orientation == new_orientation:
+        return result
+    for key, value in ORIENTATION_DEFAULTS.get(old_orientation or "", {}).items():
+        if result.get(key) == value:
+            del result[key]
+    for key, value in ORIENTATION_DEFAULTS.get(new_orientation, {}).items():
+        result.setdefault(key, value)
+    return result
+
+
 def project_overrides(conn: sqlite3.Connection, project_id: int) -> dict:
     """プロジェクトの設定差分(許可項目のみ)を返す"""
     row = conn.execute(

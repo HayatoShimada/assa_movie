@@ -7,6 +7,8 @@ import type { ConvertMethod } from '../lib/catalogs'
 import { mediaDisplayName } from '../lib/media'
 import { resolveSettings } from '../lib/settings'
 import { VideoPlayer } from '../components/player/VideoPlayer'
+import { BriefPanel } from '../components/brief/BriefPanel'
+import type { SubtitlePosition } from '../lib/subtitleLayout'
 import { AssistChat } from '../components/transcript/AssistChat'
 import { TranscriptPanel } from '../components/transcript/TranscriptPanel'
 import { ClipsTab } from '../components/clips/ClipsTab'
@@ -141,8 +143,12 @@ export function Editor({ mediaId }: { mediaId: number }) {
             segments={segments.data ?? []}
             styleValues={styleValues}
             outputOrientation={outputOrientation}
-            subtitlePosition={previewClip?.subtitle_position ?? 'bottom'}
-            subtitleOffsetY={previewClip?.subtitle_offset_y ?? 0}
+            // クリップ未選択ならプロジェクト設定(未設定なら全体設定)の字幕位置で見せる
+            subtitlePosition={
+              previewClip?.subtitle_position ??
+              ((styleValues.subtitle_position as SubtitlePosition | undefined) ?? 'bottom')
+            }
+            subtitleOffsetY={previewClip?.subtitle_offset_y ?? Number(styleValues.subtitle_offset_y ?? 0)}
             convertMethod={previewClip ? (previewClip.convert_method ?? projectConvertMethod) : null}
             cropX={previewClip?.crop_x ?? 0.5}
           />
@@ -212,6 +218,8 @@ export function Editor({ mediaId }: { mediaId: number }) {
           <div className="flex min-h-0 flex-1 flex-col">
             {tab === 'transcript' && (
               <>
+                {/* AIの精度に効くので、最初に開くこのタブの先頭に置く */}
+                <BriefPanel mediaId={mediaId} />
                 <div className="min-h-0 flex-1">
                   {segments.data?.length ? (
                     <TranscriptPanel mediaId={mediaId} segments={segments.data} />
@@ -233,9 +241,15 @@ export function Editor({ mediaId }: { mediaId: number }) {
             )}
             {tab === 'questions' && <QuestionsTab mediaId={mediaId} />}
             {tab === 'clips' && (
-              <ClipsTab mediaId={mediaId} onSelectedClipChange={setSelectedClip} />
+              <ClipsTab
+                mediaId={mediaId}
+                styleValues={styleValues}
+                onSelectedClipChange={setSelectedClip}
+              />
             )}
-            {tab === 'export' && <ExportTab mediaId={mediaId} />}
+            {tab === 'export' && (
+              <ExportTab mediaId={mediaId} onGoToClips={() => setTab('clips')} />
+            )}
             {tab === 'settings' && (
               <div className="h-full overflow-y-auto">
                 {/* ここで変えるのは全体の設定。このプロジェクトだけの設定ではないことを先に示す */}

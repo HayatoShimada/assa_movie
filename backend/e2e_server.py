@@ -137,6 +137,46 @@ def _fake_transcribe(
     progress(1.0)
 
 
+def _fake_export(
+    conn: sqlite3.Connection, media_id: int, params: dict, progress: Callable[[float], None]
+) -> None:
+    """ffmpegも実動画も使わずに書き出しを終える。
+
+    保存先とファイル名は本物と同じ関数で決める(画面に出るパスを確かめたいため)。
+    中身は空なので再生はできない。
+    """
+    import json
+    import time
+
+    from backend.pipeline import export as export_mod
+
+    src = Path(conn.execute("SELECT path FROM media WHERE id=?", (media_id,)).fetchone()["path"])
+    out_dir = export_mod.export_dir(src)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out = out_dir / export_mod.export_file_name(
+        src, float(params.get("start", 0)), float(params.get("end", 0)), params.get("clip_id")
+    )
+    progress(0.5)
+    time.sleep(0.3)  # 進捗表示をUIで観測できるよう少し待つ
+    out.write_bytes(b"")
+    conn.execute(
+        "UPDATE jobs SET result_json=? WHERE media_id=? AND type='export' AND status='running'",
+        (json.dumps({"path": str(out)}, ensure_ascii=False), media_id),
+    )
+    if params.get("clip_id"):
+        conn.execute("UPDATE clips SET status='exported' WHERE id=?", (params["clip_id"],))
+    conn.commit()
+    progress(1.0)
+
+
+# 「フォルダを開く」で開いたはずのパス。E2Eで開発機のファイラーを起動しないよう
+# 記録だけする(/api/e2e/revealed で読む)
+REVEALED: list[str] = []
+
+# シードする動画の置き場。書き出しはこの隣の exports/ に入る(本物と同じ規則)
+MEDIA_DIR = Path(tempfile.mkdtemp(prefix="ks-e2e-media-"))
+
+
 def _fake_setup_diarization(
     conn: sqlite3.Connection, media_id: int, params: dict, progress: Callable[[float], None]
 ) -> None:
@@ -224,6 +264,7 @@ def reset(request: Request) -> dict:
 
     hwprofile.set_current(None)
     hwprofile.ensure_profile(db)
+    REVEALED.clear()
     return {"status": "reset"}
 
 
@@ -261,10 +302,16 @@ def seed(request: Request, output_orientation: str = "landscape") -> dict:
     cur = db.execute(
         "INSERT INTO media (project_id, path, duration, width, height, status)"
         " VALUES (?,?,?,?,?,'registered')",
-        (project_id, "/e2e/sample.mov", 120.0, 1920, 1080),
+        (project_id, str(MEDIA_DIR / "sample.mov"), 120.0, 1920, 1080),
     )
     db.commit()
     return {"project_id": project_id, "media_id": cur.lastrowid}
+
+
+@router.get("/revealed")
+def revealed() -> list[str]:
+    """「フォルダを開く」で開こうとしたパス(古い順)"""
+    return REVEALED
 
 
 @router.post("/profile")
@@ -327,6 +374,13 @@ def build_app():
     job_queue.register("transcribe")(_fake_transcribe)
     # セットアップの取得も同様に差し替える(実物は76MBのダウンロード)
     job_queue.register("setup_diarization")(_fake_setup_diarization)
+    # 書き出しも実動画が無いので疑似処理にする。ffmpegの有無も問わない
+    job_queue.register("export")(_fake_export)
+    from backend.api import clips as clips_api
+    from backend.core import reveal as reveal_mod
+
+    clips_api._require_ffmpeg = lambda: None
+    reveal_mod.reveal = lambda path, os_name=None: REVEALED.append(str(path))
     # 差し替えまで済んだ全ジョブに関所を付ける
     for job_type, handler in list(job_queue._HANDLERS.items()):
         job_queue._HANDLERS[job_type] = _gated(job_type, handler)

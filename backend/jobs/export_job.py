@@ -1,11 +1,14 @@
 """書き出しジョブ: クリップ範囲の切り出し+字幕焼き込み。
 
 字幕は現在のセグメント状態(指示語置換・採用ジャッジ・フィラー除去)を反映して
-ASSを生成し、libassで焼き込む。出力は exports/ ディレクトリ。
+ASSを生成し、libassで焼き込む。出力は元動画の隣の exports/ ディレクトリ。
+ASSは焼き込み用の中間ファイルなので一時ディレクトリに作り、書き出し先には
+完成品(mp4)だけを置く(以前は exports/ に .ass が残り、利用者を迷わせていた)。
 """
 
 import json
 import sqlite3
+import tempfile
 from pathlib import Path
 from typing import Callable
 
@@ -98,50 +101,34 @@ def run_export_job(
         if c["end"] > start and c["start"] < end
     ]
 
-    out_dir = input_path.parent / "exports"
+    out_dir = export_mod.export_dir(input_path)
     out_dir.mkdir(exist_ok=True)
-    base = input_path.stem
-    suffix = f"_clip{params['clip_id']}" if params.get("clip_id") else ""
-    out_path = out_dir / f"{base}_{int(start)}s-{int(end)}s{suffix}.mp4"
+    out_path = out_dir / export_mod.export_file_name(
+        input_path, start, end, params.get("clip_id")
+    )
 
     # ---- 向き変換(縦↔横)と最終解像度 ----
     layout_filter, out_w, out_h = resolve_layout(conn, media, s, params, start, end)
 
-    # ---- 字幕(ASS)生成 ----
-    ass_path = None
-    if burn:
-        segments = [dict(r) for r in conn.execute(
-            "SELECT * FROM segments WHERE media_id=? ORDER BY idx", (media_id,)
-        )]
-        filler_words = filler_words_by_segment(conn, media_id)
-        for seg in segments:
-            text = seg["text"]
-            # 適用済みフィラー編集(LLM/質問回答)を除去
-            for w in filler_words.get(seg["id"], []):
-                text = filler_mod.remove_filler(text, w)
-            # 安全群フィラーは弱モード以上なら常時除去
-            if s.filler_level in ("weak", "strong"):
-                text = filler_mod.remove_fillers_weak(text)
-            seg["text"] = text
+    # ASSは焼き込みが終われば要らない。書き出し先に残さないよう作業用の場所に作る
+    with tempfile.TemporaryDirectory(prefix="ks-export-") as work_dir:
+        ass_path = None
+        if burn:
+            ass_path = Path(work_dir) / "subtitles.ass"
+            ass_path.write_text(
+                _build_subtitles(conn, media_id, s, params, start, end, out_w, out_h),
+                encoding="utf-8",
+            )
+        progress(0.05)
 
-        # ASSのPlayResは出力解像度に合わせる(スタイル値は幅/高さ比率で自動換算)
-        style = subtitle_mod.scaled_style(
-            s, out_w, out_h,
-            str(params.get("subtitle_position", "bottom")),
-            int(params.get("subtitle_offset_y", 0)),
+        # ---- ffmpeg実行 ----
+        cmd = export_mod.build_export_cmd(
+            input_path, out_path, start, end, ass_path,
+            cuts=cuts, layout_filter=layout_filter,
         )
-        events = subtitle_mod.segments_to_events(segments, clip_start=start, clip_end=end)
-        ass_path = out_dir / f"{base}_{int(start)}s-{int(end)}s.ass"
-        ass_path.write_text(subtitle_mod.build_ass(events, style), encoding="utf-8")
-
-    progress(0.05)
-
-    # ---- ffmpeg実行 ----
-    cmd = export_mod.build_export_cmd(
-        input_path, out_path, start, end, ass_path,
-        cuts=cuts, layout_filter=layout_filter,
-    )
-    export_mod.run_export(cmd, duration=end - start, progress=lambda p: progress(0.05 + p * 0.94))
+        export_mod.run_export(
+            cmd, duration=end - start, progress=lambda p: progress(0.05 + p * 0.94)
+        )
 
     conn.execute(
         "UPDATE jobs SET result_json=? WHERE media_id=? AND type='export'"
@@ -154,3 +141,38 @@ def run_export_job(
         )
     conn.commit()
     progress(1.0)
+
+
+def _build_subtitles(
+    conn: sqlite3.Connection,
+    media_id: int,
+    s,
+    params: dict,
+    start: float,
+    end: float,
+    out_w: int,
+    out_h: int,
+) -> str:
+    """現在のセグメント状態を反映したASSの中身を作る"""
+    segments = [dict(r) for r in conn.execute(
+        "SELECT * FROM segments WHERE media_id=? ORDER BY idx", (media_id,)
+    )]
+    filler_words = filler_words_by_segment(conn, media_id)
+    for seg in segments:
+        text = seg["text"]
+        # 適用済みフィラー編集(LLM/質問回答)を除去
+        for w in filler_words.get(seg["id"], []):
+            text = filler_mod.remove_filler(text, w)
+        # 安全群フィラーは弱モード以上なら常時除去
+        if s.filler_level in ("weak", "strong"):
+            text = filler_mod.remove_fillers_weak(text)
+        seg["text"] = text
+
+    # ASSのPlayResは出力解像度に合わせる(スタイル値は幅/高さ比率で自動換算)
+    style = subtitle_mod.scaled_style(
+        s, out_w, out_h,
+        str(params.get("subtitle_position", "bottom")),
+        int(params.get("subtitle_offset_y", 0)),
+    )
+    events = subtitle_mod.segments_to_events(segments, clip_start=start, clip_end=end)
+    return subtitle_mod.build_ass(events, style)

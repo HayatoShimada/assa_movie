@@ -164,31 +164,53 @@ test('クリップ: 上下微調整がプレビューに即反映される(中�
   }
 })
 
-test('クリップ: 全体設定で上書きボタンが効く', async ({ page, request }) => {
+test('クリップ: 「既定の位置に戻す」でプロジェクト(未設定なら全体)の字幕位置に戻る', async ({
+  page,
+  request,
+}) => {
   const mediaId = await seedTranscribed(request)
   const clip = await (
     await request.post(`${API}/api/media/${mediaId}/clips`, {
-      data: { start: 0, end: 8, title: '上書きテスト' },
+      data: { start: 0, end: 8, title: '戻すテスト' },
     })
   ).json()
-
+  // クリップだけ動かしておく
+  await request.patch(`${API}/api/clips/${clip.id}`, {
+    data: { subtitle_position: 'center', subtitle_offset_y: 50 },
+  })
   await request.patch(`${API}/api/settings`, {
     data: { subtitle_position: 'top', subtitle_offset_y: -20 },
   })
 
   await page.goto(`/#/media/${mediaId}`)
   await page.getByTestId('tab-clips').click()
-  await page.getByText('上書きテスト').click()
+  await page.getByText('戻すテスト').click()
 
-  await page.getByRole('button', { name: '全体設定で上書き' }).click()
+  const reset = page.getByTestId('clip-subtitle-reset')
+  // 戻す先が書いてある(「全体設定で上書き」は向きが読めなかった)
+  await expect(reset).toHaveText('既定の位置に戻す(上・-20px)')
+  await reset.click()
 
-  await expect
-    .poll(async () => {
-      const clips = await (await request.get(`${API}/api/media/${mediaId}/clips`)).json()
-      const target = clips.find((c: { id: number }) => c.id === clip.id)
-      return `${target.subtitle_position}:${target.subtitle_offset_y}`
-    })
-    .toBe('top:-20')
+  const positionOf = async () => {
+    const clips = await (await request.get(`${API}/api/media/${mediaId}/clips`)).json()
+    const target = clips.find((c: { id: number }) => c.id === clip.id)
+    return `${target.subtitle_position}:${target.subtitle_offset_y}`
+  }
+  await expect.poll(positionOf).toBe('top:-20')
+  // 既に既定と同じなら押せない
+  await expect(reset).toBeDisabled()
+
+  // プロジェクトで上書きしていれば、そちらが戻す先になる(3層設定)
+  const media = await (await request.get(`${API}/api/media/${mediaId}`)).json()
+  await request.patch(`${API}/api/projects/${media.project_id}`, {
+    data: { settings: { subtitle_position: 'center', subtitle_offset_y: 10 } },
+  })
+  await page.reload()
+  await page.getByTestId('tab-clips').click()
+  await page.getByText('戻すテスト').click()
+  await expect(reset).toHaveText('既定の位置に戻す(中央・10px)')
+  await reset.click()
+  await expect.poll(positionOf).toBe('center:10')
 
   await request.patch(`${API}/api/settings`, {
     data: { subtitle_position: 'bottom', subtitle_offset_y: 0 },

@@ -1,14 +1,20 @@
 """ジョブ投入と進捗(SSE)のAPI。"""
 
+import json
 import sqlite3
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import FileResponse
+from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
 from backend.api.deps import get_db, get_jobs
+from backend.core import reveal as reveal_mod
 from backend.jobs.progress import job_events
 from backend.jobs.queue import JobQueue
 from backend.models.dto import Job, JobCreate
+from backend.pipeline.export import export_dir
 
 router = APIRouter(prefix="/api", tags=["jobs"])
 
@@ -78,3 +84,62 @@ async def job_progress_events(job_id: int, jobs: JobQueue = Depends(get_jobs)):
     if jobs.get(job_id) is None:
         raise HTTPException(404, "ジョブが見つかりません")
     return EventSourceResponse(job_events(jobs, job_id))
+
+
+def _export_output(db: sqlite3.Connection, jobs: JobQueue, job_id: int) -> Path:
+    """書き出しジョブの出力ファイル。書き出し先(元動画の隣の exports/)の中に限る。
+
+    結果のパスはジョブ自身が書くものだが、任意のパスを開いたり返したりできる
+    APIにしないため、書き出し先の中にあることを毎回確かめる。
+    """
+    job = jobs.get(job_id)
+    if job is None:
+        raise HTTPException(404, "ジョブが見つかりません")
+    if job["type"] != "export":
+        raise HTTPException(400, "書き出しのジョブではありません")
+    result = json.loads(job.get("result_json") or "null") or {}
+    media = db.execute("SELECT path FROM media WHERE id=?", (job["media_id"],)).fetchone()
+    if job["status"] != "completed" or not result.get("path") or media is None:
+        raise HTTPException(400, "書き出しがまだ完了していません")
+    out = Path(result["path"])
+    allowed = export_dir(Path(media["path"])).resolve()
+    if out.resolve().parent != allowed:
+        raise HTTPException(400, "書き出し先の外のファイルは開けません")
+    if not out.is_file():
+        raise HTTPException(
+            404, f"書き出したファイルが見つかりません(移動または削除された可能性があります): {out}"
+        )
+    return out
+
+
+class RevealResult(BaseModel):
+    folder: str
+
+
+@router.post("/jobs/{job_id}/reveal", response_model=RevealResult)
+def reveal_export(
+    job_id: int,
+    db: sqlite3.Connection = Depends(get_db),
+    jobs: JobQueue = Depends(get_jobs),
+):
+    """書き出したファイルのあるフォルダをOSのファイラーで開く。
+
+    デスクトップ版(Tauri)でもブラウザの開発版でも同じように動くよう、
+    バックエンドが開く(Linux=xdg-open / macOS=open -R / Windows=explorer)。
+    """
+    out = _export_output(db, jobs, job_id)
+    try:
+        reveal_mod.reveal(out)
+    except OSError as e:
+        raise HTTPException(500, f"フォルダを開けませんでした({e})。場所: {out.parent}")
+    return RevealResult(folder=str(out.parent))
+
+
+@router.get("/jobs/{job_id}/output")
+def get_export_output(
+    job_id: int,
+    db: sqlite3.Connection = Depends(get_db),
+    jobs: JobQueue = Depends(get_jobs),
+):
+    """書き出した動画そのもの(画面内で再生して確かめる用。Range対応はFileResponse任せ)"""
+    return FileResponse(_export_output(db, jobs, job_id), media_type="video/mp4")
