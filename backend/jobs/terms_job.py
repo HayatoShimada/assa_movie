@@ -169,11 +169,14 @@ def apply_term_answer(
 
     changed = 0
     if term and answer and answer != term:
+        # LIKE だと語に含まれる % や _ がワイルドカードになるので instr で探す
         for seg in conn.execute(
-            "SELECT id, text FROM segments WHERE media_id=? AND text LIKE ?",
-            (media_id, f"%{term}%"),
+            "SELECT id, text FROM segments WHERE media_id=? AND instr(text, ?) > 0",
+            (media_id, term),
         ).fetchall():
-            new_text = seg["text"].replace(term, answer)
+            new_text = user_terms.replace_misrecognition(seg["text"], term, answer)
+            if new_text == seg["text"]:
+                continue  # 正しい表記の中にしか出ていない(ハコスト ⊂ ハコストア)
             conn.execute("UPDATE segments SET text=? WHERE id=?", (new_text, seg["id"]))
             conn.execute(
                 "INSERT INTO edits (media_id, segment_id, kind, original, replacement,"

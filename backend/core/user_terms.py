@@ -90,6 +90,18 @@ def find_misrecognitions(
     return found
 
 
+
+def replace_misrecognition(text: str, wrong: str, right: str) -> str:
+    """本文の聞き間違いを正しい表記に直す(純関数)。
+
+    既に正しく書けている箇所は触らない。聞き間違いが正しい表記の一部のとき
+    (ハコスト → ハコストア)、単純な置換だと「ハコストア」が「ハコストアア」になる。
+    正しい表記の出現で区切り、その間だけを置き換える(find_misrecognitions と同じ考え方)。
+    """
+    if not wrong or wrong == right:
+        return text
+    return right.join(part.replace(wrong, right) for part in text.split(right))
+
 # ---- DB ----
 
 def _to_dict(row: sqlite3.Row) -> dict:

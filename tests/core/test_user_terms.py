@@ -13,6 +13,7 @@ from backend.core.user_terms import (
     find_misrecognitions,
     merge_misrecognitions,
     normalize_term,
+    replace_misrecognition,
 )
 from backend.models import schema
 
@@ -190,3 +191,23 @@ def test_初回だけプロジェクトの用語集を辞書へ移す(tmp_path):
     conn = schema.init_db(path)
     assert [t["term"] for t in user_terms.list_terms(conn)] == ["箱ストア"]
     conn.close()
+
+
+# ---- 回答の適用(聞き間違い → 正しい表記) ----
+#
+# 聞き間違いが正しい表記の一部のとき(ハコスト → ハコストア)、単純な置換だと
+# 既に正しい「ハコストア」まで「ハコストアア」にしてしまう。
+@pytest.mark.parametrize("text,wrong,right,expected", [
+    ("反動体を作る", "反動体", "半導体", "半導体を作る"),
+    ("反動体と反動体", "反動体", "半導体", "半導体と半導体"),
+    ("ハコストに行った", "ハコスト", "ハコストア", "ハコストアに行った"),
+    ("ハコストアに行った", "ハコスト", "ハコストア", "ハコストアに行った"),
+    ("ハコストとハコストア", "ハコスト", "ハコストア", "ハコストアとハコストア"),
+    ("ハコストアとハコスト", "ハコスト", "ハコストア", "ハコストアとハコストア"),
+    # 正しい表記が聞き間違いの一部(ストア → ハコストア)でも二重にならない
+    ("ハコストアのストア", "ストア", "ハコストア", "ハコストアのハコストア"),
+    ("関係ない文", "反動体", "半導体", "関係ない文"),
+    ("", "反動体", "半導体", ""),
+])
+def test_replace_misrecognition(text, wrong, right, expected):
+    assert replace_misrecognition(text, wrong, right) == expected

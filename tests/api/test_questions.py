@@ -109,6 +109,28 @@ def test_answer_records_edits_for_audit(client, media):
     assert all(e["created_by"] == "user" for e in edits)
 
 
+def test_answer_does_not_touch_already_correct_text(client, tmp_path):
+    """聞き間違いが正しい表記の一部(ハコスト → ハコストア)でも、
+    既に正しく書けている箇所は変えない(「ハコストアア」にしない)"""
+    ids = create_media(client, tmp_path)
+    mid = ids["media_id"]
+    insert_segments(client.app.state.db, mid, [
+        {"text": "ハコストに行きました"},
+        {"text": "ハコストアは駅前です"},
+    ])
+    use_fake([{"questions": [
+        {"term": "ハコスト", "reason": "店名の聞き間違いと思われます", "candidates": ["ハコストア"]}
+    ]}])
+    run_extract(client, mid)
+    qid = client.get(f"/api/media/{mid}/questions").json()[0]["id"]
+
+    r = client.post(f"/api/questions/{qid}/answer", json={"text": "ハコストア"})
+    assert r.json()["segments_changed"] == 1  # 直したのは1行目だけ
+    texts = [s["text"] for s in client.get(f"/api/media/{mid}/segments").json()]
+    assert texts == ["ハコストアに行きました", "ハコストアは駅前です"]
+    assert len(client.get(f"/api/media/{mid}/edits").json()) == 1
+
+
 def test_dismiss_question(client, media):
     mid = media["media_id"]
     use_fake([TERM_RESPONSE])
