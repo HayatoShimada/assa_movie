@@ -145,6 +145,36 @@ def test_delete_project_cascades(client, tmp_path):
     assert client.get(f"/api/media/{mid}").status_code == 404  # CASCADE
 
 
+def test_delete_project_keeps_exported_clips(client, tmp_path):
+    """プロジェクトを消しても、書き出した切り抜きは消さない。
+
+    ドラッグ&ドロップで追加した動画は uploads/project_N/ に置かれ、
+    書き出しはその下の exports/ に入る。以前はプロジェクト削除で
+    uploads/project_N/ を丸ごと消しており、完成品が警告なしに消えていた。
+    """
+    pid = client.post("/api/projects", json={"name": "消すやつ"}).json()["id"]
+    upload_dir = tmp_path / "uploads" / f"project_{pid}"
+    (upload_dir / "exports").mkdir(parents=True)
+    (upload_dir / "対談.mov").write_bytes(b"src")
+    clip = upload_dir / "exports" / "対談_0s-10s_clip1.mp4"
+    clip.write_bytes(b"clip")
+
+    r = client.delete(f"/api/projects/{pid}")
+    assert r.status_code == 200
+    assert clip.read_bytes() == b"clip"
+    assert not (upload_dir / "対談.mov").exists()  # 取り込んだ元動画は掃除する
+
+
+def test_delete_project_removes_upload_dir_without_exports(client, tmp_path):
+    pid = client.post("/api/projects", json={"name": "消すやつ"}).json()["id"]
+    upload_dir = tmp_path / "uploads" / f"project_{pid}"
+    upload_dir.mkdir(parents=True)
+    (upload_dir / "対談.mov").write_bytes(b"src")
+
+    assert client.delete(f"/api/projects/{pid}").status_code == 200
+    assert not upload_dir.exists()
+
+
 def test_delete_project_not_found(client):
     assert client.delete("/api/projects/99999").status_code == 404
 

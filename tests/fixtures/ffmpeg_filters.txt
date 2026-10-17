@@ -1,0 +1,26 @@
+# アプリが使うffmpegフィルタの一覧(許可リスト)。
+#
+# 同梱ffmpeg(macOS・Windows)はLGPLの範囲だけでビルドしていて、GPL専用の
+# フィルタは入っていない。入っていないフィルタを使うと書き出しが
+# `No such filter` で落ちる(v1.0.0のboxblurで実際に踏んだ)。
+#
+# - tests/pipeline/test_ffmpeg_filters.py: 組み立てるフィルタグラフがこの一覧に収まること
+# - scripts/verify_unix.sh / verify_windows.ps1: 同梱ffmpegがこの一覧を全部持っていること
+#
+# フィルタを新しく使うときは、LGPLで使えるか確かめてからここに足す。
+split
+asplit
+scale
+crop
+gblur
+overlay
+vstack
+ass
+trim
+atrim
+setpts
+asetpts
+concat
+format
+hwupload
+silencedetect

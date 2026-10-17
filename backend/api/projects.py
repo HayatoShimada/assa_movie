@@ -1,5 +1,6 @@
 """プロジェクトとメディアの登録API。"""
 
+import contextlib
 import shutil
 import sqlite3
 import uuid
@@ -120,10 +121,23 @@ def delete_project(
 
     db.execute("DELETE FROM projects WHERE id=?", (project_id,))
     db.commit()
-    # アップロードされた実ファイルも掃除する(外部パス登録のメディアは消さない)
+    # アップロードされた実ファイルも掃除する(外部パス登録のメディアは消さない)。
+    # ただし書き出した切り抜き(exports/)は完成品なので残す。丸ごと消していた頃は
+    # 「一覧を片付けたら完成品も消えた」になっていた
     upload_dir = settings.db_path.parent / "uploads" / f"project_{project_id}"
     if upload_dir.exists():
-        shutil.rmtree(upload_dir, ignore_errors=True)
+        for entry in upload_dir.iterdir():
+            if entry.name == "exports" and entry.is_dir() and any(entry.iterdir()):
+                continue
+            if entry.is_dir():
+                shutil.rmtree(entry, ignore_errors=True)
+            else:
+                # Windowsで掴まれたままのファイルは消せない。rmtree同様に黙って残す
+                with contextlib.suppress(OSError):
+                    entry.unlink(missing_ok=True)
+        with contextlib.suppress(OSError):
+            if not any(upload_dir.iterdir()):
+                upload_dir.rmdir()
     return {"deleted": project_id}
 
 

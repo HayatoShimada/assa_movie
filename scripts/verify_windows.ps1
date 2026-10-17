@@ -84,6 +84,21 @@ foreach ($rel in $bundled) {
     }
 }
 
+# 同梱ffmpegはLGPLの範囲だけでビルドしている。アプリが使うフィルタが
+# 1つでも欠けていると、書き出しが `No such filter` で落ちる(v1.0.0のboxblur)。
+# 一覧はテストと共有する(tests/fixtures/ffmpeg_filters.txt)
+$ffmpeg = Join-Path $InstallDir "bin\ffmpeg.exe"
+$filterList = Join-Path $PSScriptRoot "..\tests\fixtures\ffmpeg_filters.txt"
+if ((Test-Path $ffmpeg) -and (Test-Path $filterList)) {
+    $have = & $ffmpeg -hide_banner -filters 2>$null |
+        ForEach-Object { ($_.Trim() -split '\s+')[1] }
+    $missing = Get-Content $filterList -Encoding utf8 |
+        Where-Object { $_.Trim() -and -not $_.StartsWith("#") } |
+        Where-Object { $have -notcontains $_.Trim() }
+    if ($missing) { Ng "同梱ffmpegに無いフィルタ: $($missing -join ' ')" }
+    else { Ok "同梱ffmpegにアプリが使うフィルタが揃っている" }
+}
+
 Get-ChildItem $InstallDir -ErrorAction SilentlyContinue |
     Select-Object Name, Length | Format-Table -AutoSize | Out-String -Width 100 | Write-Host
 
