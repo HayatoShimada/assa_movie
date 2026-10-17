@@ -4,7 +4,7 @@
 フロントではなくバックエンドが開く。開けるのは書き出し先だけ(API側で制限)。
 """
 
-from pathlib import Path
+from pathlib import PurePosixPath, PureWindowsPath
 
 import pytest
 
@@ -21,12 +21,14 @@ from backend.core import reveal
     ],
 )
 def test_reveal_command_unix(os_name, expected):
-    target = Path("/data/exports/対談_0s-10s_clip1.mp4")
+    # どのOSでテストしても同じ表記になるよう、対象OSのパス型で作る
+    # (Path だとWindowsのCIで \data\exports に変わって一致しない)
+    target = PurePosixPath("/data/exports/対談_0s-10s_clip1.mp4")
     assert reveal.reveal_command(target, os_name) == expected
 
 
 def test_reveal_command_windowsはexplorerで選択状態にする():
-    target = Path(r"C:\Users\山田\AppData\Roaming\kirinuki-studio\exports\対談 1_0s-10s.mp4")
+    target = PureWindowsPath(r"C:\Users\山田\AppData\Roaming\kirinuki-studio\exports\対談 1_0s-10s.mp4")
     cmd = reveal.reveal_command(target, "Windows")
     # 空白を含むパスは /select,"..." の形でないとexplorerが解釈できない
     assert cmd == f'explorer /select,"{target}"'

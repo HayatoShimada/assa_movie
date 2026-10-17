@@ -10,10 +10,10 @@ import os
 import platform
 import subprocess
 import sys
-from pathlib import Path
+from pathlib import Path, PurePath
 
 
-def reveal_command(path: Path, os_name: str) -> list[str] | str:
+def reveal_command(path: PurePath, os_name: str) -> list[str] | str:
     """ファイルを見せるコマンド(純関数)。
 
     - macOS: `open -R` でFinderに表示して選択する
