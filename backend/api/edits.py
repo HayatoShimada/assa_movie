@@ -6,8 +6,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from backend.api.deps import get_db
+from backend.api.transcripts import automatic_text
 from backend.core.project_settings import resolve_settings
 from backend.pipeline import pronoun
+from backend.pipeline.segment_text import AppliedEdit, undo_edit_in_text
 
 router = APIRouter(prefix="/api", tags=["edits"])
 
@@ -128,19 +130,26 @@ def revert_edit(edit_id: int, db: sqlite3.Connection = Depends(get_db)):
         raise HTTPException(400, "適用済みの編集ではありません")
 
     seg = db.execute("SELECT * FROM segments WHERE id=?", (edit["segment_id"],)).fetchone()
-    # 同一セグメントの他の適用済み編集を原文から再適用して復元する
-    db.execute("UPDATE edits SET status='reverted' WHERE id=?", (edit_id,))
-    s = resolve_settings(db, media_id=edit["media_id"])
-    text = seg["original_text"]
-    for other in db.execute(
-        "SELECT * FROM edits WHERE segment_id=? AND status='applied' ORDER BY id",
-        (seg["id"],),
-    ):
-        p = pronoun.EditProposal(
-            line=0, original=other["original"], replacement=other["replacement"],
-            referent=other["referent"] or "",
+    if seg["edited_by_user"]:
+        # 手で直した行は原文から作り直すと手直しが消えるので、この編集の部分だけを戻す
+        text = undo_edit_in_text(
+            seg["text"],
+            AppliedEdit(
+                id=edit["id"], kind=edit["kind"], original=edit["original"],
+                replacement=edit["replacement"], referent=edit["referent"] or "",
+            ),
         )
-        text = pronoun.apply_edit(text, p, form=s.pronoun_form)
+        if text is None:
+            raise HTTPException(
+                400,
+                "この行は手で直してあり、AIの修正箇所が見つからないため取り消せません。"
+                "文字起こしの画面で直接直してください",
+            )
+        db.execute("UPDATE edits SET status='reverted' WHERE id=?", (edit_id,))
+    else:
+        # 同一セグメントの他の適用済み編集を原文から再適用して復元する
+        db.execute("UPDATE edits SET status='reverted' WHERE id=?", (edit_id,))
+        text, _dropped = automatic_text(db, seg)
     db.execute("UPDATE segments SET text=? WHERE id=?", (text, seg["id"]))
     db.commit()
     return Edit(**dict(_get_edit(db, edit_id)))

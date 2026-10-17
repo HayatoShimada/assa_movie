@@ -270,6 +270,53 @@ export interface paths {
         patch: operations["update_segment_api_segments__segment_id__patch"];
         trace?: never;
     };
+    "/api/segments/{segment_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore Segment
+         * @description 手直しを取り消す。原文に、承認済みのAIの修正だけを当てた本文に戻す。
+         *
+         *     手直しした文に対して承認した編集は、原文には当てる場所が無いので取り消し扱いにする
+         *     (適用済みのまま残すと、レビュー画面の表示と本文が食い違う)。
+         */
+        post: operations["restore_segment_api_segments__segment_id__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/media/{media_id}/speakers/rename": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rename Speaker
+         * @description この動画の話者名を変える(その話者の全行)。
+         *
+         *     話者名は文字起こしのときに行ごとに付く(segments.speaker)ので、変える単位は動画。
+         *     既にいる別の話者の名前にはしない。2人が混ざると元に戻せなくなるため
+         *     (同じ人だったなら、行ごとの付け替えを使う)。
+         */
+        post: operations["rename_speaker_api_media__media_id__speakers_rename_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/environment": {
         parameters: {
             query?: never;
@@ -809,6 +856,33 @@ export interface components {
             /** Text */
             text: string;
         };
+        /** AssistEdit */
+        AssistEdit: {
+            /** Id */
+            id: number;
+            /** Media Id */
+            media_id: number;
+            /** Segment Id */
+            segment_id: number;
+            /** Kind */
+            kind: string;
+            /** Original */
+            original: string;
+            /** Replacement */
+            replacement: string;
+            /** Referent */
+            referent?: string | null;
+            /** Status */
+            status: string;
+            /** Confidence */
+            confidence: string;
+            /** Created By */
+            created_by: string;
+            /** Created At */
+            created_at: string;
+            /** After Text */
+            after_text: string;
+        };
         /** AssistRequest */
         AssistRequest: {
             /** Message */
@@ -819,7 +893,7 @@ export interface components {
             /** Reply */
             reply: string;
             /** Edits */
-            edits: components["schemas"]["Edit"][];
+            edits: components["schemas"]["AssistEdit"][];
             /** Instruction Suggestion */
             instruction_suggestion?: string | null;
         };
@@ -1268,6 +1342,18 @@ export interface components {
             subtitle_speaker_colors?: boolean | null;
             /** Subtitle Text Color */
             subtitle_text_color?: string | null;
+        };
+        /** SpeakerRename */
+        SpeakerRename: {
+            /** Current */
+            current: string;
+            /** New */
+            new: string;
+        };
+        /** SpeakerRenameResult */
+        SpeakerRenameResult: {
+            /** Changed */
+            changed: number;
         };
         /** UserTerm */
         UserTerm: {
@@ -1918,6 +2004,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Segment"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_segment_api_segments__segment_id__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                segment_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Segment"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rename_speaker_api_media__media_id__speakers_rename_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                media_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SpeakerRename"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpeakerRenameResult"];
                 };
             };
             /** @description Validation Error */

@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Segment } from '../../api/client'
 import { usePlayback } from '../../stores/playback'
@@ -71,5 +71,108 @@ describe('SegmentList', () => {
   it('ユーザー編集済みの印を表示する', () => {
     render(<SegmentList segments={[seg(0, { edited_by_user: true })]} />)
     expect(screen.getByTestId('segment-0')).toHaveTextContent('(編集済)')
+  })
+
+  // ---- 手直し(誤認識を手で直す・話者名を変える) ----
+  it('鉛筆ボタンで編集欄が出て、保存すると前置きを付け直した本文で呼ばれる', async () => {
+    const onSaveText = vi.fn().mockResolvedValue(undefined)
+    render(<SegmentList segments={[seg(0, { text: '話者A: 腕駒の話' })]} onSaveText={onSaveText} />)
+
+    fireEvent.click(screen.getByTestId('segment-edit-0'))
+    const input = screen.getByTestId('segment-edit-input-0')
+    expect(input).toHaveValue('腕駒の話')
+    fireEvent.change(input, { target: { value: '腕前の話' } })
+    fireEvent.click(screen.getByTestId('segment-edit-save-0'))
+
+    await waitFor(() => expect(onSaveText).toHaveBeenCalledTimes(1))
+    expect(onSaveText.mock.calls[0][1]).toBe('話者A: 腕前の話')
+    await waitFor(() => expect(screen.queryByTestId('segment-editor-0')).toBeNull())
+  })
+
+  it('行のダブルクリックでも編集欄が出る。Escでやめると保存しない', () => {
+    const onSaveText = vi.fn()
+    render(<SegmentList segments={[seg(0)]} onSaveText={onSaveText} />)
+    fireEvent.doubleClick(screen.getByTestId('segment-0'))
+    const input = screen.getByTestId('segment-edit-input-0')
+    fireEvent.change(input, { target: { value: '別の文' } })
+    fireEvent.keyDown(input, { key: 'Escape' })
+    expect(screen.queryByTestId('segment-editor-0')).toBeNull()
+    expect(onSaveText).not.toHaveBeenCalled()
+  })
+
+  it('編集欄の中をクリックしても、行の選択・シークは起きない', () => {
+    const seeker = vi.fn()
+    usePlayback.setState({ seeker })
+    render(<SegmentList segments={[seg(0), seg(1)]} onSaveText={vi.fn()} />)
+    fireEvent.click(screen.getByTestId('segment-edit-1'))
+    fireEvent.click(screen.getByTestId('segment-edit-input-1'))
+    expect(seeker).not.toHaveBeenCalled()
+  })
+
+  it('空にはできない', () => {
+    const onSaveText = vi.fn()
+    render(<SegmentList segments={[seg(0)]} onSaveText={onSaveText} />)
+    fireEvent.click(screen.getByTestId('segment-edit-0'))
+    fireEvent.change(screen.getByTestId('segment-edit-input-0'), { target: { value: '  ' } })
+    expect(screen.getByTestId('segment-edit-save-0')).toBeDisabled()
+    expect(screen.getByText('空にはできません')).toBeInTheDocument()
+  })
+
+  it('手で直した行は「手直しを取り消す」で戻せる。原文も見える', async () => {
+    const onRestore = vi.fn().mockResolvedValue(undefined)
+    render(
+      <SegmentList
+        segments={[
+          seg(0, {
+            text: '話者A: 腕前の話',
+            original_text: '話者A: 腕駒の話',
+            edited_by_user: true,
+          }),
+        ]}
+        onSaveText={vi.fn()}
+        onRestore={onRestore}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('segment-edit-0'))
+    expect(screen.getByTestId('segment-editor-0')).toHaveTextContent('原文: 腕駒の話')
+    fireEvent.click(screen.getByTestId('segment-restore-0'))
+    await waitFor(() => expect(onRestore).toHaveBeenCalledTimes(1))
+  })
+
+  it('保存に失敗したら理由を出し、編集欄は閉じない', async () => {
+    const onSaveText = vi.fn().mockRejectedValue(new Error('保存できませんでした'))
+    render(<SegmentList segments={[seg(0)]} onSaveText={onSaveText} />)
+    fireEvent.click(screen.getByTestId('segment-edit-0'))
+    fireEvent.change(screen.getByTestId('segment-edit-input-0'), { target: { value: '直した' } })
+    fireEvent.click(screen.getByTestId('segment-edit-save-0'))
+    expect(await screen.findByText('保存できませんでした')).toBeInTheDocument()
+    expect(screen.getByTestId('segment-editor-0')).toBeInTheDocument()
+  })
+
+  it('話者名を押すとメニューが開き(行の選択は起きない)、名前を変えられる', async () => {
+    const seeker = vi.fn()
+    usePlayback.setState({ seeker })
+    const onRenameSpeaker = vi.fn().mockResolvedValue(undefined)
+    render(<SegmentList segments={[seg(0)]} onRenameSpeaker={onRenameSpeaker} />)
+
+    fireEvent.click(screen.getByTestId('speaker-0'))
+    expect(seeker).not.toHaveBeenCalled()
+    fireEvent.change(screen.getByTestId('speaker-rename-input-0'), { target: { value: '山田' } })
+    fireEvent.click(screen.getByTestId('speaker-rename-save-0'))
+    await waitFor(() => expect(onRenameSpeaker).toHaveBeenCalledWith('話者A', '山田'))
+  })
+
+  it('この行だけ別の話者に付け替えられる', async () => {
+    const onSetSpeaker = vi.fn().mockResolvedValue(undefined)
+    render(
+      <SegmentList
+        segments={[seg(0), seg(1, { speaker: '話者B', text: '話者B: こんにちは' })]}
+        onSetSpeaker={onSetSpeaker}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('speaker-0'))
+    fireEvent.click(screen.getByTestId('speaker-assign-0-話者B'))
+    await waitFor(() => expect(onSetSpeaker).toHaveBeenCalledTimes(1))
+    expect(onSetSpeaker.mock.calls[0][1]).toBe('話者B')
   })
 })

@@ -173,6 +173,20 @@ def test_settings_api_returns_models_with_notes(client):
     assert body["values"]["asr_model"] == "large-v3"
 
 
+def test_large_v3の待ち時間の目安は話者分離込みの実測に合わせる():
+    """「75分の動画で約3分」はASR単体(RTX PRO 6000)の値で、実際の待ち時間とかけ離れていた。
+    実測は74分の動画で全体約23分(うち話者分離が約18分)。v2.0の初心者評価で指摘された"""
+    note = MODELS["large-v3"].note
+    assert "約3分" not in note
+    assert "話者分離" in note
+    assert "74分" in note and "23分" in note
+
+
+def test_turboの速さは文字起こし部分だけだと分かる():
+    note = MODELS["large-v3-turbo"].note
+    assert "話者分離" in note
+
+
 def test_settings_api_updates_value(client):
     r = client.patch("/api/settings", json={"asr_model": "large-v3-turbo"})
     assert r.status_code == 200

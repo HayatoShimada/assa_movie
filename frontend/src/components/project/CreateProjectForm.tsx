@@ -7,7 +7,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api, type Orientation } from '../../api/client'
-import { TEMPLATES, type Template } from '../../lib/catalogs'
+import {
+  TEMPLATES,
+  templateDescription,
+  type ConvertMethod,
+  type Template,
+} from '../../lib/catalogs'
 import { overrideProps, type SettingsValues } from '../../lib/settings'
 import { Button } from '../ui'
 import { SettingsFields } from '../settings/SettingsFields'
@@ -46,6 +51,11 @@ export function CreateProjectForm() {
   // グローバル設定との差分だけを保持する
   const [overrides, setOverrides] = useState<SettingsValues>({})
 
+  // 向き変換の方式は詳細設定で上書きできるので、上書き→全体の設定の順で今効く値を出す
+  const convertMethod = (overrides.convert_method ??
+    settings.data?.values?.convert_method ??
+    'blur_pad') as ConvertMethod
+
   const create = useMutation({
     mutationFn: () =>
       api.createProject({
@@ -78,10 +88,21 @@ export function CreateProjectForm() {
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
-        <Button data-testid="create-project" type="submit" disabled={create.isPending}>
+        <Button
+          data-testid="create-project"
+          type="submit"
+          disabled={create.isPending || !name.trim()}
+          title={name.trim() ? undefined : 'プロジェクト名を入れると作成できます'}
+        >
           作成
         </Button>
       </div>
+      {/* 名前が空のまま押しても何も起きず、押せたのかどうか分からなかった */}
+      {!name.trim() && (
+        <p data-testid="new-project-name-hint" className="-mt-1 text-xs text-neutral-500">
+          プロジェクト名を入れると「作成」を押せます。
+        </p>
+      )}
 
       <div>
         <p className="mb-1 text-xs text-neutral-500">テンプレート(元動画の向き → 書き出しの向き)</p>
@@ -103,6 +124,13 @@ export function CreateProjectForm() {
             </button>
           ))}
         </div>
+        {/* 向きを変えるときに何が起きるか(切り落とす/ぼかしで埋める)は選ぶ前に知りたい */}
+        <p
+          data-testid="template-description"
+          className="mt-1.5 text-xs text-neutral-600 dark:text-neutral-400"
+        >
+          {templateDescription(template, convertMethod)}
+        </p>
       </div>
 
       <div>

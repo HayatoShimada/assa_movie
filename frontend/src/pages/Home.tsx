@@ -350,6 +350,17 @@ export function Home() {
         <p className="ml-auto hidden text-xs text-neutral-500 sm:block">
           対談動画を文字起こしして、字幕つきの切り抜きを作る
         </p>
+        {/* 文字起こし前でも設定を見直せるように、全体の設定はホームから開ける */}
+        <Button
+          data-testid="open-global-settings"
+          variant="ghost"
+          className="ml-auto flex shrink-0 items-center gap-1 sm:ml-0"
+          title="すべてのプロジェクトに共通の設定(文字起こし・字幕・AIなど)"
+          onClick={() => navigate({ page: 'settings' })}
+        >
+          <SettingsIcon />
+          全体の設定
+        </Button>
       </header>
 
       <CreateProjectForm />

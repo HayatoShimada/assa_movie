@@ -14,6 +14,7 @@ from backend.api.edits import Edit
 from backend.core.project_settings import resolve_settings
 from backend.jobs.resolve_job import _get_client, _load_prompt_parts
 from backend.pipeline import pronoun
+from backend.pipeline.assist_reply import compose_assist_reply
 
 router = APIRouter(prefix="/api", tags=["assist"])
 
@@ -57,9 +58,16 @@ class AssistRequest(BaseModel):
     message: str
 
 
+class AssistEdit(Edit):
+    # 承認したときの行の本文(今の表現形式で当てた結果)。「何が変わるか」を見せるため
+    after_text: str
+
+
 class AssistResponse(BaseModel):
+    # 実際の状態(承認待ちの案が何件あるか等)から機械側で作る文。
+    # LLMの返事は「変更しました」と言いがちだが、この時点では何も変わっていない
     reply: str
-    edits: list[Edit]
+    edits: list[AssistEdit]
     instruction_suggestion: str | None = None
 
 
@@ -90,7 +98,9 @@ def assist(
     user = f"{context}\n\nユーザーの指示: {body.message}"
     payload = _get_client(s).complete_json(system, user, ASSIST_SCHEMA)
 
-    saved: list[Edit] = []
+    saved: list[AssistEdit] = []
+    proposals: list[tuple[str, str]] = []
+    rejected: list[str] = []
     for e in payload.get("edits", []) or []:
         proposal = pronoun.EditProposal(
             line=0,
@@ -102,6 +112,7 @@ def assist(
         # ユーザー主導の編集でも機械ガードは通す(壊れた提案の適用を防ぐ)
         v = pronoun.validate_edit(proposal, seg["text"], level=s.pronoun_level)
         if not v.ok:
+            rejected.append(v.reason)
             continue
         cur = db.execute(
             "INSERT INTO edits (media_id, segment_id, kind, original, replacement,"
@@ -110,9 +121,16 @@ def assist(
             (media_id, segment_id, proposal.original, proposal.replacement, proposal.referent),
         )
         row = db.execute("SELECT * FROM edits WHERE id=?", (cur.lastrowid,)).fetchone()
-        saved.append(Edit(**dict(row)))
+        saved.append(AssistEdit(
+            **dict(row),
+            after_text=pronoun.apply_edit(seg["text"], proposal, form=s.pronoun_form),
+        ))
+        proposals.append((
+            proposal.original,
+            pronoun.apply_edit(proposal.original, proposal, form=s.pronoun_form),
+        ))
     db.commit()
 
     suggestion = str(payload.get("instruction_suggestion") or "").strip() or None
-    return AssistResponse(reply=str(payload.get("reply", "")), edits=saved,
-                          instruction_suggestion=suggestion)
+    reply = compose_assist_reply(str(payload.get("reply", "") or ""), proposals, rejected)
+    return AssistResponse(reply=reply, edits=saved, instruction_suggestion=suggestion)

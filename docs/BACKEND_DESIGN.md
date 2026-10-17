@@ -288,6 +288,13 @@ jobs(id, media_id, type, params_json, status, progress, error, created_at)
 ```
 
 - `original_text` を必ず保持(指示語置換・ユーザー編集後も原文に戻せる)
+- 本文の組み立ては `pipeline/segment_text.py`(純関数)。手直しの無い行は「原文+適用済みの編集」から
+  作り直す(term は置き換え、filler は本文を変えない)。手直しした行は作り直すと手直しが消えるので、
+  取り消す編集の部分だけを戻す。手直しした行には resolve の自動適用をせず承認待ちに回す
+- 話者名は文字起こし時に `male_name`/`female_name`(声の高さで判定できた2人のときだけ)で付き、
+  以後は動画単位の rename と行ごとの付け替えで変える
+- 対話アシストの応答文は LLM の返事ではなく、承認待ちの案の件数・安全確認の結果から機械側で作る
+  (`pipeline/assist_reply.py`。LLMは「変更しました」と返しがちだが、承認するまで何も変わらない)
 - 指示語置換は `edits` に記録 → 置換ログUIと取り消しがそのまま実現できる
 
 ## API(抜粋)
@@ -298,7 +305,9 @@ POST /api/projects/{id}/media             動画登録(パス指定)
 POST /api/media/{id}/jobs                 {type: transcribe|resolve|export, params}
 GET  /api/jobs/{id}/events                SSE進捗
 GET  /api/media/{id}/segments             セグメント一覧(UI表示・編集)
-PATCH /api/segments/{id}                  テキスト・話者の手動修正
+PATCH /api/segments/{id}                  テキスト・話者の手動修正(本文を直すと edited_by_user=1)
+POST /api/segments/{id}/restore           手直しを取り消す(原文+承認済みの編集に戻す)
+POST /api/media/{id}/speakers/rename      この動画の話者名を変える {current, new}(既にいる名前には不可)
 GET  /api/media/{id}/edits?status=        置換の提案/適用済み一覧
 POST /api/edits/{id}/accept               提案の承認(修正付き承認は body で replacement 上書き)
 POST /api/edits/{id}/reject               提案の却下(理由付き → feedbackに記録)

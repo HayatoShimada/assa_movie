@@ -8,12 +8,13 @@ import { mediaDisplayName } from '../lib/media'
 import { resolveSettings } from '../lib/settings'
 import { VideoPlayer } from '../components/player/VideoPlayer'
 import { AssistChat } from '../components/transcript/AssistChat'
-import { SegmentList } from '../components/transcript/SegmentList'
+import { TranscriptPanel } from '../components/transcript/TranscriptPanel'
 import { ClipsTab } from '../components/clips/ClipsTab'
 import { ReviewTab } from '../components/edits/ReviewTab'
 import { ExportTab } from '../components/export/ExportTab'
 import { QuestionsTab } from '../components/questions/QuestionsTab'
 import { SettingsForm } from '../components/settings/SettingsForm'
+import { GlobalSettingsHeading } from './GlobalSettings'
 import {
   BackIcon,
   ClipIcon,
@@ -213,7 +214,7 @@ export function Editor({ mediaId }: { mediaId: number }) {
               <>
                 <div className="min-h-0 flex-1">
                   {segments.data?.length ? (
-                    <SegmentList segments={segments.data} />
+                    <TranscriptPanel mediaId={mediaId} segments={segments.data} />
                   ) : (
                     <p className="p-4 text-sm text-neutral-500">
                       {segments.isPending
@@ -237,6 +238,8 @@ export function Editor({ mediaId }: { mediaId: number }) {
             {tab === 'export' && <ExportTab mediaId={mediaId} />}
             {tab === 'settings' && (
               <div className="h-full overflow-y-auto">
+                {/* ここで変えるのは全体の設定。このプロジェクトだけの設定ではないことを先に示す */}
+                <GlobalSettingsHeading className="px-4 pt-4" />
                 <SettingsForm />
               </div>
             )}

@@ -1,10 +1,15 @@
 /**
  * 対話アシスト: 選択中のセグメントに自然言語で指示し、編集提案を受け取る。
  * 提案は通常のedits(proposed)なので、承認/却下はレビューAPIを使う。
+ *
+ * 提案は承認するまで反映されない。応答文(reply)はバックエンドが実際の状態から作り、
+ * 各案には「承認待ち」と承認後の行(after_text)を出す。LLMが「変更しました」と
+ * 返しても、画面では変わったように見せない(v2.0の初心者評価で誤解された)。
  */
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api, type AssistResponse, type Segment } from '../../api/client'
+import { displayText, errorText } from '../../lib/transcript'
 import { Button } from '../ui'
 
 export function AssistChat({ segment, projectId }: { segment: Segment; projectId?: number }) {
@@ -12,6 +17,8 @@ export function AssistChat({ segment, projectId }: { segment: Segment; projectId
   const [message, setMessage] = useState('')
   const [response, setResponse] = useState<AssistResponse | null>(null)
   const [promoted, setPromoted] = useState(false)
+  // 承認/却下の結果(案ごと)。押したあとも、何が起きたかを画面に残す
+  const [decided, setDecided] = useState<Record<number, 'accepted' | 'rejected'>>({})
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['edits'] })
@@ -22,21 +29,22 @@ export function AssistChat({ segment, projectId }: { segment: Segment; projectId
     onSuccess: (res) => {
       setResponse(res)
       setPromoted(false)
+      setDecided({})
       setMessage('')
       invalidate() // 提案がeditsに入るのでレビュータブのバッジも更新
     },
   })
   const accept = useMutation({
     mutationFn: (editId: number) => api.acceptEdit(editId, {}),
-    onSuccess: () => {
-      setResponse(null)
+    onSuccess: (_edit, editId) => {
+      setDecided((d) => ({ ...d, [editId]: 'accepted' }))
       invalidate()
     },
   })
   const reject = useMutation({
     mutationFn: (editId: number) => api.rejectEdit(editId),
-    onSuccess: () => {
-      setResponse(null)
+    onSuccess: (_edit, editId) => {
+      setDecided((d) => ({ ...d, [editId]: 'rejected' }))
       invalidate()
     },
   })
@@ -76,29 +84,56 @@ export function AssistChat({ segment, projectId }: { segment: Segment; projectId
 
       {response && (
         <div data-testid="assist-response" className="mt-2 space-y-2">
-          <p className="text-sm">{response.reply}</p>
+          <p data-testid="assist-reply" className="text-sm">
+            {response.reply}
+          </p>
           {response.edits.map((e) => (
             <div
               key={e.id}
-              className="flex items-center gap-2 rounded border border-neutral-200 bg-white p-2 text-sm dark:border-neutral-700 dark:bg-neutral-950"
+              data-testid={`assist-edit-${e.id}`}
+              className="space-y-1 rounded border border-neutral-200 bg-white p-2 text-sm dark:border-neutral-700 dark:bg-neutral-950"
             >
-              <span className="line-through opacity-60">{e.original}</span>
-              <span className="text-neutral-400">→</span>
-              <span className="font-medium">{e.replacement}</span>
-              <span className="ml-auto flex gap-1">
-                <Button className="!px-2 !py-0.5 text-xs" onClick={() => accept.mutate(e.id)}>
-                  承認
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="!px-2 !py-0.5 text-xs"
-                  onClick={() => reject.mutate(e.id)}
-                >
-                  却下
-                </Button>
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="line-through opacity-60">{e.original}</span>
+                <span className="text-neutral-400">→</span>
+                <span className="font-medium">{e.replacement}</span>
+                {decided[e.id] === 'accepted' ? (
+                  <span className="ml-auto text-xs font-medium text-emerald-600">反映しました</span>
+                ) : decided[e.id] === 'rejected' ? (
+                  <span className="ml-auto text-xs text-neutral-500">
+                    却下しました(行は変わっていません)
+                  </span>
+                ) : (
+                  <span className="ml-auto flex items-center gap-1">
+                    <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800 dark:bg-amber-900 dark:text-amber-200">
+                      承認待ち
+                    </span>
+                    <Button
+                      className="!px-2 !py-0.5 text-xs"
+                      disabled={accept.isPending || reject.isPending}
+                      onClick={() => accept.mutate(e.id)}
+                    >
+                      承認
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="!px-2 !py-0.5 text-xs"
+                      disabled={accept.isPending || reject.isPending}
+                      onClick={() => reject.mutate(e.id)}
+                    >
+                      却下
+                    </Button>
+                  </span>
+                )}
+              </div>
+              {!decided[e.id] && (
+                <p className="text-xs text-neutral-500">承認すると: {displayText(e.after_text)}</p>
+              )}
             </div>
           ))}
+          {(accept.isError || reject.isError) && (
+            <p className="text-xs text-red-600">{errorText(accept.error ?? reject.error)}</p>
+          )}
           {response.instruction_suggestion && projectId && !promoted && (
             <div className="flex items-center gap-2 rounded border border-amber-200 bg-amber-50 p-2 text-xs dark:border-amber-800 dark:bg-amber-950">
               <span>今後も使うルールにしますか?「{response.instruction_suggestion}」</span>

@@ -114,8 +114,10 @@ def run_resolve(
 
     # プロンプトの行番号は「全セグメント中の位置」に揃える(文脈が正しく引けるように)
     all_rows = conn.execute(
-        "SELECT id, text FROM segments WHERE media_id=? ORDER BY idx", (media_id,)
+        "SELECT id, text, edited_by_user FROM segments WHERE media_id=? ORDER BY idx",
+        (media_id,),
     ).fetchall()
+    hand_edited = {r["id"] for r in all_rows if r["edited_by_user"]}
     lines = [r["text"] for r in all_rows]
     id_by_line = {i + 1: r["id"] for i, r in enumerate(all_rows)}
     line_by_id = {r["id"]: i + 1 for i, r in enumerate(all_rows)}
@@ -167,12 +169,14 @@ def run_resolve(
 
         auto = edit.confidence == "auto"
         status = "proposed"
-        if apply_mode == "full_auto" or (apply_mode == "auto_and_review" and auto):
+        # 手で直した行には自動で当てない(手直しを守る)。当てていないのに
+        # 「適用済み」と記録すると取り消しや作り直しが食い違うので、承認待ちに回す
+        can_apply = segment_id not in hand_edited
+        if can_apply and (
+            apply_mode == "full_auto" or (apply_mode == "auto_and_review" and auto)
+        ):
             new_text = pronoun.apply_edit(line_text, edit, form=form)
-            conn.execute(
-                "UPDATE segments SET text=? WHERE id=? AND edited_by_user=0",
-                (new_text, segment_id),
-            )
+            conn.execute("UPDATE segments SET text=? WHERE id=?", (new_text, segment_id))
             status = "applied"
         conn.execute(
             "INSERT INTO edits (media_id, segment_id, kind, original, replacement,"

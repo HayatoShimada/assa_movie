@@ -36,7 +36,10 @@ cd frontend && npm run gen:api   # APIを変えたら型を再生成
 ## 画面構成
 
 ### 1. プロジェクト一覧(ホーム)
-- プロジェクト作成・動画ファイル登録(パス指定 or ドラッグ&ドロップ)
+- プロジェクト作成・動画ファイル登録(パス指定 or ドラッグ&ドロップ)。名前が空なら「作成」は押せない。
+  選んだテンプレートで何が起きるか(切り落とす/ぼかしで埋める)を1行で出す(`templateDescription`)
+- ヘッダーの「全体の設定」から全体の設定(`#/settings`、`pages/GlobalSettings`)を開ける。
+  文字起こし前でも設定を見直せるように。フォームは編集画面の設定タブと同じ
 - 各メディアの処理状態バッジ(未処理/文字起こし中/完了)と進捗バー
 
 ### 2. 編集画面(メイン)
@@ -57,7 +60,10 @@ cd frontend && npm run gen:api   # APIを変えたら型を再生成
 
 #### トランスクリプトタブ
 - セグメントを話者色付きで一覧(仮想スクロール)。クリックで動画シーク、再生位置に追従してハイライト
-- インライン編集(テキスト・話者変更)→ `PATCH /api/segments/{id}`
+- インライン編集: 行のダブルクリックか鉛筆ボタンで本文を直す → `PATCH /api/segments/{id}`。
+  原文は残り、「手直しを取り消す」→ `POST /api/segments/{id}/restore` でいつでも戻せる
+- 話者名を押すと、名前の変更(この動画の全行 → `POST /api/media/{id}/speakers/rename`)と
+  この行だけの付け替え(`PATCH`)ができる
 - 相槌セグメントはグレー表示(設定により非表示/復活切替)。フィラー除去語は取り消し線表示、クリックで復活
 - 指示語置換済みの箇所は下線表示。ホバーで原文をツールチップ表示
 - 選択字幕モード時: 各行に字幕採用バッジ(採用/不採用+根拠タグ)。クリックで切替(→ user_show/user_hide、feedbackに記録)。字幕プレビューは採用分のみ表示
@@ -82,6 +88,7 @@ cd frontend && npm run gen:api   # APIを変えたら型を再生成
 #### 対話アシスト(セグメント選択時)
 - トランスクリプトでセグメントを選択 → 「AIに指示」ボタンでミニチャットを開く
 - 例:「この『それ』は文字起こしアプリのこと」→ `POST /api/segments/{id}/assist` → 編集提案カードが返り、承認で適用
+- 提案は承認するまで反映されない。カードに「承認待ち」と承認後の行を出し、応答文も状態どおりにする
 - 会話の結論がルール化できる場合、「カスタム指示に追加しますか?」の昇格提案を表示
 
 #### 切り抜き候補タブ(Phase 2)
@@ -157,7 +164,7 @@ frontend/
 │   ├── stores/         Zustand(再生位置・選択セグメント・画面から始めたジョブID)
 │   ├── components/
 │   │   ├── player/     VideoPlayer(字幕オーバーレイを含む)
-│   │   ├── transcript/ SegmentList, AssistChat
+│   │   ├── transcript/ TranscriptPanel, SegmentList, AssistChat
 │   │   ├── edits/      ReviewTab
 │   │   ├── questions/  QuestionsTab
 │   │   ├── clips/      ClipsTab, ClipTimeline
@@ -172,7 +179,7 @@ frontend/
 │   ├── hooks/          useHashRoute, useSplitPane, useJobProgress, useTrackedJob
 │   ├── lib/            subtitle.ts(折返し・禁則), subtitleLayout.ts, userTerms.ts,
 │   │                   jobs.ts(操作とジョブの対応・進捗の文言)
-│   └── pages/          Home, Editor
+│   └── pages/          Home, Editor, GlobalSettings
 ├── e2e/                Playwright
 └── src-tauri/          デスクトップシェル(Rust)。画面は持たない
 ```

@@ -12,6 +12,7 @@ export type Media = components['schemas']['Media']
 export type Job = components['schemas']['Job']
 export type Segment = components['schemas']['Segment']
 export type Edit = components['schemas']['Edit']
+export type AssistEdit = components['schemas']['AssistEdit']
 export type Question = components['schemas']['Question']
 export type UserTerm = components['schemas']['UserTerm']
 
@@ -111,6 +112,11 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify(patch),
     }),
+  /** 手直しを取り消す(原文+承認済みのAIの修正に戻す) */
+  restoreSegment: (segmentId: number) => post<Segment>(`/api/segments/${segmentId}/restore`),
+  /** この動画の話者名を変える(その話者の全行) */
+  renameSpeaker: (mediaId: number, current: string, next: string) =>
+    post<{ changed: number }>(`/api/media/${mediaId}/speakers/rename`, { current, new: next }),
 
   listEdits: (mediaId: number, status?: string) =>
     request<Edit[]>(`/api/media/${mediaId}/edits${status ? `?status=${status}` : ''}`),
@@ -257,8 +263,9 @@ export const OS_LABELS: Record<HwProfile['os'], string> = {
 }
 
 export interface AssistResponse {
+  /** 実際の状態(承認待ちの案があるか等)から機械側で作った文。LLMの返事そのままではない */
   reply: string
-  edits: Edit[]
+  edits: AssistEdit[]
   instruction_suggestion: string | null
 }
 

@@ -38,6 +38,14 @@ export function ProjectSettingsPanel({ project }: { project: Project }) {
 
   return (
     <div className="mt-3 rounded border border-neutral-200 p-3 dark:border-neutral-800">
+      {/* 全体の設定との関係を先に示す(どちらを触っているのか分からなくなっていた) */}
+      <p
+        data-testid={`project-settings-scope-${project.id}`}
+        className="mb-2 text-xs text-neutral-500"
+      >
+        このプロジェクトだけの設定です。ここで変えた項目は全体の設定より優先されます
+        (全体の設定はホーム上部の「全体の設定」から)。
+      </p>
       <div className="mb-2 flex items-center gap-2">
         <span className="text-xs text-neutral-500">テンプレート</span>
         <select
