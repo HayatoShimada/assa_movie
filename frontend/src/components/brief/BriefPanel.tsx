@@ -3,8 +3,10 @@
  *
  * すべてのAI処理(指示語の解決・切り抜き候補・固有名詞の質問など)のプロンプトに
  * 入り、精度に効く。以前は書き出しタブの中にあって見つけにくかったので、
- * 最初に開く文字起こしタブの先頭に置く。未入力のうちは開いた状態で見せ、
- * 入力済みなら1行の要約に畳む。
+ * 最初に開く文字起こしタブの先頭に、1行の帯として置く(未入力なら「未入力」と
+ * 目立たせる)。押すと入力欄が開く。最初から開いておくと文字起こしの行と
+ * AIへの指示欄の場所を奪い、開閉で行の位置がずれて操作を取り違えるので、
+ * 開くのは利用者が押したときだけにする。
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
@@ -33,13 +35,11 @@ export function BriefPanel({ mediaId }: { mediaId: number }) {
     mutationFn: (patch: Partial<Brief>) => api.updateBrief(mediaId, { ...brief.data, ...patch }),
     onSuccess: (data) => queryClient.setQueryData(['brief', mediaId], data),
   })
-  // null = 利用者がまだ開閉していない(未入力なら開いて見せる)
-  const [open, setOpen] = useState<boolean | null>(null)
+  const [expanded, setExpanded] = useState(false)
 
   if (!brief.data) return null
   const value = (key: BriefKey) => brief.data[key] ?? ''
   const empty = FIELDS.every((f) => !value(f.key).trim())
-  const expanded = open ?? empty
 
   return (
     <section
@@ -50,11 +50,16 @@ export function BriefPanel({ mediaId }: { mediaId: number }) {
         type="button"
         data-testid="brief-toggle"
         aria-expanded={expanded}
-        onClick={() => setOpen(!expanded)}
+        onClick={() => setExpanded(!expanded)}
         className="flex w-full items-baseline gap-2 px-3 py-2 text-left text-xs"
       >
         <span aria-hidden="true">{expanded ? '▼' : '▶'}</span>
         <span className="font-semibold text-neutral-700 dark:text-neutral-200">動画の概要</span>
+        {empty && (
+          <span className="rounded bg-amber-200 px-1.5 text-[10px] font-semibold text-amber-900 dark:bg-amber-800 dark:text-amber-100">
+            未入力
+          </span>
+        )}
         <span className="min-w-0 flex-1 truncate text-neutral-500">
           {empty
             ? '入力するとAIの精度が上がります(主題・登場人物・固有名詞)'
@@ -62,7 +67,7 @@ export function BriefPanel({ mediaId }: { mediaId: number }) {
         </span>
       </button>
       {expanded && (
-        <div className="space-y-2 px-3 pb-3">
+        <div className="max-h-[45vh] space-y-2 overflow-y-auto px-3 pb-3">
           <p className="text-xs text-neutral-500">
             指示語の解決・切り抜き候補・固有名詞の確認など、すべてのAI処理で参考にします。
           </p>
@@ -75,8 +80,6 @@ export function BriefPanel({ mediaId }: { mediaId: number }) {
                 rows={2}
                 defaultValue={value(f.key)}
                 placeholder={f.placeholder}
-                // 入力し始めたら開いたままにする(保存で「未入力」でなくなっても畳まない)
-                onFocus={() => setOpen(true)}
                 onBlur={(e) => {
                   if (e.target.value !== value(f.key)) save.mutate({ [f.key]: e.target.value })
                 }}

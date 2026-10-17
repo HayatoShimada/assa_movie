@@ -52,26 +52,25 @@ test('クリップの書き出し後に保存先とファイル名が出て、�
   )
 })
 
-test('動画の概要は文字起こしタブの先頭にあり、未入力なら開いている', async ({
-  page,
-  request,
-}) => {
+test('動画の概要は文字起こしタブの先頭にあり、未入力なら目立たせる', async ({ page, request }) => {
   const mediaId = await seedTranscribed(request)
   await page.goto(`/#/media/${mediaId}`)
 
-  // 最初に開くタブで見える
-  await expect(page.getByTestId('brief-panel')).toBeVisible()
+  // 最初に開くタブの先頭に1行の帯で出る。未入力なら「未入力」と精度の案内
+  const toggle = page.getByTestId('brief-toggle')
+  await expect(toggle).toContainText('未入力')
+  await expect(toggle).toContainText('AIの精度が上がります')
+  await toggle.click()
   await page.getByTestId('brief-theme').fill('古着屋とAIの対談')
   await page.getByTestId('brief-people').click() // blurで保存
   await expect
     .poll(async () => (await (await request.get(`${API}/api/media/${mediaId}/brief`)).json()).theme)
     .toBe('古着屋とAIの対談')
-  // 入力中に畳まれない
-  await expect(page.getByTestId('brief-people')).toBeVisible()
 
-  // 入力済みなら次に開いたときは1行に畳まれて、主題が見える
+  // 入力済みなら主題が帯に出る
   await page.reload()
-  await expect(page.getByTestId('brief-toggle')).toContainText('古着屋とAIの対談')
+  await expect(toggle).toContainText('古着屋とAIの対談')
+  await expect(toggle).not.toContainText('未入力')
   await expect(page.getByTestId('brief-theme')).toHaveCount(0)
 
   // 書き出しタブにはもう無い
