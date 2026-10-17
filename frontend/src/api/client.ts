@@ -97,6 +97,8 @@ export const api = {
   createJob: (mediaId: number, type: string, params: Record<string, unknown> = {}) =>
     post<Job>(`/api/media/${mediaId}/jobs`, { type, params }),
   getJob: (jobId: number) => request<Job>(`/api/jobs/${jobId}`),
+  /** 待機中・実行中のジョブ(タブ切替・再読み込みの後に進捗を取り直す。lib/jobs.ts) */
+  listActiveJobs: () => request<Job[]>('/api/jobs/active'),
   cancelJob: (jobId: number) => post<Job>(`/api/jobs/${jobId}/cancel`),
 
   listSegments: (mediaId: number, includeAizuchi = true) =>
@@ -274,14 +276,31 @@ export function isJobDone(status: string): boolean {
   return (JOB_TERMINAL_STATUSES as readonly string[]).includes(status)
 }
 
-/** ジョブ進捗をSSEで購読する。戻り値を呼ぶと購読を止める。 */
-export function subscribeJob(jobId: number, onProgress: (job: Job) => void): () => void {
+/**
+ * ジョブ進捗をSSEで購読する。戻り値を呼ぶと購読を止める。
+ * 終端に届く前に接続が切れたら onError を呼ぶ(呼び出し側が取り直す)。
+ */
+export function subscribeJob(
+  jobId: number,
+  onProgress: (job: Job) => void,
+  onError?: () => void,
+): () => void {
   const source = new EventSource(`${API_BASE}/api/jobs/${jobId}/events`)
+  let done = false
   source.addEventListener('progress', (e) => {
     const job = JSON.parse((e as MessageEvent).data) as Job & { job_id: number }
     onProgress(job)
-    if (isJobDone(job.status)) source.close()
+    if (isJobDone(job.status)) {
+      done = true
+      source.close()
+    }
   })
-  source.onerror = () => source.close()
-  return () => source.close()
+  source.onerror = () => {
+    source.close()
+    if (!done) onError?.()
+  }
+  return () => {
+    done = true
+    source.close()
+  }
 }

@@ -12,6 +12,7 @@
 import os
 import sqlite3
 import tempfile
+import threading
 from pathlib import Path
 from typing import Callable
 
@@ -70,6 +71,32 @@ FAKE_META = {
     "description": "去年のハッカソンについての対談クリップ。",
     "hashtags": ["#AI", "#ハッカソン"],
 }
+
+
+# ジョブを途中で止めておく関所。FakeLLMもFake文字起こしも一瞬で終わるため、
+# 「処理中にタブを切り替える・再読み込みする」操作をE2Eで再現できない。
+# /api/e2e/gate?open=false で閉じると、ジョブは実行中のまま関所で待つ。
+# ワーカーは1本なので、後から投げたジョブは順番待ち(queued)のまま残る。
+# 既定は開いている(他のspecの挙動は変えない)。resetでも必ず開け直す
+JOB_GATE = threading.Event()
+JOB_GATE.set()
+GATE_TIMEOUT = 60.0
+
+# 種別 → 失敗させるときのエラー文言(/api/e2e/fail)。失敗の表示をE2Eで確かめるため
+FAIL_JOBS: dict[str, str] = {}
+
+
+def _gated(job_type: str, handler: Callable) -> Callable:
+    """全ジョブの入口に関所と失敗の差し込みを付ける(LLMを呼ばない経路もあるため)"""
+
+    def run(conn, media_id, params, progress):
+        # 閉じ忘れでワーカーが永久に止まらないよう上限を置く
+        JOB_GATE.wait(timeout=GATE_TIMEOUT)
+        if job_type in FAIL_JOBS:
+            raise RuntimeError(FAIL_JOBS[job_type])
+        return handler(conn, media_id, params, progress)
+
+    return run
 
 
 def _fake_llm(system: str, user: str) -> dict:
@@ -159,7 +186,14 @@ def apply_e2e_defaults() -> None:
 @router.post("/reset")
 def reset(request: Request) -> dict:
     """DBを空にして、テストの独立性を保つ"""
+    # 前のspecが関所を閉じたまま終わっても、次のspecのジョブを止めない
     db = request.app.state.db
+    jobs = request.app.state.jobs
+    # 前のspecが残したジョブ(関所で止めたもの・順番待ちのもの)を止めてから消す
+    jobs.cancel_for_media([r["id"] for r in db.execute("SELECT id FROM media")])
+    JOB_GATE.set()
+    FAIL_JOBS.clear()
+    jobs.wait_idle(timeout=GATE_TIMEOUT)
     for table in ("edits", "feedback", "questions", "clip_cuts", "clips",
                   "segments", "jobs", "glossary", "llm_instructions", "media", "projects"):
         db.execute(f"DELETE FROM {table}")
@@ -190,6 +224,23 @@ def reset(request: Request) -> dict:
     hwprofile.set_current(None)
     hwprofile.ensure_profile(db)
     return {"status": "reset"}
+
+
+@router.post("/gate")
+def gate(open: bool = True) -> dict:
+    """ジョブの関所を開閉する(処理中の画面をE2Eで観測するため)"""
+    if open:
+        JOB_GATE.set()
+    else:
+        JOB_GATE.clear()
+    return {"open": JOB_GATE.is_set()}
+
+
+@router.post("/fail")
+def fail(job_type: str, message: str) -> dict:
+    """この種別のジョブを、指定の文言で失敗させる(resetで元に戻る)"""
+    FAIL_JOBS[job_type] = message
+    return {"failing": sorted(FAIL_JOBS)}
 
 
 @router.post("/seed")
@@ -275,6 +326,9 @@ def build_app():
     job_queue.register("transcribe")(_fake_transcribe)
     # セットアップの取得も同様に差し替える(実物は76MBのダウンロード)
     job_queue.register("setup_diarization")(_fake_setup_diarization)
+    # 差し替えまで済んだ全ジョブに関所を付ける
+    for job_type, handler in list(job_queue._HANDLERS.items()):
+        job_queue._HANDLERS[job_type] = _gated(job_type, handler)
 
     # ライセンスは使い捨ての鍵ペアで検証し、保存先も一時ディレクトリにする
     license_api.PUBLIC_KEY = lic.public_key_to_text(_E2E_ISSUER.public_key())

@@ -171,6 +171,20 @@ class JobQueue:
             job["progress"] = mem_progress
         return job
 
+    def active(self) -> list[dict]:
+        """終わっていない(待機中・実行中の)ジョブを古い順に返す。
+
+        画面はジョブIDを持ち続けられない(タブ切替・再読み込みで消える)ので、
+        実行中かどうかはここから取り直す。進捗・工程名は get() と同じくメモリの値を使う
+        """
+        with self.lock:
+            ids = [
+                r["id"] for r in self.conn.execute(
+                    "SELECT id FROM jobs WHERE status IN ('queued','running') ORDER BY id"
+                )
+            ]
+        return [job for job in (self.get(i) for i in ids) if job is not None]
+
     # ---- ワーカー ----
     def start(self) -> None:
         if self._thread is None:

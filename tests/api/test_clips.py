@@ -252,6 +252,22 @@ def test_clip_resolve_uses_extra_instruction(client, media):
     assert "切り抜き動画として単体で公開" in system  # 自己完結化の追加指示が入る
 
 
+def test_clip_resolve_job_records_clip_id(client, media):
+    """どのクリップの自己完結化かをジョブから分かるようにする。
+
+    画面はタブ切替・再読み込みの後に実行中のジョブを取り直す(GET /api/jobs/active)。
+    レビュータブの「指示語を解決」も同じ resolve なので、clip_id が無いと
+    クリップの進捗がレビュータブに出てしまう
+    """
+    mid = media["media_id"]
+    clip = client.post(f"/api/media/{mid}/clips", json={"start": 10, "end": 30}).json()
+    use_fake([{"edits": []}])
+    job_id = client.post(f"/api/clips/{clip['id']}/resolve").json()["job_id"]
+    client.app.state.jobs.wait(job_id, timeout=30)
+
+    assert client.get(f"/api/jobs/{job_id}").json()["params"]["clip_id"] == clip["id"]
+
+
 def test_clip_meta_generation(client, media):
     mid = media["media_id"]
     clip = client.post(f"/api/media/{mid}/clips", json={"start": 0, "end": 30}).json()

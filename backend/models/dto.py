@@ -62,6 +62,9 @@ class Job(BaseModel):
     phase: str | None = None
     error: str | None = None
     result: dict | None = None  # 書き出しジョブの出力パスなど
+    # 投入時のパラメータ。同じ種別のジョブを画面が見分けるのに使う
+    # (クリップの書き出しと範囲指定の書き出しはどちらも export で、clip_id で分かれる)
+    params: dict | None = None
     created_at: str
 
 

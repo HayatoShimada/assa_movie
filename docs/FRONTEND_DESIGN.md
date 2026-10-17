@@ -151,7 +151,7 @@ cd frontend && npm run gen:api   # APIを変えたら型を再生成
 frontend/
 ├── src/
 │   ├── api/            client.ts(型付きクライアント)+ schema.d.ts(自動生成物)
-│   ├── stores/         Zustand(再生位置・選択セグメント)
+│   ├── stores/         Zustand(再生位置・選択セグメント・画面から始めたジョブID)
 │   ├── components/
 │   │   ├── player/     VideoPlayer(字幕オーバーレイを含む)
 │   │   ├── transcript/ SegmentList, AssistChat
@@ -166,8 +166,9 @@ frontend/
 │   │   ├── setup/      SetupWizard(初回セットアップ)
 │   │   ├── ui.tsx      Button など最小限の共通部品
 │   │   └── icons.tsx
-│   ├── hooks/          useHashRoute, useSplitPane, useJobProgress
-│   ├── lib/            subtitle.ts(折返し・禁則), subtitleLayout.ts
+│   ├── hooks/          useHashRoute, useSplitPane, useJobProgress, useTrackedJob
+│   ├── lib/            subtitle.ts(折返し・禁則), subtitleLayout.ts,
+│   │                   jobs.ts(操作とジョブの対応・進捗の文言)
 │   └── pages/          Home, Editor
 ├── e2e/                Playwright
 └── src-tauri/          デスクトップシェル(Rust)。画面は持たない
@@ -179,6 +180,10 @@ frontend/
 ## 状態管理の設計
 
 - **サーバー状態**(TanStack Query): segments / edits / clips / jobs。SSE進捗イベント受信時に該当queryを無効化して再取得
+- **ジョブの進捗**: ジョブを投げる操作は `useTrackedJob(jobSlots.〜)` を使う。ジョブIDをタブの
+  stateに持つと、タブ切替(アンマウント)や再読み込みで進捗が消え、実行中なのにボタンがまた押せた。
+  IDはストア(`stores/jobs.ts`)に預け、無ければ `GET /api/jobs/active` から拾い直す。
+  表示は `JobStatus` に寄せ、順番待ち・実行中・完了・失敗(バックエンドの文言)・中止を出し分ける
 - **UI状態**(Zustand): 再生位置(60fps更新のためReact re-render外で保持し、購読コンポーネントのみ更新)・選択セグメント・タイムラインズーム・タブ
 - 再生位置とトランスクリプトの同期: `timeupdate` → ストア更新 → 二分探索で現在セグメント特定 → ハイライト&自動スクロール(手動スクロール中は追従を一時停止)
 

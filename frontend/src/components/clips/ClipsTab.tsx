@@ -3,12 +3,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { api } from '../../api/client'
 import { clipsApi, type Clip } from '../../api/clips'
-import { useJobProgress } from '../../hooks/useJobProgress'
+import { useTrackedJob } from '../../hooks/useTrackedJob'
 import { CONVERT_METHOD_LABELS } from '../../lib/catalogs'
+import { jobSlots } from '../../lib/jobs'
 import { clipStatusLabel } from '../../lib/media'
 import { TrashIcon } from '../icons'
 import { usePlayback } from '../../stores/playback'
-import { Button, ProgressBar, formatTime } from '../ui'
+import { JobStatus } from '../JobStatus'
+import { Button, formatTime } from '../ui'
 import { ClipTimeline } from './ClipTimeline'
 
 const TARGETS = [
@@ -52,26 +54,25 @@ function ClipEditor({
     onSuccess: invalidate,
   })
 
-  const [resolveJobId, setResolveJobId] = useState<number | null>(null)
-  const resolveProgress = useJobProgress(resolveJobId, () => {
+  // ジョブIDはクリップごとにタブの外へ預ける(タブ切替・クリップの選び直し・
+  // 再読み込みで進捗を失わない。lib/jobs.ts)
+  const resolveJob = useTrackedJob(jobSlots.clipResolve(mediaId, clip.id), () => {
     queryClient.invalidateQueries({ queryKey: ['segments'] })
     queryClient.invalidateQueries({ queryKey: ['edits'] })
   })
   const resolve = useMutation({
     mutationFn: () => clipsApi.resolve(clip.id),
-    onSuccess: (r) => setResolveJobId(r.job_id),
+    onSuccess: (r) => resolveJob.start(r.job_id),
   })
 
-  const [metaJobId, setMetaJobId] = useState<number | null>(null)
-  useJobProgress(metaJobId, invalidate)
+  const metaJob = useTrackedJob(jobSlots.clipMeta(mediaId, clip.id), invalidate)
   const meta = useMutation({
     mutationFn: () => clipsApi.meta(mediaId, clip.id),
-    onSuccess: (job) => setMetaJobId(job.id),
+    onSuccess: (job) => metaJob.start(job.id),
   })
 
-  const [exportJobId, setExportJobId] = useState<number | null>(null)
   const [resultPath, setResultPath] = useState<string | null>(null)
-  const exportProgress = useJobProgress(exportJobId, async (job) => {
+  const exportJob = useTrackedJob(jobSlots.clipExport(mediaId, clip.id), async (job) => {
     invalidate()
     if (job.status === 'completed') {
       const full = await api.getJob(job.id)
@@ -82,7 +83,7 @@ function ClipEditor({
     mutationFn: () => clipsApi.exportClip(clip.id),
     onSuccess: (r) => {
       setResultPath(null)
-      setExportJobId(r.job_id)
+      exportJob.start(r.job_id)
     },
   })
 
@@ -124,39 +125,47 @@ function ClipEditor({
         <Button variant="ghost" onClick={() => jetcut.mutate()} disabled={jetcut.isPending}>
           中抜きを提案
         </Button>
-        <Button variant="ghost" onClick={() => resolve.mutate()} disabled={resolve.isPending}>
+        <Button
+          variant="ghost"
+          onClick={() => resolve.mutate()}
+          disabled={resolve.isPending || resolveJob.busy}
+        >
           指示語を自己完結化
         </Button>
-        <Button variant="ghost" onClick={() => meta.mutate()} disabled={meta.isPending}>
+        <Button
+          variant="ghost"
+          onClick={() => meta.mutate()}
+          disabled={meta.isPending || metaJob.busy}
+        >
           タイトル・メタ生成
         </Button>
         <Button
           data-testid="clip-export"
           onClick={() => exportRun.mutate()}
-          disabled={exportProgress.status === 'running'}
+          disabled={exportRun.isPending || exportJob.busy}
         >
           書き出し
         </Button>
       </div>
 
-      {resolveJobId !== null && resolveProgress.status !== 'idle' && (
-        <ProgressBar
-          value={resolveProgress.progress}
-          label={resolveProgress.status === 'completed' ? '自己完結化完了(レビュータブで確認)' : '解決中...'}
-        />
-      )}
-      {exportJobId !== null && exportProgress.status !== 'idle' && (
-        <ProgressBar
-          value={exportProgress.progress}
-          label={
-            exportProgress.status === 'failed'
-              ? `失敗: ${exportProgress.error?.split('\n')[0]}`
-              : exportProgress.status === 'completed'
-                ? '書き出し完了'
-                : `書き出し中... ${Math.round(exportProgress.progress * 100)}%`
-          }
-        />
-      )}
+      <JobStatus
+        progress={resolveJob.progress}
+        running="解決中"
+        done="自己完結化完了(レビュータブで確認)"
+        data-testid="clip-resolve-status"
+      />
+      <JobStatus
+        progress={metaJob.progress}
+        running="タイトル・メタを生成中"
+        done="タイトル・メタ生成完了"
+        data-testid="clip-meta-status"
+      />
+      <JobStatus
+        progress={exportJob.progress}
+        running="書き出し中"
+        done="書き出し完了"
+        data-testid="clip-export-status"
+      />
       {resultPath && (
         <p data-testid="clip-export-result" className="break-all text-xs text-emerald-600">
           出力: {resultPath}
@@ -304,20 +313,20 @@ export function ClipsTab({
   const settings = useQuery({ queryKey: ['settings'], queryFn: api.getSettings })
   const [target, setTarget] = useState(60)
   const [selectedId, setSelectedId] = useState<number | null>(null)
-  const [jobId, setJobId] = useState<number | null>(null)
-  const progress = useJobProgress(jobId, () =>
+  // ジョブIDはタブの外に預ける(タブ切替・再読み込みで進捗を失わない)
+  const { progress, busy, start } = useTrackedJob(jobSlots.suggestClips(mediaId), () =>
     queryClient.invalidateQueries({ queryKey: ['clips', mediaId] }),
   )
   const suggest = useMutation({
     mutationFn: () => clipsApi.suggest(mediaId, target || undefined),
-    onSuccess: (job) => setJobId(job.id),
+    onSuccess: (job) => start(job.id),
   })
   const remove = useMutation({
     mutationFn: (id: number) => clipsApi.remove(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['clips', mediaId] }),
   })
 
-  const running = progress.status === 'running' || progress.status === 'queued'
+  const running = busy || suggest.isPending
   const selected = clips.data?.find((c) => c.id === selectedId)
   const globalSubtitlePosition =
     (settings.data?.values.subtitle_position as Clip['subtitle_position'] | undefined) ?? 'bottom'
@@ -347,12 +356,12 @@ export function ClipsTab({
             切り抜き候補を探す
           </Button>
         </div>
-        {jobId !== null && progress.status !== 'idle' && (
-          <ProgressBar
-            value={progress.progress}
-            label={progress.status === 'completed' ? '候補生成完了' : '候補を探索中...'}
-          />
-        )}
+        <JobStatus
+          progress={progress}
+          running="候補を探索中"
+          done="候補生成完了"
+          data-testid="suggest-status"
+        />
       </div>
 
       {clips.data?.length === 0 && (

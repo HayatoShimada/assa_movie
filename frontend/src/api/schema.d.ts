@@ -178,6 +178,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/jobs/active": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Active Jobs
+         * @description 待機中・実行中のジョブ(メディアに紐づかないセットアップも含む)。
+         *
+         *     画面はジョブIDをタブのstateに持つので、タブ切替や再読み込みで失う。
+         *     処理中の進捗表示と二重実行の防止を保つため、画面はここから取り直す。
+         *     同時に動くジョブは数件なので、メディアでは絞らず全部返す
+         */
+        get: operations["list_active_jobs_api_jobs_active_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/jobs/{job_id}": {
         parameters: {
             query?: never;
@@ -950,6 +974,10 @@ export interface components {
             result?: {
                 [key: string]: unknown;
             } | null;
+            /** Params */
+            params?: {
+                [key: string]: unknown;
+            } | null;
             /** Created At */
             created_at: string;
         };
@@ -1672,6 +1700,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_active_jobs_api_jobs_active_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Job"][];
                 };
             };
         };

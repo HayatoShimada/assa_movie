@@ -2,13 +2,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRef, useState } from 'react'
 import { api, type Media, type Project } from '../api/client'
-import { Button, ProgressBar, StateBadge, formatTime } from '../components/ui'
+import { JobStatus } from '../components/JobStatus'
+import { Button, StateBadge, formatTime } from '../components/ui'
 import { FilmIcon, SettingsIcon, TrashIcon, UploadIcon } from '../components/icons'
 import { CreateProjectForm } from '../components/project/CreateProjectForm'
 import { ProjectSettingsPanel } from '../components/project/ProjectSettingsPanel'
 import { templateFor } from '../lib/catalogs'
+import { jobSlots } from '../lib/jobs'
 import { mediaDisplayName, mediaState } from '../lib/media'
-import { useJobProgress } from '../hooks/useJobProgress'
+import { useTrackedJob } from '../hooks/useTrackedJob'
 import { navigate } from '../hooks/useHashRoute'
 
 /** 横長の画から縦長の1枚を切り出す図。このアプリがやることそのもの */
@@ -31,9 +33,9 @@ function BrandMark() {
 
 function MediaRow({ media }: { media: Media }) {
   const queryClient = useQueryClient()
-  const [jobId, setJobId] = useState<number | null>(null)
   const [confirmingRetranscribe, setConfirmingRetranscribe] = useState(false)
-  const progress = useJobProgress(jobId, () => {
+  // ジョブIDは行の外に預ける(編集画面との行き来・再読み込みで進捗と中止ボタンを失わない)
+  const { jobId, progress, busy, start } = useTrackedJob(jobSlots.transcribe(media.id), () => {
     queryClient.invalidateQueries({ queryKey: ['media', media.project_id] })
     queryClient.invalidateQueries({ queryKey: ['segments', media.id] })
   })
@@ -42,7 +44,7 @@ function MediaRow({ media }: { media: Media }) {
     mutationFn: () => api.createJob(media.id, 'transcribe', { language: 'ja' }),
     onSuccess: (job) => {
       setConfirmingRetranscribe(false)
-      setJobId(job.id)
+      start(job.id)
     },
   })
 
@@ -50,7 +52,7 @@ function MediaRow({ media }: { media: Media }) {
     mutationFn: () => api.cancelJob(jobId as number),
   })
 
-  const running = progress.status === 'running' || progress.status === 'queued'
+  const running = busy
   const transcribed = media.status === 'transcribed'
   const state = mediaState(media.status, progress.status)
 
@@ -138,20 +140,14 @@ function MediaRow({ media }: { media: Media }) {
         </div>
       )}
 
-      {jobId !== null && progress.status !== 'idle' && (
+      {progress.status !== 'idle' && (
         <div className="mt-2 pl-12">
-          <ProgressBar
-            value={progress.progress}
-            label={
-              progress.status === 'failed'
-                ? `失敗: ${progress.error?.split('\n')[0] ?? ''}`
-                : progress.status === 'cancelled'
-                  ? '中止しました'
-                  : progress.status === 'completed'
-                    ? '文字起こし完了'
-                    : // 工程名はジョブが報告する(話者分離中→文字起こし中→保存中)
-                      `${progress.phase ?? '文字起こし中'}... ${Math.round(progress.progress * 100)}%`
-            }
+          {/* 工程名はジョブが報告する(話者分離中→文字起こし中→保存中) */}
+          <JobStatus
+            progress={progress}
+            running="文字起こし中"
+            done="文字起こし完了"
+            data-testid={`media-progress-${media.id}`}
           />
         </div>
       )}

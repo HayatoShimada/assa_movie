@@ -4,8 +4,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api } from '../../api/client'
-import { useJobProgress } from '../../hooks/useJobProgress'
-import { Button, ProgressBar, formatTime } from '../ui'
+import { useTrackedJob } from '../../hooks/useTrackedJob'
+import { jobSlots } from '../../lib/jobs'
+import { JobStatus } from '../JobStatus'
+import { Button, formatTime } from '../ui'
 
 function BriefEditor({ mediaId }: { mediaId: number }) {
   const queryClient = useQueryClient()
@@ -70,33 +72,41 @@ function JobButton({
   mediaId,
   type,
   label,
+  running: runningLabel,
   params = {},
   onDone,
 }: {
   mediaId: number
   type: string
   label: string
+  /** 実行中の文言 */
+  running: string
   params?: Record<string, unknown>
   onDone?: () => void
 }) {
-  const [jobId, setJobId] = useState<number | null>(null)
-  const progress = useJobProgress(jobId, onDone)
+  // ジョブIDはタブの外に預ける(タブ切替・再読み込みで進捗を失わない)
+  const { progress, busy, start } = useTrackedJob(jobSlots.mediaJob(mediaId, type), onDone)
   const run = useMutation({
     mutationFn: () => api.createJob(mediaId, type, params),
-    onSuccess: (job) => setJobId(job.id),
+    onSuccess: (job) => start(job.id),
   })
-  const running = progress.status === 'running' || progress.status === 'queued'
+  const running = busy || run.isPending
   return (
     <div className="space-y-1">
-      <Button variant="ghost" disabled={running} onClick={() => run.mutate()}>
+      <Button
+        data-testid={`job-${type}`}
+        variant="ghost"
+        disabled={running}
+        onClick={() => run.mutate()}
+      >
         {label}
       </Button>
-      {jobId !== null && progress.status !== 'idle' && (
-        <ProgressBar
-          value={progress.progress}
-          label={progress.status === 'failed' ? `失敗: ${progress.error?.split('\n')[0]}` : undefined}
-        />
-      )}
+      <JobStatus
+        progress={progress}
+        running={runningLabel}
+        done="完了"
+        data-testid={`job-${type}-progress`}
+      />
     </div>
   )
 }
@@ -109,10 +119,10 @@ export function ExportTab({ mediaId }: { mediaId: number }) {
   const [start, setStart] = useState(0)
   const [end, setEnd] = useState(Math.min(60, Math.round(duration)))
   const [burn, setBurn] = useState(true)
-  const [jobId, setJobId] = useState<number | null>(null)
   const [resultPath, setResultPath] = useState<string | null>(null)
 
-  const progress = useJobProgress(jobId, async (job) => {
+  // ジョブIDはタブの外に預ける(タブ切替・再読み込みで進捗を失わない)
+  const exportJob = useTrackedJob(jobSlots.exportRange(mediaId), async (job) => {
     if (job.status === 'completed') {
       const full = await api.getJob(job.id)
       setResultPath((full.result as { path?: string } | null)?.path ?? null)
@@ -123,10 +133,11 @@ export function ExportTab({ mediaId }: { mediaId: number }) {
       api.createJob(mediaId, 'export', { start, end, burn_subtitles: burn }),
     onSuccess: (job) => {
       setResultPath(null)
-      setJobId(job.id)
+      exportJob.start(job.id)
     },
   })
-  const running = progress.status === 'running' || progress.status === 'queued'
+  const { progress } = exportJob
+  const running = exportJob.busy || exportRun.isPending
   const invalidateAll = () => {
     queryClient.invalidateQueries({ queryKey: ['segments'] })
     queryClient.invalidateQueries({ queryKey: ['edits'] })
@@ -144,12 +155,14 @@ export function ExportTab({ mediaId }: { mediaId: number }) {
             mediaId={mediaId}
             type="filler"
             label="フィラーを検出"
+            running="フィラーを検出中"
             onDone={invalidateAll}
           />
           <JobButton
             mediaId={mediaId}
             type="judge_subtitles"
             label="字幕採用をジャッジ"
+            running="字幕採用をジャッジ中"
             onDone={invalidateAll}
           />
         </div>
@@ -194,18 +207,12 @@ export function ExportTab({ mediaId }: { mediaId: number }) {
         >
           書き出し
         </Button>
-        {jobId !== null && progress.status !== 'idle' && (
-          <ProgressBar
-            value={progress.progress}
-            label={
-              progress.status === 'failed'
-                ? `失敗: ${progress.error?.split('\n')[0]}`
-                : progress.status === 'completed'
-                  ? '書き出し完了'
-                  : `書き出し中... ${Math.round(progress.progress * 100)}%`
-            }
-          />
-        )}
+        <JobStatus
+          progress={progress}
+          running="書き出し中"
+          done="書き出し完了"
+          data-testid="export-status"
+        />
         {resultPath && (
           <p data-testid="export-result" className="break-all text-xs text-emerald-600">
             出力: {resultPath}

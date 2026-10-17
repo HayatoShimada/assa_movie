@@ -48,9 +48,21 @@ def _to_job(job: dict) -> Job:
     import json
 
     job = dict(job)
-    job.pop("params_json", None)
+    job["params"] = json.loads(job.pop("params_json", None) or "null")
     job["result"] = json.loads(job.pop("result_json", None) or "null")
     return Job(**job)
+
+
+# /jobs/{job_id} より先に置く(後ろだと "active" がjob_idとして解釈される)
+@router.get("/jobs/active", response_model=list[Job])
+def list_active_jobs(jobs: JobQueue = Depends(get_jobs)):
+    """待機中・実行中のジョブ(メディアに紐づかないセットアップも含む)。
+
+    画面はジョブIDをタブのstateに持つので、タブ切替や再読み込みで失う。
+    処理中の進捗表示と二重実行の防止を保つため、画面はここから取り直す。
+    同時に動くジョブは数件なので、メディアでは絞らず全部返す
+    """
+    return [_to_job(job) for job in jobs.active()]
 
 
 @router.get("/jobs/{job_id}", response_model=Job)

@@ -5,8 +5,9 @@
  * 何が足りていて何が足りないかを画面で示し、取れるものはここから取る。
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
-import { api, isJobDone, subscribeJob, type SetupItem } from '../../api/client'
+import { api, type SetupItem } from '../../api/client'
+import { useTrackedJob } from '../../hooks/useTrackedJob'
+import { jobErrorMessage, jobSlots } from '../../lib/jobs'
 import { Button } from '../ui'
 
 /** 3.1GBを「3100MB」と出すと大きさが伝わらない */
@@ -17,30 +18,24 @@ function formatSize(mb: number): string {
 /** 1項目ぶんの取得UI。初回セットアップのウィザードからも使う(components/setup/) */
 export function SetupItemRow({ id, item }: { id: string; item: SetupItem }) {
   const queryClient = useQueryClient()
-  const [progress, setProgress] = useState<number | null>(null)
-
-  const fetchModel = useMutation({
-    mutationFn: async () => {
-      const job = await api.createSetupJob(id)
-      setProgress(0)
-      // 完了までSSEで進捗を受ける(数十MBのダウンロードなのでバーが要る)
-      await new Promise<void>((resolve) => {
-        const stop = subscribeJob(job.id, (j) => {
-          setProgress(j.progress)
-          if (isJobDone(j.status)) {
-            stop()
-            resolve()
-          }
-        })
-      })
-    },
-    onSettled: () => {
-      setProgress(null)
-      queryClient.invalidateQueries({ queryKey: ['setup'] })
-      // 話者分離エンジンの選択可否が変わる
-      queryClient.invalidateQueries({ queryKey: ['settings'] })
-    },
+  // 完了までSSEで進捗を受ける(数十MBのダウンロードなのでバーが要る)。
+  // ジョブIDは行の外に預ける。行のstateに持っていたときは、取得中にタブを
+  // 切り替えて戻ると進捗が消え、もう一度押せて二重にダウンロードできた
+  const job = useTrackedJob(jobSlots.setup(id), () => {
+    queryClient.invalidateQueries({ queryKey: ['setup'] })
+    // 話者分離エンジンの選択可否が変わる
+    queryClient.invalidateQueries({ queryKey: ['settings'] })
   })
+  const fetchModel = useMutation({
+    mutationFn: () => api.createSetupJob(id),
+    onSuccess: (j) => job.start(j.id),
+  })
+  const fetching = job.busy || fetchModel.isPending
+  const failed = fetchModel.isError || job.progress.status === 'failed'
+  // 失敗の理由はバックエンドの文言をそのまま添える(推測で言い換えない)
+  const failure = fetchModel.isError
+    ? fetchModel.error.message
+    : jobErrorMessage(job.progress.error)
 
   return (
     <div
@@ -70,13 +65,18 @@ export function SetupItemRow({ id, item }: { id: string; item: SetupItem }) {
             data-testid={`setup-fetch-${id}`}
             type="button"
             onClick={() => fetchModel.mutate()}
-            disabled={fetchModel.isPending}
+            disabled={fetching}
           >
-            {progress === null ? 'ダウンロード' : `取得中… ${Math.round(progress * 100)}%`}
+            {!fetching
+              ? 'ダウンロード'
+              : job.progress.status === 'queued'
+                ? '順番待ち…'
+                : `取得中… ${Math.round(job.progress.progress * 100)}%`}
           </Button>
-          {fetchModel.isError && (
+          {failed && !fetching && (
             <p data-testid={`setup-error-${id}`} className="mt-1 text-xs text-red-600">
               取得できませんでした。ネットワークを確認して、もう一度お試しください。
+              {failure && <span className="block break-all">{failure}</span>}
             </p>
           )}
         </div>

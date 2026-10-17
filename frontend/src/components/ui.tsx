@@ -22,9 +22,22 @@ export function Button({
   )
 }
 
-export function ProgressBar({ value, label }: { value: number; label?: string }) {
+export function ProgressBar({
+  value,
+  label,
+  'data-testid': testId,
+}: {
+  value: number
+  label?: string
+  'data-testid'?: string
+}) {
   return (
-    <div role="progressbar" aria-valuenow={Math.round(value * 100)} className="w-full">
+    <div
+      role="progressbar"
+      aria-valuenow={Math.round(value * 100)}
+      data-testid={testId}
+      className="w-full"
+    >
       {label && <p className="mb-1 text-xs text-neutral-500">{label}</p>}
       <div className="h-2 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800">
         <div
