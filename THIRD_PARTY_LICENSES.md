@@ -55,6 +55,24 @@ FFmpeg は本体とリンクしておらず、独立した実行ファイルを�
 
 インストール後は `licenses/python/THIRD-PARTY-NOTICES.txt` に入ります。
 
+### BudouX (Apache-2.0)
+
+字幕の改行位置(文節の区切り)を決めるのに、Google の
+[BudouX](https://github.com/google/budoux) を使っています。
+バックエンド(書き出しの焼き込み)は Python 版、画面のプレビューは JavaScript 版で、
+両者の改行を一致させるため同じバージョンに固定しています。
+Python 版の表記(Apache-2.0 の本文を含む)は上の `THIRD-PARTY-NOTICES.txt` に入ります。
+
+### 画面(JavaScript)の依存パッケージ
+
+画面は React などを1つのファイルにまとめてアプリに組み込んでいます。
+圧縮すると各ファイルの `@license` コメントが消えるため、ビルド時に
+Vite が組み込んだ依存の一覧と本文を
+`licenses/javascript-THIRD-PARTY-NOTICES.md` に書き出し、画面と一緒に同梱します
+(`frontend/vite.config.ts` の `build.license`)。
+BudouX の npm パッケージには本文が入っていないため一覧には名前だけが載りますが、
+本文は Python 版の表記に含まれる同じ Apache-2.0 です。
+
 ### whisper.cpp (MIT)
 
 3OSすべてに `whisper-cli` を同梱しています。ソースからビルドします

@@ -59,6 +59,13 @@ def _report_startup_checks() -> None:
             f"⚠ 環境変数の接頭辞が KS_ に変わりました。{', '.join(legacy)} は無視されます。"
         )
 
+    # 字幕の文節モデル(BudouX)はJSONファイルから読む。配布版でPyInstallerが
+    # 取りこぼすと書き出しの瞬間まで気付けないので、起動時に読んで落とす
+    # (実機検証 scripts/verify_unix.sh / verify_windows.ps1 がここで気付く)
+    from backend.pipeline.subtitle import wrap_subtitle
+
+    wrap_subtitle("起動時の確認です", 4)
+
     encoder = detect_encoder()  # ffmpeg -encoders の実行のみ(実測33ms)
     if encoder is None:
         print(f"⚠ 書き出しには ffmpeg が必要です。{FFMPEG_MISSING_MSG}")

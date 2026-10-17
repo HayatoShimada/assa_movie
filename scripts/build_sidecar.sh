@@ -65,6 +65,9 @@ echo "=== 1ファイルに固める ==="
 # ctranslate2のバイナリ、opencvのカスケードxml、faster-whisperのVADモデル)を
 # 取りこぼさないため。
 #
+# budoux は字幕の文節モデル(models/ja.json)をファイルから読む。忘れると
+# 書き出しが FileNotFoundError で落ちる(起動時に読むのでそこで気付ける)。
+#
 # faster_whisper を忘れると silero_vad_v6.onnx が入らず、VAD(既定で有効)を通る
 # 文字起こしが必ず NO_SUCHFILE で落ちる。v0.9.3までこれが入っておらず、
 # faster-whisperを使う全環境(Windows / NVIDIAのLinux)で文字起こしができなかった
@@ -79,6 +82,7 @@ echo "=== 1ファイルに固める ==="
   --collect-all cv2 \
   --collect-all anthropic \
   --collect-all faster_whisper \
+  --collect-data budoux \
   --hidden-import uvicorn.lifespan.on \
   --hidden-import uvicorn.protocols.http.httptools_impl \
   --hidden-import uvicorn.protocols.websockets.websockets_impl \

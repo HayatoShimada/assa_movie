@@ -5,7 +5,10 @@
 """
 
 from dataclasses import dataclass, field
+from functools import cache
 from pathlib import Path
+
+import budoux
 
 # 行頭に来てはいけない文字(句読点・閉じ括弧・小書き仮名・長音など)
 KINSOKU_HEAD = set(
@@ -18,9 +21,75 @@ KINSOKU_TAIL = set("「『((〔[{〈《")
 # ぶら下げで1行に収める超過許容文字数
 HANG_ALLOWANCE = 2
 
+# 中身を1つのまとまりとして扱う括弧。指示語置換の既定はカッコ注釈
+# (「それ(去年の話)」)なので、注釈の途中で改行しない。
+# 「」は発言の引用で長くなりやすく、まとめると文節改行が効かなくなるので対象外
+GROUP_OPEN = set("((")
+GROUP_CLOSE = set("))")
+
+
+@cache
+def _parser() -> budoux.Parser:
+    return budoux.load_default_japanese_parser()
+
+
+def _phrases(text: str) -> list[str]:
+    """BudouXの文節を、改行してよい単位にまとめ直す(純関数)。
+
+    - 行頭禁則文字で始まる文節は前にくっつける
+    - 開き括弧で終わる文節は次にくっつける
+    - 丸括弧の中は閉じるまでくっつける
+    """
+    out: list[str] = []
+    depth = 0
+    for phrase in _parser().parse(text):
+        if out and (phrase[0] in KINSOKU_HEAD or out[-1][-1] in KINSOKU_TAIL or depth > 0):
+            out[-1] += phrase
+        else:
+            out.append(phrase)
+        for ch in phrase:
+            if ch in GROUP_OPEN:
+                depth += 1
+            elif ch in GROUP_CLOSE and depth:
+                depth -= 1
+    return out
+
 
 def wrap_subtitle(text: str, max_chars: int = 15) -> list[str]:
-    """日本語向けの字幕折返し。
+    """日本語向けの字幕折返し。文節の切れ目で改行する。
+
+    - 文節(BudouX)を1行の最大文字数まで詰める。単語の途中で切らない
+    - 末尾の句読点だけがはみ出すならぶら下げる(最大 HANG_ALLOWANCE 文字)
+    - 1つの文節が1行に収まらないときだけ wrap_chars(文字数で折返し)に任せる
+    """
+    if max_chars < 2:
+        max_chars = 2
+    if len(text) <= max_chars:
+        return [text]
+    lines: list[str] = []
+    cur = ""
+    for phrase in _phrases(text):
+        body = phrase.rstrip("".join(KINSOKU_HEAD))
+        hangs = (
+            cur != ""
+            and len(cur) + len(body) <= max_chars
+            and len(cur) + len(phrase) <= max_chars + HANG_ALLOWANCE
+        )
+        if len(cur) + len(phrase) <= max_chars or hangs:
+            cur += phrase
+        elif len(phrase) <= max_chars:
+            lines.append(cur)
+            cur = phrase
+        else:
+            parts = wrap_chars(cur + phrase, max_chars)
+            lines.extend(parts[:-1])
+            cur = parts[-1]
+    lines.append(cur)
+    return [line for line in lines if line] or [""]
+
+
+def wrap_chars(text: str, max_chars: int = 15) -> list[str]:
+    """文字数での字幕折返し(文節が1行に収まらないときの受け皿)。
 
     - 最大文字数で折り返す
     - 行頭禁則文字は前の行にぶら下げる(最大 HANG_ALLOWANCE 文字超過)
