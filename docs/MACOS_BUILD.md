@@ -117,13 +117,15 @@ macOS 向けのスタンドアロンアプリ (`.app` および `.dmg` インス
 `frontend/src-tauri/target/release/bundle/dmg/KirinukiStudio_*.dmg`
 
 > [!NOTE]
-> **コード署名（Code Signing）について**
-> 開発者証明書（Apple Developer Program）を設定していないため、Ad-hoc 署名でビルドされます。
-> この DMG をブラウザでダウンロードして他の Mac にインストールすると、quarantine 属性が付き、
-> 最近の macOS（Sequoia 以降）では **「"KirinukiStudio.app" は壊れているため開けません」**
-> と表示されます（ファイルは壊れていません。署名が無いだけです）。
-> インストール後にターミナルで次を実行すると起動できます。
+> **コード署名（Code Signing）と公証について**
+> リリース(`.github/workflows/release.yml`)は Developer ID で署名し、Apple の公証
+> (notarization)まで通します。署名用の Secrets(`APPLE_CERTIFICATE` ほか6つ)が
+> 揃っていないときだけ、無署名でビルドします。
+> 手元の `./dev.sh package` は、環境変数 `APPLE_SIGNING_IDENTITY` があり、その証明書が
+> ログインキーチェーンにあれば同梱バイナリにも署名します(`scripts/sign_macos_binaries.sh`)。
+> 無署名の DMG をブラウザ経由で他の Mac に入れると、最近の macOS(Sequoia 以降)では
+> **「"KirinukiStudio.app" は壊れているため開けません」** と表示されます(署名が無いだけです)。
+> その場合はインストール後にターミナルで次を実行すると起動できます。
 > ```bash
 > xattr -dr com.apple.quarantine /Applications/KirinukiStudio.app
 > ```
-> 根本対応は Apple Developer Program での署名+公証（notarization）です。

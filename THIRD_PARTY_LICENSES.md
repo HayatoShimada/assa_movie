@@ -8,10 +8,12 @@ KirinukiStudio 本体は MIT ライセンスです([LICENSE](LICENSE))。
 
 | コンポーネント | 対象OS | ライセンス | 用途 |
 |---|---|---|---|
-| [FFmpeg](https://ffmpeg.org/) | Windows | LGPL v2.1 | 動画の書き出し・メディア情報の取得 |
+| [FFmpeg](https://ffmpeg.org/) | Windows / macOS | LGPL v2.1 | 動画の書き出し・メディア情報の取得 |
 | [whisper.cpp](https://github.com/ggml-org/whisper.cpp) | Linux / macOS / Windows | MIT | 高速な文字起こし |
 | 話者分離モデル(ONNX) | 全OS | MIT / Apache-2.0 | だれが話しているかの判定 |
 | Python の依存パッケージ | 全OS | MIT / BSD / Apache-2.0 ほか | バックエンド(PyInstallerが取り込む) |
+| [BudouX](https://github.com/google/budoux) | 全OS | Apache-2.0 | 字幕の改行位置(文節の区切り) |
+| 画面の依存パッケージ(React など) | 全OS | MIT / Apache-2.0 | 画面(Viteが1つにまとめる) |
 
 ### FFmpeg (LGPL v2.1)
 
@@ -120,6 +122,6 @@ uv run --no-project python scripts/fetch_diarization_models.py   # 話者分離�
 
 ## 残っているもの
 
-- macOS版・AppImage版の ffmpeg 同梱(現在はWindows版のみ)。
-  macOSは `brew install ffmpeg`、`.deb` はパッケージの依存で解決。
-  AppImage だけは自動で入る経路が無いため、書き出し時に導入手順を案内している
+- AppImage版の ffmpeg 同梱(Windows版・macOS版は同梱済み)。
+  `.deb` はパッケージの依存で解決している。AppImage だけは自動で入る経路が
+  無いため、書き出し時に導入手順を案内している
