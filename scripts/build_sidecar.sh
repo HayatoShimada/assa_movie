@@ -52,12 +52,12 @@ mkdir -p "$BUILD_DIR"
 rm -rf "$VENV"
 uv venv --python 3.12 "$VENV"
 
-# [project.dependencies] だけを取り出す(dependency-groupsは開発用なので入れない)
-uv run --no-sync python - > "$BUILD_DIR/requirements.txt" <<'PY'
-import tomllib
-with open("pyproject.toml", "rb") as f:
-    print("\n".join(tomllib.load(f)["project"]["dependencies"]))
-PY
+# [project.dependencies] だけを uv.lock の版で取り出す(dependency-groupsは開発用なので入れない)。
+# 以前は pyproject.toml の範囲指定をそのまま渡しており、ビルドのたびに最新版が入っていた
+# (開発・テストは anthropic 0.121 なのに配布物は 1.15、など)。
+# 開発環境と配布物の構成が一致していること自体が仕様なので、ロックに固定する
+uv export --frozen --no-default-groups --no-hashes --no-emit-project --no-header \
+  > "$BUILD_DIR/requirements.txt"
 VIRTUAL_ENV="$VENV" uv pip install -q -r "$BUILD_DIR/requirements.txt" pyinstaller
 
 echo "=== 1ファイルに固める ==="
