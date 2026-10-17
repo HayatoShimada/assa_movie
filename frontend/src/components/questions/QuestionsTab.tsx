@@ -1,6 +1,7 @@
 /**
  * 質問キュー: LLMからの質問(固有名詞の表記確認)に答える。
- * 回答すると全出現箇所が一括修正され、用語集に登録される。
+ * 回答すると全出現箇所が一括修正され、用語集と「名前・用語の辞書」に登録される
+ * (辞書は全プロジェクト共通で、次の文字起こしからWhisperに渡る)。
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
@@ -8,6 +9,7 @@ import { api, type Question } from '../../api/client'
 import { usePlayback } from '../../stores/playback'
 import { useTrackedJob } from '../../hooks/useTrackedJob'
 import { jobSlots } from '../../lib/jobs'
+import { answeredMessage } from '../../lib/userTerms'
 import { JobStatus } from '../JobStatus'
 import { Button } from '../ui'
 
@@ -31,10 +33,11 @@ function QuestionCard({
   }
   const answer = useMutation({
     mutationFn: (text: string) => api.answerQuestion(question.id, text),
-    onSuccess: (res) => {
+    onSuccess: (res, text) => {
       // 回答するとカード自体がリストから消えるため、結果表示は親に渡す
-      onAnswered(`${res.segments_changed}箇所を修正し、用語集に登録しました`)
+      onAnswered(answeredMessage(question.kind, res.segments_changed, text))
       invalidate()
+      if (question.kind === 'term') queryClient.invalidateQueries({ queryKey: ['user-terms'] })
     },
   })
   const dismiss = useMutation({ mutationFn: () => api.dismissQuestion(question.id), onSuccess: invalidate })

@@ -14,6 +14,7 @@ import { LicensePanel } from './LicensePanel'
 import { OpenSourcePanel } from './OpenSourcePanel'
 import { SaveBar } from './SaveBar'
 import { SettingsFields } from './SettingsFields'
+import { UserTermsPanel } from './UserTermsPanel'
 import { Button } from '../ui'
 
 export function SettingsForm() {
@@ -46,6 +47,8 @@ export function SettingsForm() {
       <SetupPanel />
       <LicensePanel />
       <ApiKeysPanel />
+      {/* 利用者が育てるデータ(その場で保存)。下書き→保存の設定項目とは分けて置く */}
+      <UserTermsPanel />
       <p className="mb-2 text-xs text-neutral-500">
         全体設定。新規プロジェクトの既定値になります(プロジェクト単位で上書き可能)。
       </p>

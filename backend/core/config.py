@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     asr_vad_filter: bool = True
     # フィラー入りの文体例をinitial_promptに与え、言い淀みを忠実に転写させる
     asr_verbatim_style: bool = True
+    # 利用者の辞書(名前・用語。core/user_terms.py)をWhisperにヒントとして渡すか。
+    # 渡した語がまれに無音部分などへ紛れ込む(Whisperのプロンプトの癖)ことがあり、
+    # そのときに切れるよう設定にしている。プロジェクト単位でも切り替えられる
+    asr_use_user_terms: bool = True
 
     # ---- 話者分離 ----
     # エンジンはONNX(sherpa-onnx)のみ。選択肢が1つなので設定は置かない

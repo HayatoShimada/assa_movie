@@ -744,6 +744,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/user-terms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List User Terms */
+        get: operations["list_user_terms_api_user_terms_get"];
+        put?: never;
+        /**
+         * Create User Term
+         * @description 語を足す。すでにあれば1件にまとめる(確認回数を足す)
+         */
+        post: operations["create_user_term_api_user_terms_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/user-terms/{term_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete User Term */
+        delete: operations["delete_user_term_api_user_terms__term_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update User Term */
+        patch: operations["update_user_term_api_user_terms__term_id__patch"];
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -1175,6 +1214,8 @@ export interface components {
             asr_language?: string | null;
             /** Asr Model */
             asr_model?: string | null;
+            /** Asr Use User Terms */
+            asr_use_user_terms?: boolean | null;
             /** Asr Vad Filter */
             asr_vad_filter?: boolean | null;
             /** Claude Model */
@@ -1227,6 +1268,42 @@ export interface components {
             subtitle_speaker_colors?: boolean | null;
             /** Subtitle Text Color */
             subtitle_text_color?: string | null;
+        };
+        /** UserTerm */
+        UserTerm: {
+            /** Id */
+            id: number;
+            /** Term */
+            term: string;
+            /** Misrecognitions */
+            misrecognitions: string[];
+            /** Hits */
+            hits: number;
+            /** Source */
+            source: string;
+            /** Created At */
+            created_at: string;
+            /** Updated At */
+            updated_at: string;
+            /** Used For Asr */
+            used_for_asr: boolean;
+        };
+        /** UserTermCreate */
+        UserTermCreate: {
+            /** Term */
+            term: string;
+            /**
+             * Misrecognitions
+             * @default []
+             */
+            misrecognitions: string[];
+        };
+        /** UserTermUpdate */
+        UserTermUpdate: {
+            /** Term */
+            term?: string | null;
+            /** Misrecognitions */
+            misrecognitions?: string[] | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -2859,6 +2936,127 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_user_terms_api_user_terms_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserTerm"][];
+                };
+            };
+        };
+    };
+    create_user_term_api_user_terms_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserTermCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserTerm"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_user_term_api_user_terms__term_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                term_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_user_term_api_user_terms__term_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                term_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserTermUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserTerm"];
                 };
             };
             /** @description Validation Error */

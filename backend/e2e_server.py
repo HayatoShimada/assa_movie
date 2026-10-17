@@ -195,7 +195,8 @@ def reset(request: Request) -> dict:
     FAIL_JOBS.clear()
     jobs.wait_idle(timeout=GATE_TIMEOUT)
     for table in ("edits", "feedback", "questions", "clip_cuts", "clips",
-                  "segments", "jobs", "glossary", "llm_instructions", "media", "projects"):
+                  "segments", "jobs", "glossary", "llm_instructions", "media", "projects",
+                  "user_terms"):
         db.execute(f"DELETE FROM {table}")
     db.commit()
     # 登録済みライセンスも消す(specの実行順に結果が左右されないように)

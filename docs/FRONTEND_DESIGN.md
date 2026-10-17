@@ -75,7 +75,8 @@ cd frontend && npm run gen:api   # APIを変えたら型を再生成
 - ヘッダに未回答件数バッジ。カード形式で1問ずつ表示:
   「『反動体』(12回出現)は『半導体』の誤認識と思われます。正式表記は?」
   - 推定候補をボタンで提示(ワンタップ回答)+ 自由入力欄。出現箇所へのジャンプリンク付き
-- 回答すると: 用語集に自動登録 → 全出現箇所を一括修正 → 修正件数をトースト表示
+- 回答すると: 用語集に自動登録+「名前・用語の辞書」に記憶 → 全出現箇所を一括修正 →
+  「N箇所を修正し、「半導体」を辞書に覚えました(次の文字起こしから使います)」と表示
 - 「後で」「この質問を却下」も可能。未回答でも他の作業はブロックされない
 
 #### 対話アシスト(セグメント選択時)
@@ -116,7 +117,7 @@ cd frontend && npm run gen:api   # APIを変えたら型を再生成
 画面ごとに出すセクションを選べる。**どのエンジンで動かすかはここに無い**
 (実行環境で確定しているため。`EnvironmentPanel` が表示と再検出を担当する)。
 
-- 文字起こし(`TranscriptionSection`): モデル・話者分離の有無・話者名
+- 文字起こし(`TranscriptionSection`): モデル・名前と用語の辞書を使うか・話者分離の有無・話者名
 - 整形(`TextSection`): フィラー排除・指示語置換(積極性/表現形式/適用モード)
 - 字幕(`SubtitleSection`): 採用率・フォント・サイズ・色・背景・位置・上下微調整・
   話者別色・1行最大文字数
@@ -135,6 +136,8 @@ cd frontend && npm run gen:api   # APIを変えたら型を再生成
   (エンジン名を保存すると、同梱物が増えても追従しなくなる)
 - `SetupPanel`: 足りていないモデルの案内とその場での取得(進捗はSSE)
 - `ApiKeysPanel`: Gemini / Claude のAPIキー登録。平文ファイル+0600で保存する
+- `UserTermsPanel`: 名前・用語の辞書(全プロジェクト共通)。追加・修正・削除はその場で保存。
+  上限でWhisperに渡らない語には「上限のため今回は使いません」と出す
 - `LicensePanel`: ライセンスキーの登録と状態
 - `OpenSourcePanel`: 同梱物のライセンス表記(LGPLのFFmpegはここに出す義務がある)
 
@@ -161,13 +164,13 @@ frontend/
 │   │   ├── export/     ExportTab
 │   │   ├── project/    CreateProjectForm, ProjectSettingsPanel
 │   │   ├── settings/   SettingsForm, SettingsFields, SaveBar,
-│   │   │               EnvironmentPanel, SetupPanel, ApiKeysPanel,
+│   │   │               EnvironmentPanel, SetupPanel, ApiKeysPanel, UserTermsPanel,
 │   │   │               LicensePanel, OpenSourcePanel
 │   │   ├── setup/      SetupWizard(初回セットアップ)
 │   │   ├── ui.tsx      Button など最小限の共通部品
 │   │   └── icons.tsx
 │   ├── hooks/          useHashRoute, useSplitPane, useJobProgress, useTrackedJob
-│   ├── lib/            subtitle.ts(折返し・禁則), subtitleLayout.ts,
+│   ├── lib/            subtitle.ts(折返し・禁則), subtitleLayout.ts, userTerms.ts,
 │   │                   jobs.ts(操作とジョブの対応・進捗の文言)
 │   └── pages/          Home, Editor
 ├── e2e/                Playwright

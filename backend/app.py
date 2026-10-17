@@ -15,6 +15,7 @@ from backend.api import projects as projects_api
 from backend.api import questions as questions_api
 from backend.api import settings_api
 from backend.api import transcripts as transcripts_api
+from backend.api import user_terms as user_terms_api
 from backend.core import hwprofile, paths, project_settings
 from backend.core.config import settings
 from backend.jobs import attention_job  # noqa: F401  ジョブハンドラの登録に必要
@@ -112,6 +113,7 @@ app.include_router(assist_api.router)
 app.include_router(clips_api.router)
 app.include_router(license_api.router)
 app.include_router(keys_api.router)
+app.include_router(user_terms_api.router)
 
 
 @app.get("/api/health")

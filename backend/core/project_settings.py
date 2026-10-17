@@ -17,6 +17,7 @@ from backend.core.config import Settings, settings
 # (v0.9.5でUI保存された固定値が whisper.cpp 同梱後も残り続けた事故の再発防止)
 MUTABLE_FIELDS = {
     "asr_model", "asr_language", "asr_beam_size", "asr_vad_filter",
+    "asr_use_user_terms",
     "diarization_enabled",
     "num_speakers", "male_name", "female_name",
     "aizuchi_max_duration",

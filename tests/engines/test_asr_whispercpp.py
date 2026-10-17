@@ -133,3 +133,29 @@ def test_transcribe_builds_segments_from_tokens(tmp_path):
 
 def test_unload_is_safe():
     WhisperCppEngine(binary=Path("/x"), model=Path("/y")).unload()
+
+
+# ---- 利用者の辞書(名前・用語)がCLIに渡る ----
+
+def test_dictionary_prompt_is_passed_as_single_argument(tmp_path):
+    """辞書の語を詰めたプロンプトは --prompt の1引数として渡る(-ml は付かない)"""
+    import json
+
+    from backend.engines.asr.prompt import VERBATIM_STYLE, build_initial_prompt
+
+    calls = []
+
+    def fake_run(cmd, out_base):
+        calls.append(cmd)
+        out_base.with_suffix(".json").write_text(json.dumps(SAMPLE), encoding="utf-8")
+
+    prompt = build_initial_prompt(VERBATIM_STYLE, ["半導体", "箱ストア"])
+    engine = WhisperCppEngine(
+        binary=tmp_path / "whisper-cli", model=tmp_path / "ggml.bin", runner=fake_run
+    )
+    engine.transcribe(np.zeros(16000, dtype=np.float32), language="ja", initial_prompt=prompt)
+    cmd = calls[0]
+    assert cmd[cmd.index("--prompt") + 1] == "えーと、あのー、そのー、なんか、うん。 半導体、箱ストア。"
+    assert cmd.count("--prompt") == 1
+    assert "-ml" not in cmd
+    assert "-ojf" in cmd

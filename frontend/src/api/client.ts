@@ -13,6 +13,7 @@ export type Job = components['schemas']['Job']
 export type Segment = components['schemas']['Segment']
 export type Edit = components['schemas']['Edit']
 export type Question = components['schemas']['Question']
+export type UserTerm = components['schemas']['UserTerm']
 
 declare global {
   interface Window {
@@ -131,6 +132,18 @@ export const api = {
   answerQuestion: (questionId: number, text: string) =>
     post<{ segments_changed: number }>(`/api/questions/${questionId}/answer`, { text }),
   dismissQuestion: (questionId: number) => post<Question>(`/api/questions/${questionId}/dismiss`),
+
+  /** 利用者の辞書(名前・用語)。全プロジェクト共通で、次の文字起こしに渡る */
+  listUserTerms: () => request<UserTerm[]>('/api/user-terms'),
+  addUserTerm: (term: string, misrecognitions: string[] = []) =>
+    post<UserTerm>('/api/user-terms', { term, misrecognitions }),
+  updateUserTerm: (termId: number, patch: { term?: string; misrecognitions?: string[] }) =>
+    request<UserTerm>(`/api/user-terms/${termId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    }),
+  deleteUserTerm: (termId: number) =>
+    request<{ deleted: number }>(`/api/user-terms/${termId}`, { method: 'DELETE' }),
 
   getSettings: () => request<SettingsResponse>('/api/settings'),
   updateSettings: (patch: Record<string, unknown>) =>

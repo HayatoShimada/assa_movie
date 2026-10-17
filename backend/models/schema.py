@@ -82,6 +82,20 @@ CREATE TABLE IF NOT EXISTS glossary (
     description TEXT
 );
 
+-- 利用者の辞書(名前・用語)。プロジェクトに紐づけない(全プロジェクト共通)。
+-- 次の文字起こしでWhisperに渡す(backend/core/user_terms.py)
+CREATE TABLE IF NOT EXISTS user_terms (
+    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+    term                 TEXT NOT NULL UNIQUE,
+    -- 以前どう聞き間違えられたか(JSON配列)。次の動画のスキャンで質問にする
+    misrecognitions_json TEXT NOT NULL DEFAULT '[]',
+    -- 確認された回数。多いほど優先してWhisperに渡す
+    hits                 INTEGER NOT NULL DEFAULT 1,
+    source               TEXT NOT NULL DEFAULT 'manual',  -- question | manual | glossary
+    created_at           TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at           TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS feedback (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     media_id   INTEGER NOT NULL REFERENCES media(id) ON DELETE CASCADE,
@@ -190,12 +204,20 @@ def init_db(db_path: Path) -> sqlite3.Connection:
     """スキーマを作成(既存なら何もしない)して接続を返す"""
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = connect(db_path)
+    # 辞書の表を初めて作るときだけ、旧来の用語集から語を移す(user_terms.migrate_from_glossary)
+    had_user_terms = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='user_terms'"
+    ).fetchone() is not None
     conn.executescript(SCHEMA)
     for table, column, coltype in _MIGRATIONS:
         cols = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})")}
         if column not in cols:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {coltype}")
     _drop_removed_settings(conn)
+    if not had_user_terms:
+        from backend.core.user_terms import migrate_from_glossary
+
+        migrate_from_glossary(conn)
     conn.commit()
     return conn
 

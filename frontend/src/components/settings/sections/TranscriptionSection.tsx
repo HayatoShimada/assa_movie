@@ -2,7 +2,7 @@
  * 文字起こしの設定。
  *
  * どのエンジンで動かすかは実行環境で決まっている(設定タブの「実行環境」)。
- * ここで選ぶのはモデルと話者分離まわりだけ。
+ * ここで選ぶのはモデル・名前と用語の辞書を使うか・話者分離まわりだけ。
  */
 import { selectCls } from '../../ui'
 import { Row, Section, resetButton, type SectionProps } from './common'
@@ -32,6 +32,22 @@ export function TranscriptionSection(props: SectionProps) {
         </span>
       </Row>
       {asrNote && <p className="text-xs text-neutral-500">{asrNote}</p>}
+
+      <Row label="名前・用語の辞書を使う">
+        <span>
+          <input
+            type="checkbox"
+            data-testid={`${idPrefix}-asr-use-user-terms`}
+            checked={Boolean(v.asr_use_user_terms)}
+            onChange={(e) => set('asr_use_user_terms')(e.target.checked)}
+          />
+          {resetButton(props, 'asr_use_user_terms')}
+        </span>
+      </Row>
+      <p className="text-xs text-neutral-500">
+        質問タブで答えた名前や用語を、文字起こしで正しく書くためのヒントにします。
+        辞書の中身は設定タブの「名前・用語の辞書」で見直せます。
+      </p>
 
       <Row label="話者分離">
         <input
