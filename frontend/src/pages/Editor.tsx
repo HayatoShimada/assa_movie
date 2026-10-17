@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { api } from '../api/client'
 import type { Clip } from '../api/clips'
 import type { ConvertMethod } from '../lib/catalogs'
+import { mediaDisplayName } from '../lib/media'
 import { resolveSettings } from '../lib/settings'
 import { VideoPlayer } from '../components/player/VideoPlayer'
 import { AssistChat } from '../components/transcript/AssistChat'
@@ -14,6 +15,7 @@ import { ExportTab } from '../components/export/ExportTab'
 import { QuestionsTab } from '../components/questions/QuestionsTab'
 import { SettingsForm } from '../components/settings/SettingsForm'
 import {
+  BackIcon,
   ClipIcon,
   ExportIcon,
   QuestionIcon,
@@ -96,13 +98,34 @@ export function Editor({ mediaId }: { mediaId: number }) {
 
   return (
     <main className="flex h-screen flex-col">
-      <header className="flex items-center gap-3 border-b border-neutral-200 px-4 py-2 dark:border-neutral-800">
-        <Button variant="ghost" onClick={() => navigate({ page: 'home' })}>
-          ← 戻る
+      {/* どのプロジェクトのどの動画を開いているかを常に見せる */}
+      <header
+        data-testid="editor-header"
+        className="flex items-center gap-3 border-b border-neutral-200 px-4 py-2 dark:border-neutral-800"
+      >
+        <Button
+          variant="ghost"
+          className="flex shrink-0 items-center gap-1"
+          onClick={() => navigate({ page: 'home' })}
+        >
+          <BackIcon />
+          プロジェクト一覧
         </Button>
-        <h1 className="truncate text-sm font-semibold">
-          {media.data?.path?.split('/').pop() ?? `メディア #${mediaId}`}
-        </h1>
+        <div className="flex min-w-0 flex-1 items-baseline gap-2 text-sm">
+          {project.data && (
+            <>
+              <span className="max-w-64 shrink truncate text-neutral-500">
+                {project.data.name}
+              </span>
+              <span aria-hidden="true" className="text-neutral-300 dark:text-neutral-600">
+                /
+              </span>
+            </>
+          )}
+          <h1 className="truncate font-semibold" title={media.data?.path}>
+            {media.data ? mediaDisplayName(media.data.path) : `メディア #${mediaId}`}
+          </h1>
+        </div>
       </header>
 
       {/* 幅は割合で持ち、境界バーのドラッグで変えられる。

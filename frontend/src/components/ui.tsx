@@ -1,5 +1,6 @@
 /** 小さな共通UI部品。本格的なデザインは全機能完成後に調整する(CLAUDE.md)。 */
-import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from 'react'
+import type { StateTone } from '../lib/media'
 
 export function Button({
   variant = 'primary',
@@ -9,12 +10,13 @@ export function Button({
   const styles = {
     primary: 'bg-blue-600 text-white hover:bg-blue-700 disabled:bg-neutral-300',
     ghost:
-      'border border-neutral-300 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800',
-    danger: 'bg-red-600 text-white hover:bg-red-700',
+      'border border-neutral-300 hover:bg-neutral-100 disabled:opacity-50 dark:border-neutral-700 dark:hover:bg-neutral-800',
+    danger: 'bg-red-600 text-white hover:bg-red-700 disabled:opacity-50',
   }[variant]
   return (
     <button
-      className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed ${styles} ${className}`}
+      // キーボード操作で今どこにいるかが見えるよう、フォーカス枠は必ず出す
+      className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed ${styles} ${className}`}
       {...props}
     />
   )
@@ -64,6 +66,38 @@ export function Card({ title, children }: { title: string; children: ReactNode }
       <h2 className="mb-2 font-semibold">{title}</h2>
       {children}
     </section>
+  )
+}
+
+const TONE_STYLES: Record<StateTone, string> = {
+  neutral: 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300',
+  busy: 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300',
+  done: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300',
+  error: 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300',
+}
+
+const DOT_STYLES: Record<StateTone, string> = {
+  neutral: 'bg-neutral-400',
+  busy: 'bg-blue-500 motion-safe:animate-pulse',
+  done: 'bg-emerald-500',
+  error: 'bg-red-500',
+}
+
+/** 状態を色と言葉の両方で示す小さな札(色だけに頼らない) */
+export function StateBadge({
+  tone,
+  children,
+  className = '',
+  ...props
+}: HTMLAttributes<HTMLSpanElement> & { tone: StateTone }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ${TONE_STYLES[tone]} ${className}`}
+      {...props}
+    >
+      <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${DOT_STYLES[tone]}`} />
+      {children}
+    </span>
   )
 }
 

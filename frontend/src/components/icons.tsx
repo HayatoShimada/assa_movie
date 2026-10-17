@@ -84,3 +84,28 @@ export const SettingsIcon = (p: IconProps) => (
     <circle cx="14" cy="18" r="2" />
   </Svg>
 )
+
+/** 戻る: 左向きの矢印 */
+export const BackIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M19 12H5" />
+    <path d="M11 6l-6 6 6 6" />
+  </Svg>
+)
+
+/** 動画ファイル: フィルムの1コマ */
+export const FilmIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="3" y="4" width="18" height="16" rx="2" />
+    <path d="M7 4v16M17 4v16M3 9h4M3 15h4M17 9h4M17 15h4" />
+  </Svg>
+)
+
+/** 追加: 箱に上向きの矢印(ファイルを取り込む) */
+export const UploadIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M12 16V4" />
+    <path d="M7 9l5-5 5 5" />
+    <path d="M4 20h16" />
+  </Svg>
+)

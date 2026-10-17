@@ -5,6 +5,7 @@ import { api } from '../../api/client'
 import { clipsApi, type Clip } from '../../api/clips'
 import { useJobProgress } from '../../hooks/useJobProgress'
 import { CONVERT_METHOD_LABELS } from '../../lib/catalogs'
+import { clipStatusLabel } from '../../lib/media'
 import { TrashIcon } from '../icons'
 import { usePlayback } from '../../stores/playback'
 import { Button, ProgressBar, formatTime } from '../ui'
@@ -397,7 +398,7 @@ export function ClipsTab({
                   </span>
                 ))}
                 <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-neutral-400 dark:bg-neutral-800">
-                  {clip.status}
+                  {clipStatusLabel(clip.status)}
                 </span>
               </div>
             </button>
