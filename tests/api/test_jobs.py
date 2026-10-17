@@ -191,6 +191,9 @@ def test_job_events_sse_streams_completion(client, tmp_path):
     assert payloads[-1]["status"] == "completed"
     assert payloads[-1]["progress"] == 1.0
     assert "phase" in payloads[-1]  # 工程名もSSEで届く(終端ではNone)
+    # 画面は SSE の本文を Job 型として扱い、完了時に job.id で詳細を取り直す。
+    # job_id しか無かった頃は getJob(undefined) になり、書き出し先が出なかった
+    assert all(p["id"] == job_id for p in payloads)
 
 
 # ---- セグメントAPI ----

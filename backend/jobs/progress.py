@@ -25,6 +25,9 @@ async def job_events(jobs: JobQueue, job_id: int) -> AsyncIterator[dict]:
                 "event": "progress",
                 "data": json.dumps(
                     {
+                        # 画面は本文を Job 型として扱う(完了時に job.id で詳細を取り直す)。
+                        # job_id は従来の受け手のために残す
+                        "id": job_id,
                         "job_id": job_id,
                         "status": job["status"],
                         "progress": job["progress"],
