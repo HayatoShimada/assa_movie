@@ -16,6 +16,7 @@ import requests
 
 from backend.core import keyfile
 from backend.engines.llm.base import LLMError
+from backend.engines.llm.errors import is_retryable
 
 DEFAULT_MODEL = "claude-opus-5"
 # Claudeは既定で思考する。max_tokensは「思考+本文」の合計にかかるので、
@@ -109,27 +110,36 @@ class ClaudeClient:
             },
         }
 
-        last_error = None
+        last_error: LLMError | None = None
         for attempt in range(self.retries):
             try:
                 return self._parse(self.sdk.messages.create(**request))
             except _Refused:
                 raise  # 同じ内容を投げ直しても結果は変わらない
             except Exception as e:
-                last_error = e
+                # キー不正(401)・モデル名違い(404)は再試行しても同じ
+                last_error = LLMError.from_exception("claude", self.model, e)
+                if not is_retryable(last_error.code):
+                    break
                 time.sleep(2 * (attempt + 1))
-        raise LLMError(f"Claude呼び出しに{self.retries}回失敗: {last_error}")
+        assert last_error is not None
+        raise last_error
 
     def _parse(self, message) -> dict:
         # 安全機構による拒否は「成功応答」で返るため、本文を読む前に確認する
         stop = getattr(message, "stop_reason", None)
         if stop == "refusal":
             detail = getattr(getattr(message, "stop_details", None), "category", "")
-            raise _Refused(f"Claudeがこの内容の処理を拒否しました{f'({detail})' if detail else ''}。")
+            raise _Refused(
+                f"Claudeがこの内容の処理を拒否しました{f'({detail})' if detail else ''}。"
+                "設定タブの「AI」で別のAIを選ぶと処理できる場合があります。",
+                code="refused",
+            )
         if stop == "max_tokens":
             raise LLMError(
                 "Claudeの応答が長すぎて途中で切れました。"
-                "チャンクサイズ(llm_chunk_size)を小さくしてください。"
+                "もう一度実行するか、設定タブの「AI」で別のモデルを選んでください。",
+                code="too_long",
             )
 
         text = next(
@@ -137,11 +147,13 @@ class ClaudeClient:
             None,
         )
         if not text:
-            raise LLMError("Claudeの応答にテキストが含まれていません。")
+            raise LLMError.from_failure(
+                "claude", self.model, parse_error=True, body="応答にテキストが無い"
+            )
         try:
             return json.loads(text)
         except json.JSONDecodeError as e:
-            raise LLMError(f"ClaudeのJSONを解釈できません: {e}") from e
+            raise LLMError.from_failure("claude", self.model, parse_error=True, body=str(e)) from e
 
 
 class _Refused(LLMError):

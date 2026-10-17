@@ -8,8 +8,9 @@ import { useState } from 'react'
 import { api, type Question } from '../../api/client'
 import { usePlayback } from '../../stores/playback'
 import { useTrackedJob } from '../../hooks/useTrackedJob'
-import { jobSlots } from '../../lib/jobs'
+import { jobResultMessage, jobSlots } from '../../lib/jobs'
 import { answeredMessage } from '../../lib/userTerms'
+import { HelpTip } from '../HelpTip'
 import { JobStatus } from '../JobStatus'
 import { Button } from '../ui'
 
@@ -120,9 +121,12 @@ export function QuestionsTab({ mediaId }: { mediaId: number }) {
   return (
     <div className="flex h-full flex-col overflow-y-auto">
       <div className="space-y-2 border-b border-neutral-200 p-3 dark:border-neutral-800">
-        <Button data-testid="run-scan" disabled={running} onClick={() => scan.mutate()}>
-          固有名詞をスキャン
-        </Button>
+        <div className="flex items-center">
+          <Button data-testid="run-scan" disabled={running} onClick={() => scan.mutate()}>
+            固有名詞をスキャン
+          </Button>
+          <HelpTip term="固有名詞" />
+        </div>
         <JobStatus
           progress={progress}
           running="スキャン中"
@@ -136,8 +140,11 @@ export function QuestionsTab({ mediaId }: { mediaId: number }) {
         </p>
       )}
       {questions.data?.length === 0 && (
-        <p className="p-3 text-sm text-neutral-500">
-          未回答の質問はありません。「固有名詞をスキャン」で表記が怪しい語を探せます。
+        <p data-testid="questions-empty" className="p-3 text-sm text-neutral-500">
+          未回答の質問はありません。
+          {/* スキャン直後に「スキャンで探せます」と出すと、動かなかったように見える */}
+          {jobResultMessage(progress) === null &&
+            '「固有名詞をスキャン」で、表記が怪しい人名・会社名・専門用語をAIが探して質問します。'}
         </p>
       )}
       {questions.data?.map((q) => (

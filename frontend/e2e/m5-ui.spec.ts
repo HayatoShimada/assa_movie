@@ -91,6 +91,9 @@ test('設定タブでASRモデルを切り替えると保存される', async ({
   await page.goto(`/#/media/${seed.media_id}`)
   await page.getByRole('button', { name: '設定' }).click()
 
+  // モデル名は専門用語なので「詳しい設定」に畳んである
+  await expect(page.getByTestId('setting-asr-model')).toBeHidden()
+  await page.getByTestId('setting-advanced').locator('summary').click()
   const select = page.getByTestId('setting-asr-model')
   await expect(select).toHaveValue('large-v3')
   await select.selectOption('large-v3-turbo')
@@ -106,6 +109,7 @@ test('設定タブでASRモデルを切り替えると保存される', async ({
   // リロードしても保持されている(バックエンドに保存された)
   await page.reload()
   await page.getByRole('button', { name: '設定' }).click()
+  await page.getByTestId('setting-advanced').locator('summary').click()
   await expect(page.getByTestId('setting-asr-model')).toHaveValue('large-v3-turbo')
 
   // 後片付け

@@ -17,6 +17,8 @@ import { ExportTab } from '../components/export/ExportTab'
 import { QuestionsTab } from '../components/questions/QuestionsTab'
 import { SettingsForm } from '../components/settings/SettingsForm'
 import { GlobalSettingsHeading } from './GlobalSettings'
+import { LlmStatusBanner } from '../components/settings/LlmStatusBanner'
+import { HelpTip } from '../components/HelpTip'
 import {
   BackIcon,
   ClipIcon,
@@ -130,6 +132,8 @@ export function Editor({ mediaId }: { mediaId: number }) {
           </h1>
         </div>
       </header>
+      {/* AIが使えない設定なら、AI機能を押す前にここで知らせて直させる */}
+      <LlmStatusBanner projectId={media.data?.project_id} className="mx-4 mt-2" />
 
       {/* 幅は割合で持ち、境界バーのドラッグで変えられる。
           lg未満はflexの縦積みになり gridTemplateColumns は無視される */}
@@ -212,6 +216,7 @@ export function Editor({ mediaId }: { mediaId: number }) {
                 onChange={(e) => setShowAizuchi(e.target.checked)}
               />
               相槌を表示
+              <HelpTip term="相槌" align="right" />
             </label>
           )}
 

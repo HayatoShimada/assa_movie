@@ -159,7 +159,7 @@ def test_再試行を使い切ったらLLMErrorにする(monkeypatch):
     monkeypatch.setattr("time.sleep", lambda _: None)
     sdk = FakeSDK(RuntimeError("だめ"), RuntimeError("だめ"))
     client = ClaudeClient(api_key="sk-test", sdk=sdk, retries=2)
-    with pytest.raises(LLMError, match="2回"):
+    with pytest.raises(LLMError, match="Claude"):
         client.complete_json("s", "u", SCHEMA)
 
 

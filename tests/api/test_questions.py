@@ -142,6 +142,25 @@ def test_dismiss_question(client, media):
     assert len(client.get(f"/api/media/{mid}/questions?status=dismissed").json()) == 1
 
 
+def test_0件のスキャンは何を探したかを結果に残す(client, media):
+    """以前は0件でも「スキャン完了」だけで、動いたのかが分からなかった"""
+    mid = media["media_id"]
+    use_fake([{"questions": []}])
+    job = run_extract(client, mid)
+    assert job["status"] == "completed", job["error"]
+    result = client.get(f"/api/jobs/{job['id']}").json()["result"]
+    assert result["found"] == 0
+    assert "見つかりませんでした" in result["message"]
+    assert "4行" in result["message"]
+
+
+def test_見つかった件数を結果に残す(client, media):
+    mid = media["media_id"]
+    use_fake([TERM_RESPONSE])
+    job = run_extract(client, mid)
+    assert client.get(f"/api/jobs/{job['id']}").json()["result"]["found"] == 1
+
+
 def test_answer_unknown_question_404(client):
     assert client.post("/api/questions/999/answer", json={"text": "x"}).status_code == 404
 

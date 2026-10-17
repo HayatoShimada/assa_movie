@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, JOB_TERMINAL_STATUSES, api, isJobDone, resolveApiBase } from './client'
+import {
+  ApiError,
+  JOB_TERMINAL_STATUSES,
+  api,
+  errorText,
+  isJobDone,
+  resolveApiBase,
+} from './client'
 
 function mockFetch(body: unknown, status = 200) {
   const spy = vi.fn().mockResolvedValue({
@@ -40,6 +47,38 @@ describe('apiクライアント', () => {
   it('エラー応答をApiErrorにする', async () => {
     mockFetch({ detail: 'だめ' }, 400)
     await expect(api.acceptEdit(1)).rejects.toBeInstanceOf(ApiError)
+  })
+
+  it('FastAPIのdetailだけを取り出す(生のJSONを画面に出さない)', async () => {
+    mockFetch({ detail: 'Ollama が起動していません。', code: 'ollama_unreachable' }, 503)
+    const err = await api.assistSegment(1, 'x').catch((e) => e)
+    expect(err.detail).toBe('Ollama が起動していません。')
+    expect(err.code).toBe('ollama_unreachable')
+    expect(errorText(err)).toBe('Ollama が起動していません。')
+  })
+
+  it('detailが無い応答は本文をそのまま使う', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        statusText: 'ERR',
+        text: async () => 'Internal Server Error',
+      }),
+    )
+    const err = await api.getSettings().catch((e) => e)
+    expect(err.detail).toBe('Internal Server Error')
+  })
+
+  it('検証エラー(detailが配列)は文字列にする', async () => {
+    mockFetch({ detail: [{ msg: 'field required' }] }, 422)
+    const err = await api.getSettings().catch((e) => e)
+    expect(typeof err.detail).toBe('string')
+  })
+
+  it('errorTextはApiError以外のエラーも文字列にする', () => {
+    expect(errorText(new Error('通信できません'))).toBe('通信できません')
   })
 
   it('ジョブ投入はtypeとparamsを送る', async () => {

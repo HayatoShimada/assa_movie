@@ -65,6 +65,30 @@ def test_failed_job_records_error(jobs):
     assert "意図的な失敗" in job["error"]
 
 
+@register("test_llm_fail")
+def _handler_llm_fail(conn, media_id, params, progress):
+    from backend.engines.llm.base import LLMError
+
+    raise LLMError.from_failure("ollama", "qwen3:32b", status=404, body="model not found")
+
+
+def test_AIの失敗は1行目に直し方だけを書く(jobs):
+    """画面はエラーの1行目を出す。型名(LLMError: …)や再試行回数は利用者には不要"""
+    job = jobs.wait(jobs.enqueue(None, "test_llm_fail", {}), timeout=10)
+    assert job["status"] == "failed"
+    first = job["error"].split("\n")[0]
+    assert first.startswith("AIモデル「qwen3:32b」がインストールされていません")
+    assert "ollama pull qwen3:32b" in first
+    assert "LLMError" not in first
+    # 調査用の詳細は2行目以降に残す
+    assert "model not found" in job["error"]
+
+
+def test_想定外の失敗は従来どおり型名付きで残す(jobs):
+    job = jobs.wait(jobs.enqueue(None, "test_fail", {}), timeout=10)
+    assert job["error"].split("\n")[0] == "RuntimeError: 意図的な失敗"
+
+
 def test_enqueue_unknown_type_raises(jobs):
     with pytest.raises(ValueError):
         jobs.enqueue(None, "no_such_job", {})

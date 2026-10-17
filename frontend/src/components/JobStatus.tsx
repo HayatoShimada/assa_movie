@@ -6,7 +6,7 @@
  * 文言の決め方は lib/jobs.ts の jobStatusText に1箇所でまとめる。
  */
 import type { JobProgress } from '../hooks/useJobProgress'
-import { jobStatusText } from '../lib/jobs'
+import { jobResultMessage, jobStatusText } from '../lib/jobs'
 import { ProgressBar } from './ui'
 
 export function JobStatus({
@@ -36,5 +36,20 @@ export function JobStatus({
       </p>
     )
   }
-  return <ProgressBar value={progress.progress} label={text} data-testid={testId} />
+  // 完了時の結果の説明(0件のときに何を探したか等)。無ければ従来どおりバーだけ
+  const result = jobResultMessage(progress)
+  if (result === null) {
+    return <ProgressBar value={progress.progress} label={text} data-testid={testId} />
+  }
+  return (
+    <div>
+      <ProgressBar value={progress.progress} label={text} data-testid={testId} />
+      <p
+        data-testid={testId ? `${testId}-result` : undefined}
+        className="mt-1 text-xs text-neutral-600 dark:text-neutral-400"
+      >
+        {result}
+      </p>
+    </div>
+  )
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Job } from '../api/client'
-import { isJobBusy, jobSlots, jobStatusText, pickJobId } from './jobs'
+import { isJobBusy, jobResultMessage, jobSlots, jobStatusText, pickJobId } from './jobs'
 
 function job(
   id: number,
@@ -171,5 +171,24 @@ describe('jobStatusText(進捗の文言)', () => {
     ['中止', p('cancelled'), '中止しました'],
   ] as const)('%s', (_, progress, expected) => {
     expect(jobStatusText(progress, labels)).toBe(expected)
+  })
+})
+
+describe('jobResultMessage(完了時の結果の説明)', () => {
+  // 0件で「完了」とだけ出ると、動いたのか・何を探したのかが分からない(評価での指摘)。
+  // バックエンドが result.message に説明を入れる(backend/pipeline/job_summary.py)
+  const base = { progress: 1, phase: null, error: null }
+  it.each([
+    [
+      '完了して説明があれば出す',
+      { ...base, status: 'completed', result: { found: 0, message: '見つかりませんでした' } },
+      '見つかりませんでした',
+    ],
+    ['説明が無い結果(書き出しの出力先等)は出さない', { ...base, status: 'completed', result: { path: '/x.mp4' } }, null],
+    ['結果が無ければ出さない', { ...base, status: 'completed', result: null }, null],
+    ['完了前は出さない', { ...base, status: 'running', result: { message: '途中' } }, null],
+    ['空文字は出さない', { ...base, status: 'completed', result: { message: '' } }, null],
+  ] as const)('%s', (_, progress, expected) => {
+    expect(jobResultMessage(progress)).toBe(expected)
   })
 })

@@ -5,7 +5,8 @@
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
-import { api, type Edit, type Segment } from '../../api/client'
+import { api, errorText, type Edit, type Segment } from '../../api/client'
+import { HelpTip } from '../HelpTip'
 import { usePlayback } from '../../stores/playback'
 import { useTrackedJob } from '../../hooks/useTrackedJob'
 import { jobSlots } from '../../lib/jobs'
@@ -117,7 +118,7 @@ function ProposedRow({
       )}
       {(accept.isError || reject.isError) && (
         <p className="mt-1 text-xs text-red-600">
-          {String((accept.error ?? reject.error)?.message)}
+          {errorText(accept.error ?? reject.error)}
         </p>
       )}
     </div>
@@ -162,6 +163,9 @@ function RerunBar({ mediaId, projectId }: { mediaId: number; projectId?: number 
         <Button variant="ghost" disabled={running} onClick={() => run.mutate('unresolved')}>
           未解決のみ再実行
         </Button>
+        <span className="self-center">
+          <HelpTip term="指示語" />
+        </span>
       </div>
       <div className="flex items-center gap-2">
         <input

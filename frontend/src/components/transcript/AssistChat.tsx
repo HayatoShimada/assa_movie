@@ -80,7 +80,13 @@ export function AssistChat({ segment, projectId }: { segment: Segment; projectId
         </Button>
       </form>
 
-      {ask.isError && <p className="mt-1 text-xs text-red-600">{String(ask.error.message)}</p>}
+      {/* 「API 500: Internal Server Error」ではなく、何が起きてどう直すかを出す
+          (AIの失敗はバックエンドが日本語の説明+直し方にして返す) */}
+      {ask.isError && (
+        <p role="alert" data-testid="assist-error" className="mt-1 text-xs text-red-600">
+          {errorText(ask.error)}
+        </p>
+      )}
 
       {response && (
         <div data-testid="assist-response" className="mt-2 space-y-2">

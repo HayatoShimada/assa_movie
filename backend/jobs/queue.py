@@ -14,8 +14,24 @@ import traceback
 from typing import Callable
 
 from backend.core.cancellation import JobCancelled, bind, unbind
+from backend.core.errors import UserFacingError
 
-Handler = Callable[[sqlite3.Connection, int | None, dict, Callable[..., None]], None]
+# ハンドラは結果の要約(dict)を返してよい。返したものは jobs.result_json に入り、
+# 画面が「0件でした」などの説明に使う
+Handler = Callable[[sqlite3.Connection, int | None, dict, Callable[..., None]], dict | None]
+
+
+def format_error(e: BaseException) -> str:
+    """失敗ジョブに残す文字列。画面は1行目を出す。
+
+    利用者向けのエラー(AIモデル未インストール等)は1行目を直し方の文言だけにし、
+    型名や生のHTTP応答は2行目以降(調査用)に回す。
+    """
+    tb = traceback.format_exc()[-2000:]
+    if isinstance(e, UserFacingError):
+        detail = getattr(e, "detail", "")
+        return f"{e}\n{detail}\n{tb}" if detail else f"{e}\n{tb}"
+    return f"{type(e).__name__}: {e}\n{tb}"
 
 # これ以上進まない状態。SSEの打ち切りもフロントの待機もこれで判断する。
 # フロント側の対応物は frontend/src/api/client.ts の JOB_TERMINAL_STATUSES
@@ -253,7 +269,7 @@ class JobQueue:
                 try:
                     handler = _HANDLERS[job["type"]]
                     params = json.loads(job["params_json"] or "{}")
-                    handler(
+                    result = handler(
                         conn,
                         job["media_id"],
                         params,
@@ -262,7 +278,13 @@ class JobQueue:
                         ),
                     )
                     conn.commit()  # ハンドラのcommit漏れでロックを持ち越さない
-                    self._update(job_id, status="completed", progress=1.0)
+                    if isinstance(result, dict):
+                        self._update(
+                            job_id, status="completed", progress=1.0,
+                            result_json=json.dumps(result, ensure_ascii=False),
+                        )
+                    else:
+                        self._update(job_id, status="completed", progress=1.0)
                 except Exception as e:
                     # 未完トランザクションを解放しないと台帳更新がロック待ちになる
                     try:
@@ -276,10 +298,7 @@ class JobQueue:
                     if cancelled or isinstance(e, JobCancelled):
                         self._update(job_id, status="cancelled")
                     else:
-                        self._update(
-                            job_id, status="failed",
-                            error=f"{type(e).__name__}: {e}\n{traceback.format_exc()[-2000:]}",
-                        )
+                        self._update(job_id, status="failed", error=format_error(e))
                 finally:
                     unbind()
                     with self.lock:

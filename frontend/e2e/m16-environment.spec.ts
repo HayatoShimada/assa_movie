@@ -13,7 +13,8 @@ test('実行環境パネル: 確定した構成が表示される', async ({ pag
   await expect(page.getByTestId('env-profile')).toContainText(/Linux|Windows|macOS/)
   await expect(page.getByTestId('env-resolved')).toContainText(/whisper\.cpp|faster-whisper/)
   await expect(page.getByTestId('env-recommendation')).toContainText(/large-v3/)
-  await expect(panel).toContainText('動画エンコード')
+  // エンコーダ名(h264_vaapi等)だけでなく、何をする方式かを書く
+  await expect(panel).toContainText('動画の書き出し')
   await expect(panel).toContainText('Ollama')
 })
 

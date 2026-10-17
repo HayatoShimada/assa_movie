@@ -123,3 +123,33 @@ def test_assist_reply_for_plain_question_includes_ai_answer(client, seg_ids):
     body = client.post(f"/api/segments/{seg_ids['ids'][1]}/assist", json={"message": "?"}).json()
     assert body["reply"].startswith("この行は変わっていません。")
     assert "ハッカソンを指しています" in body["reply"]
+
+
+# ---- AIが使えないときの伝え方 ----
+def test_AIの失敗は500ではなく日本語の直し方を返す(client, seg_ids):
+    """以前は「API 500: Internal Server Error」とだけ出て、何をすればよいか分からなかった"""
+    from backend.engines.llm.base import LLMError
+
+    use_fake([LLMError.from_failure(
+        "ollama", "qwen3:32b", status=404, body='{"error":"model \\"qwen3:32b\\" not found"}'
+    )])
+    r = client.post(f"/api/segments/{seg_ids['ids'][1]}/assist", json={"message": "x"})
+    assert r.status_code == 503
+    body = r.json()
+    assert "qwen3:32b" in body["detail"]
+    assert "ollama pull qwen3:32b" in body["detail"]
+    assert body["code"] == "model_not_installed"
+
+
+def test_キー未登録のクラウドAIは登録を促す(client, seg_ids, monkeypatch, tmp_path):
+    from backend.core.config import settings
+    from backend.jobs import resolve_job
+
+    resolve_job.set_client_factory(None)  # 実際の組み立て(build_client)を通す
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    client.patch("/api/settings", json={"llm_provider": "gemini"})
+    settings.gemini_key_file = tmp_path / "none.txt"
+    r = client.post(f"/api/segments/{seg_ids['ids'][1]}/assist", json={"message": "x"})
+    assert r.status_code == 503
+    assert "APIキー" in r.json()["detail"]
+    assert r.json()["code"] == "no_key"

@@ -92,6 +92,8 @@ test('辞書: 使わない設定にすると辞書の画面でも分かる', asy
   await openDictionary(page, mediaId)
   await expect(page.getByTestId('user-terms-disabled')).toHaveCount(0)
 
+  // 辞書を使うかどうかは「詳しい設定」に畳んである
+  await page.getByTestId('setting-advanced').locator('summary').click()
   await page.getByTestId('setting-asr-use-user-terms').uncheck()
   await page.getByTestId('settings-save').click()
   await expect(page.getByTestId('user-terms-disabled')).toBeVisible()

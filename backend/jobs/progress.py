@@ -33,6 +33,8 @@ async def job_events(jobs: JobQueue, job_id: int) -> AsyncIterator[dict]:
                         "progress": job["progress"],
                         "phase": job.get("phase"),
                         "error": job["error"],
+                        # 完了時の説明(「0件でした」等)。画面は完了イベントでそのまま出す
+                        "result": json.loads(job.get("result_json") or "null"),
                     },
                     ensure_ascii=False,
                 ),

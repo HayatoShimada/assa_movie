@@ -105,6 +105,18 @@ export function jobErrorMessage(error: string | null | undefined): string | null
 }
 
 /**
+ * 完了したジョブの結果の説明(「指示語は見つかりませんでした(対象: …)」等)。
+ * バックエンドの jobs.result.message(backend/pipeline/job_summary.py)。無ければ null
+ */
+export function jobResultMessage(
+  progress: Pick<JobProgress, 'status' | 'result'>,
+): string | null {
+  if (progress.status !== 'completed') return null
+  const message = progress.result?.message
+  return typeof message === 'string' && message ? message : null
+}
+
+/**
  * 進捗バーに添える文言。始めていなければ null。
  *
  * - 順番待ちは実行中と分ける。別の動画の文字起こしの後ろで待っている間

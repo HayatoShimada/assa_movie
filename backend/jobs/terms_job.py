@@ -17,6 +17,7 @@ from backend.core import user_terms
 from backend.core.project_settings import resolve_settings
 from backend.jobs.queue import register
 from backend.jobs.resolve_job import _get_client
+from backend.pipeline.job_summary import terms_summary
 
 QUESTIONS_SCHEMA = {
     "type": "object",
@@ -62,14 +63,14 @@ def run_extract_terms(
     media_id: int,
     params: dict,
     progress: Callable[[float], None],
-) -> None:
+) -> dict:
     rows = conn.execute(
         "SELECT text FROM segments WHERE media_id=? AND is_aizuchi=0 ORDER BY idx",
         (media_id,),
     ).fetchall()
     if not rows:
         progress(1.0)
-        return
+        return terms_summary(found=0, lines=0)
 
     texts = [r["text"] for r in rows]
     joined = "\n".join(texts)
@@ -81,6 +82,7 @@ def run_extract_terms(
         )
     }
     asked = {term for term in existing.values() if term}
+    created = 0  # 今回新しく作った質問の数(結果の説明に使う)
 
     # ---- 辞書にある「以前の聞き間違い」(AIを呼ぶ前に済ませる。AIに繋がらなくても残る) ----
     dictionary = user_terms.list_terms(conn)
@@ -94,6 +96,7 @@ def run_extract_terms(
                 "しれません。正式な表記を教えてください。")
         _insert_question(conn, media_id, wrong, count, text, [correct], source="dictionary")
         asked.add(wrong)
+        created += 1
     conn.commit()
 
     client = _get_client(resolve_settings(conn, media_id=media_id))
@@ -127,9 +130,11 @@ def run_extract_terms(
         if text in existing:
             continue
         _insert_question(conn, media_id, term, count, text, candidates)
+        created += 1
 
     conn.commit()
     progress(1.0)
+    return terms_summary(found=created, lines=len(texts))
 
 
 def _insert_question(

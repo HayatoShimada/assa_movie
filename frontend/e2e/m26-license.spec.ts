@@ -8,12 +8,15 @@ async function openSettings(page, mediaId: number) {
   await expect(page.getByTestId('license-panel')).toBeVisible()
 }
 
-test('ライセンス: 未登録と表示され、案内が出る', async ({ page, request }) => {
+test('ライセンス: 未登録と表示され、登録は任意だと案内する', async ({ page, request }) => {
   const mediaId = await seedTranscribed(request)
   await openSettings(page, mediaId)
 
   await expect(page.getByTestId('license-status')).toHaveText('未登録')
-  await expect(page.getByTestId('license-note')).toContainText('登録してください')
+  // 機能制限は未実装(V1_PLAN M26)。「登録してください」と急かすと事実に反する
+  await expect(page.getByTestId('license-note')).toHaveText(
+    '登録は任意です。未登録でもすべての機能を使えます。',
+  )
 })
 
 test('ライセンス: 不正なキーはエラーになり、状態は変わらない', async ({ page, request }) => {

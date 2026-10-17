@@ -13,8 +13,14 @@ from backend.api.deps import get_db, get_jobs
 from backend.core import hwprofile
 from backend.core.config import Settings, settings
 from backend.core.console import SUBPROCESS_TEXT
-from backend.core.environment import recommend, scan_environment
-from backend.core.project_settings import MUTABLE_FIELDS, save_global_overrides
+from backend.core.environment import gpu_vram_mb, llm_fits, recommend, scan_environment
+from backend.core.project_settings import (
+    MUTABLE_FIELDS,
+    project_overrides,
+    resolve_settings,
+    save_global_overrides,
+)
+from backend.engines.llm.status import llm_status
 from backend.engines.asr.registry import MODELS
 from backend.engines.diarize import registry as diarize
 from backend.api.keys_api import provider_ready
@@ -39,12 +45,14 @@ SettingsUpdate = create_model(
 def get_environment() -> dict:
     """確定済みプロファイルと、VRAMに収まるASR/LLMモデルの推奨(設定タブの環境パネル用)"""
     env = scan_environment(settings)
-    # GPUで計算する構成のときだけVRAMを前提にモデルを選ばせる
-    on_gpu = env["resolved"]["engine"] == "whispercpp"
-    total = env["gpu"].get("vram_total_mb", 0) if on_gpu else 0
+    # GPUのVRAM。文字起こしの構成(whisper.cpp / CPU)とは関係なく、Ollamaは自分でGPUを使う。
+    # 以前は文字起こしがCPU構成だとVRAMを0扱いにしていて、24GB機の20GB級モデルが
+    # すべて「VRAM超過」になり、おすすめも出なかった。
+    # 文字起こしとAIは直列に動く(同時には載らない)ので、AIはVRAM全体で判定する
+    total = gpu_vram_mb(env["profile"])
 
     ollama_options = [
-        {**m, "fits": on_gpu and m["vram_mb"] <= total}
+        {**m, "fits": llm_fits(m["vram_mb"], total)}
         for m in env["ollama"]["models"]
     ]
     return {
@@ -54,6 +62,49 @@ def get_environment() -> dict:
         ),
         "ollama_options": ollama_options,
     }
+
+
+class LlmStatus(BaseModel):
+    """保存済みのAI設定で、AI機能が実際に動くか"""
+
+    ok: bool
+    # 問題の分類: ollama_unreachable | model_not_installed | no_key(問題なしは null)
+    code: str | None = None
+    # 利用者向けの説明(問題なしは空)
+    message: str = ""
+    provider: str
+    provider_label: str
+    model: str
+    installed_models: list[str] = []
+    # この機体でのおすすめ(インストール済みでVRAMに収まる最大のもの)
+    recommended_model: str | None = None
+    # 未インストールのモデルを入れるコマンド
+    pull_command: str | None = None
+    # プロジェクト設定でAIの設定を上書きしているか(直す場所がプロジェクト設定になる)
+    overridden_by_project: bool = False
+
+
+LLM_KEYS = {"llm_provider", "ollama_model", "gemini_model", "claude_model"}
+
+
+@router.get("/llm/status", response_model=LlmStatus)
+def get_llm_status(
+    project_id: int | None = None, db: sqlite3.Connection = Depends(get_db)
+) -> LlmStatus:
+    """AI機能を押す前に、設定どおりのAIが使えるかを調べる(ホーム/編集画面の警告用)"""
+    s = resolve_settings(db, project_id=project_id)
+    profile = hwprofile.current()
+    vram = gpu_vram_mb(profile.to_dict())
+    engine = hwprofile.resolve_spec(profile).engine
+    status = llm_status(
+        s,
+        key_ready=s.llm_provider == "ollama" or provider_ready(s.llm_provider),
+        recommended_from_env=lambda models: recommend(vram, engine, models)["ollama_model"],
+    )
+    overridden = bool(
+        project_id is not None and LLM_KEYS & set(project_overrides(db, project_id))
+    )
+    return LlmStatus(**status, overridden_by_project=overridden)
 
 
 @router.post("/environment/redetect")

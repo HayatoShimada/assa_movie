@@ -45,6 +45,45 @@ def edits(client, media_id, status=None):
     return client.get(url).json()
 
 
+# ---- 結果の説明(0件で「完了」だけにしない) ----
+def test_0件なら対象の指示語を説明する(client, media):
+    mid = media["media_id"]
+    use_fake([{"edits": []}])
+    job = run_resolve(client, mid, {"level": "weak"})
+    result = client.get(f"/api/jobs/{job['id']}").json()["result"]
+    assert result["found"] == 0
+    assert "これ・それ・あれ" in result["message"]
+    assert "3行" in result["message"]
+
+
+def test_適用とレビュー待ちの件数を説明する(client, media):
+    mid = media["media_id"]
+    use_fake([{"edits": [
+        {"line": 2, "original": "それ", "replacement": "去年のハッカソン",
+         "referent": "去年のハッカソン", "confidence": "auto"},
+        {"line": 3, "original": "その人", "replacement": "はやまる",
+         "referent": "はやまる", "confidence": "review"},
+    ]}])
+    job = run_resolve(client, mid, {"apply_mode": "auto_and_review"})
+    result = client.get(f"/api/jobs/{job['id']}").json()["result"]
+    assert result["found"] == 2
+    assert "自動で適用1件" in result["message"]
+    assert "レビュー待ち1件" in result["message"]
+
+
+def test_SSEの完了イベントに結果が載る(client, media):
+    """画面は完了イベントで結果を受け取って表示する(取り直しをしない)"""
+    import json
+
+    mid = media["media_id"]
+    use_fake([{"edits": []}])
+    job = run_resolve(client, mid)
+    with client.stream("GET", f"/api/jobs/{job['id']}/events") as r:
+        data = [json.loads(line[5:]) for line in r.iter_lines() if line.startswith("data:")]
+    assert data[-1]["status"] == "completed"
+    assert "見つかりませんでした" in data[-1]["result"]["message"]
+
+
 # ---- 提案の保存と適用 ----
 def test_auto_confidence_is_applied_review_is_not(client, media):
     mid = media["media_id"]

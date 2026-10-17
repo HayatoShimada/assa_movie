@@ -48,6 +48,8 @@ backend/
 │       ├── base.py         # LLMClient抽象 + FakeLLMClient(テスト用)
 │       ├── ollama.py       # ローカル(qwen3:32b等)
 │       ├── gemini.py       # クラウド(Gemini API)
+│       ├── errors.py       # 失敗→利用者向けの日本語+直し方(純関数)。HTTPは503/504/502で返す
+│       ├── status.py       # 保存済み設定でAIが動くかの事前診断(GET /api/llm/status)
 │       └── registry.py     # プロバイダ選択
 ├── pipeline/
 │   ├── audio.py            # PyAVデコード(16kHz mono)・silero-VAD

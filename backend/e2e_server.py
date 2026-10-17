@@ -99,8 +99,36 @@ def _gated(job_type: str, handler: Callable) -> Callable:
     return run
 
 
+# FakeLLMの振る舞い(/api/e2e/llm)。"normal"=決まった応答 / "empty"=何も見つからない /
+# "missing_model"=Ollamaのモデル未インストールで失敗(AIの失敗の伝え方を確かめる)
+LLM_MODE = {"mode": "normal"}
+
+# Ollamaの状態(/api/e2e/ollama)。開発機に本物のOllamaがあるかどうかで
+# 画面(AIの警告・モデルの選択肢)が変わらないよう、E2Eでは常にこれを返す。
+# 既定は「起動していて、既定のモデルが入っている」(警告が出ない状態)
+def _default_ollama() -> dict:
+    from backend.core.config import Settings
+
+    return {
+        "reachable": True,
+        "models": [{"name": Settings().ollama_model, "vram_mb": 21000}],
+    }
+
+
+FAKE_OLLAMA: dict = _default_ollama()
+
+
 def _fake_llm(system: str, user: str) -> dict:
     """呼び出し内容で応答を出し分ける(プロンプトの種類で判別)"""
+    if LLM_MODE["mode"] == "missing_model":
+        from backend.engines.llm.base import LLMError
+
+        raise LLMError.from_failure(
+            "ollama", settings.ollama_model, status=404,
+            body=f'{{"error":"model \\"{settings.ollama_model}\\" not found"}}',
+        )
+    if LLM_MODE["mode"] == "empty":
+        return {"edits": [], "questions": [], "candidates": [], "reply": "見つかりませんでした"}
     if "編集アシスタント" in system:
         return FAKE_ASSIST
     if "音は合っているが漢字表記が誤っている" in system:
@@ -233,6 +261,9 @@ def reset(request: Request) -> dict:
     jobs.cancel_for_media([r["id"] for r in db.execute("SELECT id FROM media")])
     JOB_GATE.set()
     FAIL_JOBS.clear()
+    LLM_MODE["mode"] = "normal"
+    FAKE_OLLAMA.clear()
+    FAKE_OLLAMA.update(_default_ollama())
     jobs.wait_idle(timeout=GATE_TIMEOUT)
     for table in ("edits", "feedback", "questions", "clip_cuts", "clips",
                   "segments", "jobs", "glossary", "llm_instructions", "media", "projects",
@@ -283,6 +314,25 @@ def fail(job_type: str, message: str) -> dict:
     """この種別のジョブを、指定の文言で失敗させる(resetで元に戻る)"""
     FAIL_JOBS[job_type] = message
     return {"failing": sorted(FAIL_JOBS)}
+
+
+@router.post("/llm")
+def set_llm_mode(mode: str = "normal") -> dict:
+    """FakeLLMの振る舞いを切り替える(resetで normal に戻る)"""
+    if mode not in ("normal", "empty", "missing_model"):
+        from fastapi import HTTPException
+
+        raise HTTPException(400, f"未知のモード: {mode}")
+    LLM_MODE["mode"] = mode
+    return dict(LLM_MODE)
+
+
+@router.post("/ollama")
+def set_ollama(state: dict) -> dict:
+    """Ollamaの状態を差し替える({reachable, models:[{name, vram_mb}]})。resetで既定に戻る"""
+    FAKE_OLLAMA.clear()
+    FAKE_OLLAMA.update({"reachable": bool(state.get("reachable")), "models": state.get("models", [])})
+    return dict(FAKE_OLLAMA)
 
 
 @router.post("/seed")
@@ -413,6 +463,14 @@ def build_app():
     # 以前は whispercpp の bundled_dir だけを差し替えていて、残り2つは
     # 開発機の本物を見ていた
     os.environ["KS_RESOURCE_DIR"] = str(model_dir)
+
+    # Ollamaの状態は実機を見ない(環境パネル・AIの警告・モデル選択が同じものを見る)
+    from backend.core import environment
+
+    environment.scan_ollama = lambda url: {
+        "reachable": FAKE_OLLAMA["reachable"],
+        "models": [dict(m) for m in FAKE_OLLAMA["models"]],
+    }
 
     app.include_router(router)
     resolve_job.set_client_factory(lambda: FakeLLMClient(responses=_fake_llm))

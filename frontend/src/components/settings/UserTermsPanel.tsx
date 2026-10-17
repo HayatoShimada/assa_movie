@@ -17,14 +17,8 @@ import { Button, selectCls } from '../ui'
 const QUERY_KEY = ['user-terms']
 
 function errorText(error: unknown, fallback: string): string {
-  if (error instanceof ApiError) {
-    try {
-      return (JSON.parse(error.detail) as { detail?: string }).detail ?? fallback
-    } catch {
-      return fallback
-    }
-  }
-  return fallback
+  // ApiError.detail は client.ts が {"detail": "..."} から取り出し済み(生のJSONではない)
+  return error instanceof ApiError && error.detail ? error.detail : fallback
 }
 
 function TermRow({ item, enabled }: { item: UserTerm; enabled: boolean }) {

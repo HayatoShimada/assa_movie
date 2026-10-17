@@ -380,6 +380,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/llm/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Llm Status
+         * @description AI機能を押す前に、設定どおりのAIが使えるかを調べる(ホーム/編集画面の警告用)
+         */
+        get: operations["get_llm_status_api_llm_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/environment/redetect": {
         parameters: {
             query?: never;
@@ -1158,6 +1178,41 @@ export interface components {
         LicenseRegistration: {
             /** Key */
             key: string;
+        };
+        /**
+         * LlmStatus
+         * @description 保存済みのAI設定で、AI機能が実際に動くか
+         */
+        LlmStatus: {
+            /** Ok */
+            ok: boolean;
+            /** Code */
+            code?: string | null;
+            /**
+             * Message
+             * @default
+             */
+            message: string;
+            /** Provider */
+            provider: string;
+            /** Provider Label */
+            provider_label: string;
+            /** Model */
+            model: string;
+            /**
+             * Installed Models
+             * @default []
+             */
+            installed_models: string[];
+            /** Recommended Model */
+            recommended_model?: string | null;
+            /** Pull Command */
+            pull_command?: string | null;
+            /**
+             * Overridden By Project
+             * @default false
+             */
+            overridden_by_project: boolean;
         };
         /** Media */
         Media: {
@@ -2211,6 +2266,37 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    get_llm_status_api_llm_status_get: {
+        parameters: {
+            query?: {
+                project_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LlmStatus"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
