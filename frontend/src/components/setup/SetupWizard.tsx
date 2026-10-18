@@ -10,8 +10,9 @@
  * だからここで決めたことは、あとから設定タブで同じように変えられる。
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
-import { GPU_LABELS, OS_LABELS, api, machineQueryOptions } from '../../api/client'
+import { useEffect, useRef, useState } from 'react'
+import { GPU_LABELS, OS_LABELS, api, errorText, machineQueryOptions } from '../../api/client'
+import { ollamaModelOptions, pickOllamaModel, type OllamaModel } from '../../lib/llm'
 import { SetupItemRow } from '../settings/SetupPanel'
 import { Button, selectCls } from '../ui'
 
@@ -197,7 +198,7 @@ function LlmStep() {
               </div>
               {register.isError && (
                 <p data-testid="wizard-key-error" className="mt-1 text-xs text-red-600">
-                  {(register.error as Error).message}
+                  {errorText(register.error)}
                 </p>
               )}
             </>
@@ -216,10 +217,106 @@ function LlmStep() {
         >
           {env.data?.ollama.reachable
             ? `Ollamaが動いています(モデル${env.data.ollama.models.length}件)`
-            : 'Ollamaが見つかりません。ollama.com から導入して起動してください'}
+            : 'Ollamaが見つかりません。ollama.com から導入して起動してから「再確認」を押してください'}
         </p>
       )}
+      {current?.local && env.data && !env.data.ollama.reachable && (
+        <Button
+          data-testid="wizard-ollama-recheck"
+          type="button"
+          variant="ghost"
+          className="mt-2"
+          onClick={() => env.refetch()}
+          disabled={env.isFetching}
+        >
+          {env.isFetching ? '確認中…' : '再確認'}
+        </Button>
+      )}
+      {current?.local && env.data?.ollama.reachable && (
+        <OllamaModelPicker
+          current={String(settings.data.values.ollama_model ?? '')}
+          installed={env.data.ollama_options}
+          recommended={env.data.recommendations.ollama_model}
+          suggested={current.models}
+        />
+      )}
     </Section>
+  )
+}
+
+/**
+ * Ollamaのモデル選び。インストール済みのものから選ばせ、おすすめを既定にする。
+ *
+ * 以前はモデルを選ばせず、既定の qwen3:32b が入っていない機体ではAI機能が
+ * 全部失敗した(評価での指摘)。今の設定が入っていなければ、ここを開いた時点で
+ * おすすめ(無ければ入っている中で最小のもの)に切り替えて保存する。
+ * 選択肢に出ている値と保存値が食い違わないよう、表示だけ変えることはしない。
+ */
+function OllamaModelPicker({
+  current,
+  installed,
+  recommended,
+  suggested,
+}: {
+  current: string
+  installed: OllamaModel[]
+  recommended: string | null
+  suggested: string[]
+}) {
+  const queryClient = useQueryClient()
+  const save = useMutation({
+    mutationFn: (name: string) => api.updateSettings({ ollama_model: name }),
+    onSuccess: (data) => queryClient.setQueryData(['settings'], data),
+  })
+  const pick = pickOllamaModel(current, installed, recommended)
+  const needsSwitch = pick !== null && pick !== current
+  // 自動で切り替えるのは1回だけ(利用者が選び直した値を上書きしない)
+  const switched = useRef(false)
+  const { mutate } = save
+  useEffect(() => {
+    if (needsSwitch && !switched.current && pick) {
+      switched.current = true
+      mutate(pick)
+    }
+  }, [needsSwitch, pick, mutate])
+
+  if (installed.length === 0) {
+    return (
+      <p data-testid="wizard-ollama-no-models" className="mt-2 text-xs text-amber-700 dark:text-amber-400">
+        Ollamaにモデルがまだ入っていません。ターミナルで{' '}
+        <code className="rounded bg-neutral-100 px-1 dark:bg-neutral-800">ollama pull {current}</code>{' '}
+        を実行してから、設定タブでモデルを選んでください。
+      </p>
+    )
+  }
+  const options = ollamaModelOptions({ current, installed, suggested, recommended })
+  return (
+    <div className="mt-3">
+      <label className="block text-xs text-neutral-500" htmlFor="wizard-ollama-model">
+        使うモデル(このPCにインストール済みのもの)
+      </label>
+      <select
+        id="wizard-ollama-model"
+        data-testid="wizard-ollama-model"
+        className={`${selectCls} mt-1 w-full`}
+        value={current}
+        onChange={(e) => {
+          switched.current = true
+          mutate(e.target.value)
+        }}
+      >
+        {options.map((m) => (
+          <option key={m.name} value={m.name}>
+            {m.label}
+          </option>
+        ))}
+      </select>
+      {recommended && (
+        <p className="mt-1 text-xs text-neutral-500">
+          おすすめは、GPUメモリに収まる中で最も高性能な「{recommended}」です。
+        </p>
+      )}
+    </div>
   )
 }
 

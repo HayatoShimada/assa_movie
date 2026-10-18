@@ -2,20 +2,22 @@
  * マウス操作のクリップ範囲バー。
  * - 両端ハンドルをドラッグして開始/終了を調整(0.1秒単位)
  * - 中抜き区間は斜線帯で表示し、クリックでON/OFF
- * - 表示窓はクリップ範囲の前後に余白を持たせる
+ * - 表示窓はクリップ範囲の前後に余白を持たせる(動画の外へは広げない。lib/clipTimeline.ts)
  */
 import { useCallback, useRef } from 'react'
 import type { Clip } from '../../api/clips'
+import { timelineWindow } from '../../lib/clipTimeline'
 import { formatTime } from '../ui'
-
-const PAD_RATIO = 0.2
 
 export function ClipTimeline({
   clip,
+  duration,
   onRangeChange,
   onToggleCut,
 }: {
   clip: Clip
+  /** 動画の長さ(秒)。不明ならnull */
+  duration: number | null
   onRangeChange: (start: number, end: number) => void
   onToggleCut: (cutId: number, active: boolean) => void
 }) {
@@ -24,10 +26,7 @@ export function ClipTimeline({
   // ドラッグ中の値(確定はpointerup時にonRangeChangeへ)
   const live = useRef({ start: clip.start, end: clip.end })
 
-  const span = clip.end - clip.start
-  const pad = Math.max(5, span * PAD_RATIO)
-  const viewStart = Math.max(0, clip.start - pad)
-  const viewEnd = clip.end + pad
+  const { viewStart, viewEnd } = timelineWindow(clip.start, clip.end, duration)
   const toPct = (t: number) => ((t - viewStart) / (viewEnd - viewStart)) * 100
   const fromClientX = useCallback(
     (clientX: number) => {

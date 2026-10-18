@@ -233,6 +233,9 @@ def resolve_clip(
     job_id = jobs.enqueue(clip["media_id"], "resolve", {
         "scope": "segment_ids",
         "segment_ids": seg_ids,
+        # ジョブ自体は使わない。画面が実行中のジョブを取り直すときに、
+        # レビュータブの「指示語を解決」と見分けるための印
+        "clip_id": clip_id,
         "extra_instruction": (
             "この範囲は切り抜き動画として単体で公開される。範囲より前の文脈は視聴者に"
             "見えないため、範囲内で参照先が示されていない指示語は特に積極的に解決すること。"

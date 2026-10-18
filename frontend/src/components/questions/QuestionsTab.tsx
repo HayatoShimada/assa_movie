@@ -1,13 +1,18 @@
 /**
  * 質問キュー: LLMからの質問(固有名詞の表記確認)に答える。
- * 回答すると全出現箇所が一括修正され、用語集に登録される。
+ * 回答すると全出現箇所が一括修正され、用語集と「名前・用語の辞書」に登録される
+ * (辞書は全プロジェクト共通で、次の文字起こしからWhisperに渡る)。
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api, type Question } from '../../api/client'
 import { usePlayback } from '../../stores/playback'
-import { useJobProgress } from '../../hooks/useJobProgress'
-import { Button, ProgressBar } from '../ui'
+import { useTrackedJob } from '../../hooks/useTrackedJob'
+import { jobResultMessage, jobSlots } from '../../lib/jobs'
+import { answeredMessage } from '../../lib/userTerms'
+import { HelpTip } from '../HelpTip'
+import { JobStatus } from '../JobStatus'
+import { Button } from '../ui'
 
 function QuestionCard({
   question,
@@ -29,10 +34,11 @@ function QuestionCard({
   }
   const answer = useMutation({
     mutationFn: (text: string) => api.answerQuestion(question.id, text),
-    onSuccess: (res) => {
+    onSuccess: (res, text) => {
       // 回答するとカード自体がリストから消えるため、結果表示は親に渡す
-      onAnswered(`${res.segments_changed}箇所を修正し、用語集に登録しました`)
+      onAnswered(answeredMessage(question.kind, res.segments_changed, text))
       invalidate()
+      if (question.kind === 'term') queryClient.invalidateQueries({ queryKey: ['user-terms'] })
     },
   })
   const dismiss = useMutation({ mutationFn: () => api.dismissQuestion(question.id), onSuccess: invalidate })
@@ -101,29 +107,32 @@ export function QuestionsTab({ mediaId }: { mediaId: number }) {
     queryKey: ['questions', mediaId],
     queryFn: () => api.listQuestions(mediaId),
   })
-  const [jobId, setJobId] = useState<number | null>(null)
-  const progress = useJobProgress(jobId, () =>
+  // ジョブIDはタブの外に預ける(タブ切替・再読み込みで進捗を失わない)
+  const { progress, busy, start } = useTrackedJob(jobSlots.scanTerms(mediaId), () =>
     queryClient.invalidateQueries({ queryKey: ['questions', mediaId] }),
   )
   const scan = useMutation({
     mutationFn: () => api.createJob(mediaId, 'extract_terms', {}),
-    onSuccess: (job) => setJobId(job.id),
+    onSuccess: (job) => start(job.id),
   })
-  const running = progress.status === 'running' || progress.status === 'queued'
+  const running = busy || scan.isPending
   const [lastResult, setLastResult] = useState<string | null>(null)
 
   return (
     <div className="flex h-full flex-col overflow-y-auto">
       <div className="space-y-2 border-b border-neutral-200 p-3 dark:border-neutral-800">
-        <Button data-testid="run-scan" disabled={running} onClick={() => scan.mutate()}>
-          固有名詞をスキャン
-        </Button>
-        {jobId !== null && progress.status !== 'idle' && (
-          <ProgressBar
-            value={progress.progress}
-            label={progress.status === 'completed' ? 'スキャン完了' : 'スキャン中...'}
-          />
-        )}
+        <div className="flex items-center">
+          <Button data-testid="run-scan" disabled={running} onClick={() => scan.mutate()}>
+            固有名詞をスキャン
+          </Button>
+          <HelpTip term="固有名詞" />
+        </div>
+        <JobStatus
+          progress={progress}
+          running="スキャン中"
+          done="スキャン完了"
+          data-testid="scan-status"
+        />
       </div>
       {lastResult && (
         <p className="border-b border-emerald-100 bg-emerald-50 px-3 py-2 text-xs text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300">
@@ -131,8 +140,11 @@ export function QuestionsTab({ mediaId }: { mediaId: number }) {
         </p>
       )}
       {questions.data?.length === 0 && (
-        <p className="p-3 text-sm text-neutral-500">
-          未回答の質問はありません。「固有名詞をスキャン」で表記が怪しい語を探せます。
+        <p data-testid="questions-empty" className="p-3 text-sm text-neutral-500">
+          未回答の質問はありません。
+          {/* スキャン直後に「スキャンで探せます」と出すと、動かなかったように見える */}
+          {jobResultMessage(progress) === null &&
+            '「固有名詞をスキャン」で、表記が怪しい人名・会社名・専門用語をAIが探して質問します。'}
         </p>
       )}
       {questions.data?.map((q) => (

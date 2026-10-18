@@ -37,7 +37,7 @@ def test_build_client_gemini_without_key_raises(monkeypatch, tmp_path):
     s = Settings(_env_file=None)
     s.llm_provider = "gemini"
     s.gemini_key_file = tmp_path / "none.txt"
-    with pytest.raises(ValueError, match="APIキーが設定されていません"):
+    with pytest.raises(ValueError, match="APIキーが登録されていません"):
         build_client(s)
 
 
@@ -144,9 +144,83 @@ def test_gemini_retries_then_raises(monkeypatch):
     monkeypatch.setattr(c._session, "post", fake_post)
     monkeypatch.setattr("time.sleep", lambda _: None)
 
-    with pytest.raises(LLMError, match="2回失敗"):
+    with pytest.raises(LLMError, match="利用上限"):
         c.complete_json("s", "u", EDITS_SCHEMA)
     assert len(calls) == 2
+
+
+# ---- 失敗の伝え方(利用者向けの文言。判定表は test_llm_errors.py) ----
+def test_Ollamaのモデル未インストールは直し方付きのエラーにする(monkeypatch):
+    calls = []
+
+    def fake_post(url, json=None, timeout=None):
+        calls.append(1)
+        return _FakeResponse(
+            {"error": 'model "qwen3:32b" not found, try pulling it first'}, status=404
+        )
+
+    monkeypatch.setattr("backend.engines.llm.ollama.requests.post", fake_post)
+    monkeypatch.setattr("time.sleep", lambda _: None)
+    with pytest.raises(LLMError) as exc:
+        OllamaClient(model="qwen3:32b", retries=3).complete_json("s", "u", EDITS_SCHEMA)
+    assert exc.value.code == "model_not_installed"
+    assert "ollama pull qwen3:32b" in str(exc.value)
+    assert "回失敗" not in str(exc.value)
+    assert len(calls) == 1, "入っていないモデルは何度呼んでも同じなので再試行しない"
+    assert "404" in exc.value.detail, "原因の調査用に生の応答は残す"
+
+
+def test_Ollama未起動は起動を促すエラーにする(monkeypatch):
+    def fake_post(url, json=None, timeout=None):
+        raise requests.ConnectionError("Connection refused")
+
+    monkeypatch.setattr("backend.engines.llm.ollama.requests.post", fake_post)
+    monkeypatch.setattr("time.sleep", lambda _: None)
+    with pytest.raises(LLMError) as exc:
+        OllamaClient(retries=2).complete_json("s", "u", EDITS_SCHEMA)
+    assert exc.value.code == "ollama_unreachable"
+    assert "Ollama が起動していません" in str(exc.value)
+
+
+def test_Ollamaの壊れたJSONは再試行して直れば成功する(monkeypatch):
+    replies = [
+        _FakeResponse({"message": {"content": "これはJSONではない"}}),
+        _FakeResponse({"message": {"content": '{"edits": []}'}}),
+    ]
+    monkeypatch.setattr(
+        "backend.engines.llm.ollama.requests.post",
+        lambda url, json=None, timeout=None: replies.pop(0),
+    )
+    monkeypatch.setattr("time.sleep", lambda _: None)
+    assert OllamaClient(retries=3).complete_json("s", "u", EDITS_SCHEMA) == {"edits": []}
+
+
+def test_GeminiのAPIキー不正は登録し直しを促す(monkeypatch):
+    calls = []
+
+    def fake_post(url, json=None, headers=None, timeout=None):
+        calls.append(1)
+        return _FakeResponse({"error": {"message": "API key not valid"}}, status=400)
+
+    c = GeminiClient(api_key="bad", retries=3)
+    monkeypatch.setattr(c._session, "post", fake_post)
+    monkeypatch.setattr("time.sleep", lambda _: None)
+    with pytest.raises(LLMError) as exc:
+        c.complete_json("s", "u", EDITS_SCHEMA)
+    assert exc.value.code == "invalid_key"
+    assert "APIキーが正しくありません" in str(exc.value)
+    assert len(calls) == 1
+
+
+def test_キー未登録は利用者向けのエラーにする(monkeypatch, tmp_path):
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    s = Settings(_env_file=None)
+    s.llm_provider = "gemini"
+    s.gemini_key_file = tmp_path / "none.txt"
+    with pytest.raises(LLMError) as exc:
+        build_client(s)
+    assert exc.value.code == "no_key"
+    assert "設定タブ" in str(exc.value)
 
 
 # ---- APIキーの疎通確認(登録時に1回だけ呼ぶ) ----

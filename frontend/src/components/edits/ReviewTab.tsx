@@ -5,10 +5,13 @@
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
-import { api, type Edit, type Segment } from '../../api/client'
+import { api, errorText, type Edit, type Segment } from '../../api/client'
+import { HelpTip } from '../HelpTip'
 import { usePlayback } from '../../stores/playback'
-import { useJobProgress } from '../../hooks/useJobProgress'
-import { Button, ProgressBar, formatTime } from '../ui'
+import { useTrackedJob } from '../../hooks/useTrackedJob'
+import { jobSlots } from '../../lib/jobs'
+import { JobStatus } from '../JobStatus'
+import { Button, formatTime } from '../ui'
 
 function DiffText({ edit }: { edit: Edit }) {
   return (
@@ -115,7 +118,7 @@ function ProposedRow({
       )}
       {(accept.isError || reject.isError) && (
         <p className="mt-1 text-xs text-red-600">
-          {String((accept.error ?? reject.error)?.message)}
+          {errorText(accept.error ?? reject.error)}
         </p>
       )}
     </div>
@@ -124,10 +127,10 @@ function ProposedRow({
 
 function RerunBar({ mediaId, projectId }: { mediaId: number; projectId?: number }) {
   const queryClient = useQueryClient()
-  const [jobId, setJobId] = useState<number | null>(null)
   const [instruction, setInstruction] = useState('')
   const [keep, setKeep] = useState(false)
-  const progress = useJobProgress(jobId, () => {
+  // ジョブIDはタブの外に預ける(タブ切替・再読み込みで進捗を失わない)
+  const { progress, busy, start } = useTrackedJob(jobSlots.resolve(mediaId), () => {
     queryClient.invalidateQueries({ queryKey: ['edits'] })
     queryClient.invalidateQueries({ queryKey: ['segments'] })
   })
@@ -142,10 +145,10 @@ function RerunBar({ mediaId, projectId }: { mediaId: number; projectId?: number 
       // 現状は「今後も使う」= instructionsに保存、それ以外は保存せず実行のみ。
       return api.createJob(mediaId, 'resolve', params)
     },
-    onSuccess: (job) => setJobId(job.id),
+    onSuccess: (job) => start(job.id),
   })
 
-  const running = progress.status === 'running' || progress.status === 'queued'
+  const running = busy || run.isPending
 
   return (
     <div className="space-y-2 border-b border-neutral-200 p-3 dark:border-neutral-800">
@@ -160,6 +163,9 @@ function RerunBar({ mediaId, projectId }: { mediaId: number; projectId?: number 
         <Button variant="ghost" disabled={running} onClick={() => run.mutate('unresolved')}>
           未解決のみ再実行
         </Button>
+        <span className="self-center">
+          <HelpTip term="指示語" />
+        </span>
       </div>
       <div className="flex items-center gap-2">
         <input
@@ -173,18 +179,12 @@ function RerunBar({ mediaId, projectId }: { mediaId: number; projectId?: number 
           今後も使う
         </label>
       </div>
-      {jobId !== null && progress.status !== 'idle' && (
-        <ProgressBar
-          value={progress.progress}
-          label={
-            progress.status === 'failed'
-              ? `失敗: ${progress.error?.split('\n')[0] ?? ''}`
-              : progress.status === 'completed'
-                ? '解決完了'
-                : '解決中...'
-          }
-        />
-      )}
+      <JobStatus
+        progress={progress}
+        running="解決中"
+        done="解決完了"
+        data-testid="resolve-status"
+      />
     </div>
   )
 }

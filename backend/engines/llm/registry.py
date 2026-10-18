@@ -2,7 +2,8 @@
 
 from dataclasses import dataclass
 
-from backend.engines.llm.base import LLMClient
+from backend.engines.llm.base import LLMClient, LLMConfigError
+from backend.engines.llm.errors import no_key_message
 from backend.engines.llm.claude import DEFAULT_MODEL as CLAUDE_DEFAULT
 from backend.engines.llm.claude import ClaudeClient
 from backend.engines.llm.claude import load_api_key as load_claude_key
@@ -63,10 +64,7 @@ def build_client(settings) -> LLMClient:
     if provider == "claude":
         api_key = load_claude_key(settings.claude_key_file)
         if not api_key:
-            raise ValueError(
-                "Claude APIキーが設定されていません。設定タブで登録するか、"
-                "環境変数 ANTHROPIC_API_KEY を設定してください。"
-            )
+            raise LLMConfigError(no_key_message("claude"), code="no_key")
         return ClaudeClient(
             api_key=api_key,
             model=settings.claude_model or CLAUDE_DEFAULT,
@@ -75,10 +73,7 @@ def build_client(settings) -> LLMClient:
 
     api_key = load_api_key(settings.gemini_key_file)
     if not api_key:
-        raise ValueError(
-            "Gemini APIキーが設定されていません。"
-            "環境変数 GEMINI_API_KEY を設定するか gemini_api_key.txt に記述してください。"
-        )
+        raise LLMConfigError(no_key_message("gemini"), code="no_key")
     return GeminiClient(
         api_key=api_key,
         model=settings.gemini_model or GEMINI_DEFAULT,

@@ -11,7 +11,7 @@ from backend.models import schema
 EXPECTED_TABLES = {
     "projects", "media", "segments", "edits", "llm_instructions",
     "glossary", "feedback", "questions", "clips", "clip_cuts",
-    "templates", "jobs",
+    "templates", "jobs", "user_terms",
 }
 
 

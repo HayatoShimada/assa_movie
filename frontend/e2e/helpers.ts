@@ -33,3 +33,22 @@ export async function seedTranscribed(
     .toBe('transcribed')
   return media_id
 }
+
+/**
+ * ジョブを実行中のまま止めておく(backend/e2e_server.py の JOB_GATE)。
+ * FakeLLMは一瞬で終わるので、止めないと「処理中」の画面を観測できない。
+ * reset で必ず開くので、spec の途中で失敗しても次へ持ち越さない
+ */
+export async function holdJobs(request: APIRequestContext) {
+  await request.post(`${API}/api/e2e/gate?open=false`)
+}
+
+export async function releaseJobs(request: APIRequestContext) {
+  await request.post(`${API}/api/e2e/gate?open=true`)
+}
+
+/** この種別のジョブを、指定の文言で失敗させる(reset で元に戻る) */
+export async function failJobs(request: APIRequestContext, jobType: string, message: string) {
+  const query = new URLSearchParams({ job_type: jobType, message })
+  await request.post(`${API}/api/e2e/fail?${query}`)
+}

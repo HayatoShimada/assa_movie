@@ -12,7 +12,12 @@ export type Media = components['schemas']['Media']
 export type Job = components['schemas']['Job']
 export type Segment = components['schemas']['Segment']
 export type Edit = components['schemas']['Edit']
+export type AssistEdit = components['schemas']['AssistEdit']
 export type Question = components['schemas']['Question']
+export type UserTerm = components['schemas']['UserTerm']
+/** 動画の概要(主題・登場人物・固有名詞)。すべてのAI処理のプロンプトに入る */
+export type Brief = components['schemas']['Brief']
+export type LlmStatus = components['schemas']['LlmStatus']
 
 declare global {
   interface Window {
@@ -37,13 +42,40 @@ export const API_BASE = resolveApiBase()
 
 export class ApiError extends Error {
   status: number
+  /** 利用者向けの説明(FastAPIの {"detail": "..."} の中身) */
   detail: string
+  /** 失敗の分類(AIの失敗なら model_not_installed 等。backend/engines/llm/errors.py) */
+  code: string | null
 
-  constructor(status: number, detail: string) {
+  constructor(status: number, detail: string, code: string | null = null) {
     super(`API ${status}: ${detail}`)
     this.status = status
     this.detail = detail
+    this.code = code
   }
+}
+
+/**
+ * エラー応答の本文から detail と code を取り出す。
+ * 以前は生のJSON(`{"detail":"…"}`)をそのまま画面に出していた。
+ */
+function parseErrorBody(text: string): { detail: string; code: string | null } {
+  try {
+    const body = JSON.parse(text) as { detail?: unknown; code?: unknown }
+    const code = typeof body.code === 'string' ? body.code : null
+    if (typeof body.detail === 'string') return { detail: body.detail, code }
+    if (body.detail !== undefined) return { detail: JSON.stringify(body.detail), code }
+  } catch {
+    // JSONでない本文(プロキシのエラーページ等)はそのまま使う
+  }
+  return { detail: text, code: null }
+}
+
+/** 画面に出すエラー文。APIのエラーは「API 503: 」を付けず説明だけにする */
+export function errorText(e: unknown): string {
+  if (e instanceof ApiError) return e.detail
+  if (e instanceof Error) return e.message
+  return String(e)
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -53,8 +85,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     headers: isFormData ? init?.headers : { 'Content-Type': 'application/json', ...init?.headers },
   })
   if (!res.ok) {
-    const detail = await res.text().catch(() => res.statusText)
-    throw new ApiError(res.status, detail)
+    const text = await res.text().catch(() => res.statusText)
+    const { detail, code } = parseErrorBody(text)
+    throw new ApiError(res.status, detail, code)
   }
   return res.status === 204 ? (undefined as T) : ((await res.json()) as T)
 }
@@ -94,10 +127,21 @@ export const api = {
     return request<Media>(`/api/projects/${projectId}/media/upload`, { method: 'POST', body: form })
   },
 
+  getBrief: (mediaId: number) => request<Brief>(`/api/media/${mediaId}/brief`),
+  updateBrief: (mediaId: number, brief: Brief) =>
+    request<Brief>(`/api/media/${mediaId}/brief`, { method: 'PATCH', body: JSON.stringify(brief) }),
+
   createJob: (mediaId: number, type: string, params: Record<string, unknown> = {}) =>
     post<Job>(`/api/media/${mediaId}/jobs`, { type, params }),
   getJob: (jobId: number) => request<Job>(`/api/jobs/${jobId}`),
+  /** 待機中・実行中のジョブ(タブ切替・再読み込みの後に進捗を取り直す。lib/jobs.ts) */
+  listActiveJobs: () => request<Job[]>('/api/jobs/active'),
   cancelJob: (jobId: number) => post<Job>(`/api/jobs/${jobId}/cancel`),
+  /** 書き出したファイルのあるフォルダをOSのファイラーで開く(書き出しジョブ限定) */
+  revealExport: (jobId: number) =>
+    post<components['schemas']['RevealResult']>(`/api/jobs/${jobId}/reveal`),
+  /** 書き出した動画のURL(画面内での再生用) */
+  exportOutputUrl: (jobId: number) => `${API_BASE}/api/jobs/${jobId}/output`,
 
   listSegments: (mediaId: number, includeAizuchi = true) =>
     request<Segment[]>(
@@ -108,6 +152,11 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify(patch),
     }),
+  /** 手直しを取り消す(原文+承認済みのAIの修正に戻す) */
+  restoreSegment: (segmentId: number) => post<Segment>(`/api/segments/${segmentId}/restore`),
+  /** この動画の話者名を変える(その話者の全行) */
+  renameSpeaker: (mediaId: number, current: string, next: string) =>
+    post<{ changed: number }>(`/api/media/${mediaId}/speakers/rename`, { current, new: next }),
 
   listEdits: (mediaId: number, status?: string) =>
     request<Edit[]>(`/api/media/${mediaId}/edits${status ? `?status=${status}` : ''}`),
@@ -130,6 +179,18 @@ export const api = {
     post<{ segments_changed: number }>(`/api/questions/${questionId}/answer`, { text }),
   dismissQuestion: (questionId: number) => post<Question>(`/api/questions/${questionId}/dismiss`),
 
+  /** 利用者の辞書(名前・用語)。全プロジェクト共通で、次の文字起こしに渡る */
+  listUserTerms: () => request<UserTerm[]>('/api/user-terms'),
+  addUserTerm: (term: string, misrecognitions: string[] = []) =>
+    post<UserTerm>('/api/user-terms', { term, misrecognitions }),
+  updateUserTerm: (termId: number, patch: { term?: string; misrecognitions?: string[] }) =>
+    request<UserTerm>(`/api/user-terms/${termId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    }),
+  deleteUserTerm: (termId: number) =>
+    request<{ deleted: number }>(`/api/user-terms/${termId}`, { method: 'DELETE' }),
+
   getSettings: () => request<SettingsResponse>('/api/settings'),
   updateSettings: (patch: Record<string, unknown>) =>
     request<SettingsResponse>('/api/settings', { method: 'PATCH', body: JSON.stringify(patch) }),
@@ -148,6 +209,9 @@ export const api = {
   registerLicense: (key: string) =>
     request<LicenseStatus>('/api/license', { method: 'POST', body: JSON.stringify({ key }) }),
   getEnvironment: () => request<EnvironmentResponse>('/api/environment'),
+  /** 保存済みのAI設定で実際にAIが動くか(プロジェクトを渡すとその上書きも反映) */
+  getLlmStatus: (projectId?: number) =>
+    request<LlmStatus>(`/api/llm/status${projectId ? `?project_id=${projectId}` : ''}`),
   /** 実行環境の再検出(GPU増設・ドライバ導入後の追従手段) */
   redetectEnvironment: () => post<EnvironmentResponse>('/api/environment/redetect'),
 }
@@ -242,8 +306,9 @@ export const OS_LABELS: Record<HwProfile['os'], string> = {
 }
 
 export interface AssistResponse {
+  /** 実際の状態(承認待ちの案があるか等)から機械側で作った文。LLMの返事そのままではない */
   reply: string
-  edits: Edit[]
+  edits: AssistEdit[]
   instruction_suggestion: string | null
 }
 
@@ -274,14 +339,31 @@ export function isJobDone(status: string): boolean {
   return (JOB_TERMINAL_STATUSES as readonly string[]).includes(status)
 }
 
-/** ジョブ進捗をSSEで購読する。戻り値を呼ぶと購読を止める。 */
-export function subscribeJob(jobId: number, onProgress: (job: Job) => void): () => void {
+/**
+ * ジョブ進捗をSSEで購読する。戻り値を呼ぶと購読を止める。
+ * 終端に届く前に接続が切れたら onError を呼ぶ(呼び出し側が取り直す)。
+ */
+export function subscribeJob(
+  jobId: number,
+  onProgress: (job: Job) => void,
+  onError?: () => void,
+): () => void {
   const source = new EventSource(`${API_BASE}/api/jobs/${jobId}/events`)
+  let done = false
   source.addEventListener('progress', (e) => {
     const job = JSON.parse((e as MessageEvent).data) as Job & { job_id: number }
     onProgress(job)
-    if (isJobDone(job.status)) source.close()
+    if (isJobDone(job.status)) {
+      done = true
+      source.close()
+    }
   })
-  source.onerror = () => source.close()
-  return () => source.close()
+  source.onerror = () => {
+    source.close()
+    if (!done) onError?.()
+  }
+  return () => {
+    done = true
+    source.close()
+  }
 }

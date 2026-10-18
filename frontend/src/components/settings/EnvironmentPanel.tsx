@@ -7,7 +7,8 @@
  * エンジンは選ばせない(選択を誤ると「遅い」「動かない」になるため)。
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { GPU_LABELS, OS_LABELS, api, machineQueryOptions } from '../../api/client'
+import { GPU_LABELS, OS_LABELS, api, errorText, machineQueryOptions } from '../../api/client'
+import { encoderDescription } from '../../lib/environment'
 import { Button } from '../ui'
 
 const GB = (mb: number) => `${(mb / 1024).toFixed(1)}GB`
@@ -91,22 +92,22 @@ export function EnvironmentPanel() {
         value={<span data-testid="env-resolved">{e.resolved.label}</span>}
       />
       {hasGpu && e.profile.vram_total_mb > 0 && (
-        <Item label="VRAM" value={GB(e.profile.vram_total_mb)} />
+        <Item label="GPUメモリ(VRAM)" value={GB(e.profile.vram_total_mb)} />
       )}
       <Item
-        label="動画エンコード"
+        label="動画の書き出し"
         value={
           e.ffmpeg
-            ? (e.encoder ?? 'ソフトウェア')
+            ? encoderDescription(e.encoder)
             : '⚠ ffmpeg未インストール(書き出し不可)'
         }
       />
       <Item
-        label="Ollama"
+        label="ローカルAI(Ollama)"
         value={
           e.ollama.reachable
             ? `稼働中(${e.ollama.models.length}モデル)`
-            : '未起動(クラウドLLMは利用可)'
+            : '未起動(クラウドのAIは利用可)'
         }
       />
 
@@ -124,8 +125,15 @@ export function EnvironmentPanel() {
         <p className="text-xs text-neutral-500">この構成でのおすすめモデル:</p>
         <p data-testid="env-recommendation" className="mt-0.5">
           文字起こし: {rec.asr_model}
-          {rec.ollama_model ? ` / LLM: ${rec.ollama_model}` : ''}
+          {rec.ollama_model ? ` / AI: ${rec.ollama_model}` : ''}
         </p>
+        {/* 文字起こしとAIは順に動く前提でVRAM全体に収まるものを選んでいる */}
+        {rec.ollama_model && (
+          <p className="text-xs text-neutral-500">
+            AIはインストール済みのモデルのうち、GPUメモリに収まる最も大きいものです
+            (文字起こしとAIは同時には動かないので、それぞれGPUメモリ全体で判定しています)。
+          </p>
+        )}
         <Button
           data-testid="env-apply-recommendation"
           variant="ghost"
@@ -144,7 +152,7 @@ export function EnvironmentPanel() {
       </div>
       {(applyModel.isError || redetect.isError) && (
         <p className="text-xs text-red-600">
-          失敗しました: {String(applyModel.error ?? redetect.error)}
+          失敗しました: {errorText(applyModel.error ?? redetect.error)}
         </p>
       )}
     </div>

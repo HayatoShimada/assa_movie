@@ -28,7 +28,12 @@ test('プロジェクト作成: テンプレート「横→縦」と設定の上
   expect(created.input_orientation).toBe('landscape')
   expect(created.settings.convert_method).toBe('crop')
   // 変更していない項目は差分に入らない(グローバルに追従する)
-  expect(created.settings.subtitle_font_size).toBeUndefined()
+  expect(created.settings.filler_level).toBeUndefined()
+  // ただし縦向きのテンプレートは、字幕を縦動画向けの値で始める
+  // (1920基準のままだと幅1080で0.56倍になり小さすぎるため。core/project_settings.py)
+  expect(created.settings.subtitle_font_size).toBe(96)
+  expect(created.settings.subtitle_position).toBe('bottom')
+  expect(created.settings.subtitle_offset_y).toBe(-120)
 
   // カードにテンプレートバッジが出る
   await expect(page.getByTestId(`project-template-badge-${created.id}`)).toHaveText('横 → 縦')

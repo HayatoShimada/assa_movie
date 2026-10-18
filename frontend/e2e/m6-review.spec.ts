@@ -96,7 +96,7 @@ test('質問: スキャン→候補ボタンで回答→全出現箇所が修正
   await expect(page.getByTestId('tab-questions')).toContainText('1')
 
   await card.getByRole('button', { name: '半導体', exact: true }).click()
-  await expect(page.getByText(/箇所を修正し、用語集に登録しました/)).toBeVisible()
+  await expect(page.getByText(/箇所を修正し、「半導体」を辞書に覚えました/)).toBeVisible()
 
   await page.getByTestId('tab-transcript').click()
   await expect(page.getByTestId('segment-2')).toContainText('半導体の話も面白かったです')

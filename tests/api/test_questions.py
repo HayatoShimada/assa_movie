@@ -109,6 +109,28 @@ def test_answer_records_edits_for_audit(client, media):
     assert all(e["created_by"] == "user" for e in edits)
 
 
+def test_answer_does_not_touch_already_correct_text(client, tmp_path):
+    """聞き間違いが正しい表記の一部(ハコスト → ハコストア)でも、
+    既に正しく書けている箇所は変えない(「ハコストアア」にしない)"""
+    ids = create_media(client, tmp_path)
+    mid = ids["media_id"]
+    insert_segments(client.app.state.db, mid, [
+        {"text": "ハコストに行きました"},
+        {"text": "ハコストアは駅前です"},
+    ])
+    use_fake([{"questions": [
+        {"term": "ハコスト", "reason": "店名の聞き間違いと思われます", "candidates": ["ハコストア"]}
+    ]}])
+    run_extract(client, mid)
+    qid = client.get(f"/api/media/{mid}/questions").json()[0]["id"]
+
+    r = client.post(f"/api/questions/{qid}/answer", json={"text": "ハコストア"})
+    assert r.json()["segments_changed"] == 1  # 直したのは1行目だけ
+    texts = [s["text"] for s in client.get(f"/api/media/{mid}/segments").json()]
+    assert texts == ["ハコストアに行きました", "ハコストアは駅前です"]
+    assert len(client.get(f"/api/media/{mid}/edits").json()) == 1
+
+
 def test_dismiss_question(client, media):
     mid = media["media_id"]
     use_fake([TERM_RESPONSE])
@@ -118,6 +140,25 @@ def test_dismiss_question(client, media):
     assert client.post(f"/api/questions/{qid}/dismiss").json()["status"] == "dismissed"
     assert client.get(f"/api/media/{mid}/questions").json() == []
     assert len(client.get(f"/api/media/{mid}/questions?status=dismissed").json()) == 1
+
+
+def test_0件のスキャンは何を探したかを結果に残す(client, media):
+    """以前は0件でも「スキャン完了」だけで、動いたのかが分からなかった"""
+    mid = media["media_id"]
+    use_fake([{"questions": []}])
+    job = run_extract(client, mid)
+    assert job["status"] == "completed", job["error"]
+    result = client.get(f"/api/jobs/{job['id']}").json()["result"]
+    assert result["found"] == 0
+    assert "見つかりませんでした" in result["message"]
+    assert "4行" in result["message"]
+
+
+def test_見つかった件数を結果に残す(client, media):
+    mid = media["media_id"]
+    use_fake([TERM_RESPONSE])
+    job = run_extract(client, mid)
+    assert client.get(f"/api/jobs/{job['id']}").json()["result"]["found"] == 1
 
 
 def test_answer_unknown_question_404(client):

@@ -12,6 +12,7 @@ from backend.engines.llm.base import LLMClient
 from backend.engines.llm.registry import build_client
 from backend.jobs.queue import register
 from backend.pipeline import pronoun
+from backend.pipeline.job_summary import resolve_summary
 
 # テストからLLMクライアントを差し替えるためのフック
 _client_factory: Callable[[], LLMClient] | None = None
@@ -100,7 +101,7 @@ def run_resolve(
     media_id: int,
     params: dict,
     progress: Callable[[float], None],
-) -> None:
+) -> dict:
     s = resolve_settings(conn, media_id=media_id)
     level = params.get("level", s.pronoun_level)
     form = params.get("form", s.pronoun_form)
@@ -110,12 +111,14 @@ def run_resolve(
     segments = _target_segments(conn, media_id, params)
     if not segments:
         progress(1.0)
-        return
+        return resolve_summary(level=level, found=0, applied=0, guarded=0, lines=0)
 
     # プロンプトの行番号は「全セグメント中の位置」に揃える(文脈が正しく引けるように)
     all_rows = conn.execute(
-        "SELECT id, text FROM segments WHERE media_id=? ORDER BY idx", (media_id,)
+        "SELECT id, text, edited_by_user FROM segments WHERE media_id=? ORDER BY idx",
+        (media_id,),
     ).fetchall()
+    hand_edited = {r["id"] for r in all_rows if r["edited_by_user"]}
     lines = [r["text"] for r in all_rows]
     id_by_line = {i + 1: r["id"] for i, r in enumerate(all_rows)}
     line_by_id = {r["id"]: i + 1 for i, r in enumerate(all_rows)}
@@ -140,6 +143,8 @@ def run_resolve(
 
     # ---- 機械ガード → 保存 ----
     accepted = 0
+    applied = 0
+    guarded = 0
     for raw_edit, line_range in proposals:
         segment_id = id_by_line.get(raw_edit.line)
         if segment_id is None:
@@ -147,6 +152,7 @@ def run_resolve(
         # 置換先が指示語のまま(「これ→そのこと」)なら referent で補正、不能なら却下
         edit = pronoun.normalize_edit(raw_edit)
         if edit is None:
+            guarded += 1
             conn.execute(
                 "INSERT INTO feedback (media_id, kind, before, after, note)"
                 " VALUES (?,'rejection',?,?,?)",
@@ -157,6 +163,7 @@ def run_resolve(
         line_text = lines[edit.line - 1]
         v = pronoun.validate_edit(edit, line_text, level=level, line_range=line_range)
         if not v.ok:
+            guarded += 1
             # 却下理由をfeedbackに残し、次回のfew-shotに使う
             conn.execute(
                 "INSERT INTO feedback (media_id, kind, before, after, note)"
@@ -167,13 +174,16 @@ def run_resolve(
 
         auto = edit.confidence == "auto"
         status = "proposed"
-        if apply_mode == "full_auto" or (apply_mode == "auto_and_review" and auto):
+        # 手で直した行には自動で当てない(手直しを守る)。当てていないのに
+        # 「適用済み」と記録すると取り消しや作り直しが食い違うので、承認待ちに回す
+        can_apply = segment_id not in hand_edited
+        if can_apply and (
+            apply_mode == "full_auto" or (apply_mode == "auto_and_review" and auto)
+        ):
             new_text = pronoun.apply_edit(line_text, edit, form=form)
-            conn.execute(
-                "UPDATE segments SET text=? WHERE id=? AND edited_by_user=0",
-                (new_text, segment_id),
-            )
+            conn.execute("UPDATE segments SET text=? WHERE id=?", (new_text, segment_id))
             status = "applied"
+            applied += 1
         conn.execute(
             "INSERT INTO edits (media_id, segment_id, kind, original, replacement,"
             " referent, status, confidence, created_by)"
@@ -185,3 +195,6 @@ def run_resolve(
 
     conn.commit()
     progress(1.0)
+    return resolve_summary(
+        level=level, found=accepted, applied=applied, guarded=guarded, lines=len(segments)
+    )

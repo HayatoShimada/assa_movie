@@ -27,7 +27,9 @@ const STATUS_STYLE: Record<LicenseStatus['status'], string> = {
 
 /** 状態に応じて出す一言。何をすればいいかだけ書く */
 function guidance(license: LicenseStatus): string | null {
-  if (license.status === 'missing') return 'ライセンスキーを登録してください。'
+  // 未登録による機能制限は実装していない(docs/V1_PLAN.md M26)。
+  // 「登録してください」と書くと、使えないのかと誤解させる
+  if (license.status === 'missing') return '登録は任意です。未登録でもすべての機能を使えます。'
   if (license.status === 'grace') {
     return `猶予期間中です。あと${(license.days_left ?? 0) + 30}日で使えなくなります。更新版のキーをご登録ください。`
   }
@@ -78,7 +80,14 @@ export function LicensePanel() {
         </div>
       )}
       {note && (
-        <p data-testid="license-note" className="mt-2 text-xs text-amber-700 dark:text-amber-400">
+        <p
+          data-testid="license-note"
+          className={`mt-2 text-xs ${
+            current.status === 'missing'
+              ? 'text-neutral-500'
+              : 'text-amber-700 dark:text-amber-400'
+          }`}
+        >
           {note}
         </p>
       )}

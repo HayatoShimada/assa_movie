@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { api } from './api/client'
 import { SetupWizard } from './components/setup/SetupWizard'
 import { Editor } from './pages/Editor'
+import { GlobalSettings } from './pages/GlobalSettings'
 import { Home } from './pages/Home'
 import { useHashRoute } from './hooks/useHashRoute'
 
@@ -14,7 +15,13 @@ export default function App() {
 
   return (
     <>
-      {route.page === 'editor' ? <Editor mediaId={route.mediaId} /> : <Home />}
+      {route.page === 'editor' ? (
+        <Editor mediaId={route.mediaId} />
+      ) : route.page === 'settings' ? (
+        <GlobalSettings />
+      ) : (
+        <Home />
+      )}
       {needsSetup && <SetupWizard />}
     </>
   )

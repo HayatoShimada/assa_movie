@@ -1,107 +1,70 @@
 /**
- * 書き出しタブ: 概要(ブリーフ)の編集・字幕ジャッジ・フィラー検出・クリップ書き出し。
+ * 書き出しタブ: 字幕ジャッジ・フィラー検出と、秒指定の書き出し(詳細)。
+ *
+ * 切り抜きの書き出しはクリップタブが本線。ここにも開始秒/終了秒の書き出し欄が
+ * 並んでいて「どちらで書き出すのか」迷わせていたので、秒指定は「詳細」に畳む。
+ * 動画の概要(ブリーフ)は文字起こしタブの先頭へ移した(components/brief)。
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api } from '../../api/client'
-import { useJobProgress } from '../../hooks/useJobProgress'
-import { Button, ProgressBar, formatTime } from '../ui'
-
-function BriefEditor({ mediaId }: { mediaId: number }) {
-  const queryClient = useQueryClient()
-  const brief = useQuery({
-    queryKey: ['brief', mediaId],
-    queryFn: () =>
-      fetch(`/api/media/${mediaId}/brief`).then(
-        (r) => r.json() as Promise<{ theme: string; people: string; notes: string }>,
-      ),
-  })
-  const save = useMutation({
-    mutationFn: (patch: Record<string, string>) =>
-      fetch(`/api/media/${mediaId}/brief`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...brief.data, ...patch }),
-      }).then((r) => r.json()),
-    onSuccess: (data) => queryClient.setQueryData(['brief', mediaId], data),
-  })
-
-  if (!brief.data) return null
-  const fields = [
-    { key: 'theme', label: '動画全体の主題', placeholder: '例: AIと人の関わりについての対談' },
-    {
-      key: 'people',
-      label: '登場人物の紹介',
-      placeholder: '例: はやまる(古着店「箱ストア」店主)、高田さん(エッセイスト)',
-    },
-    {
-      key: 'notes',
-      label: '固有名詞・補足',
-      placeholder: '例: 「箱ストア」は店名。「富山変人会」は二人が出会ったイベント',
-    },
-  ] as const
-
-  return (
-    <div className="space-y-2 border-b border-neutral-200 p-3 dark:border-neutral-800">
-      <h3 className="text-xs font-semibold text-neutral-500">
-        動画の概要(すべてのAI処理のプロンプトに注入されます)
-      </h3>
-      {fields.map((f) => (
-        <label key={f.key} className="block text-xs">
-          <span className="text-neutral-500">{f.label}</span>
-          <textarea
-            data-testid={`brief-${f.key}`}
-            className="mt-0.5 w-full rounded border border-neutral-300 px-2 py-1 text-sm dark:border-neutral-700 dark:bg-neutral-900"
-            rows={2}
-            defaultValue={brief.data[f.key]}
-            placeholder={f.placeholder}
-            onBlur={(e) => {
-              if (e.target.value !== brief.data[f.key]) save.mutate({ [f.key]: e.target.value })
-            }}
-          />
-        </label>
-      ))}
-      {save.isSuccess && <p className="text-xs text-emerald-600">保存しました</p>}
-    </div>
-  )
-}
+import { useTrackedJob } from '../../hooks/useTrackedJob'
+import { jobSlots } from '../../lib/jobs'
+import { JobStatus } from '../JobStatus'
+import { Button, formatTime } from '../ui'
+import { ExportResult } from './ExportResult'
 
 function JobButton({
   mediaId,
   type,
   label,
+  running: runningLabel,
   params = {},
   onDone,
 }: {
   mediaId: number
   type: string
   label: string
+  /** 実行中の文言 */
+  running: string
   params?: Record<string, unknown>
   onDone?: () => void
 }) {
-  const [jobId, setJobId] = useState<number | null>(null)
-  const progress = useJobProgress(jobId, onDone)
+  // ジョブIDはタブの外に預ける(タブ切替・再読み込みで進捗を失わない)
+  const { progress, busy, start } = useTrackedJob(jobSlots.mediaJob(mediaId, type), onDone)
   const run = useMutation({
     mutationFn: () => api.createJob(mediaId, type, params),
-    onSuccess: (job) => setJobId(job.id),
+    onSuccess: (job) => start(job.id),
   })
-  const running = progress.status === 'running' || progress.status === 'queued'
+  const running = busy || run.isPending
   return (
     <div className="space-y-1">
-      <Button variant="ghost" disabled={running} onClick={() => run.mutate()}>
+      <Button
+        data-testid={`job-${type}`}
+        variant="ghost"
+        disabled={running}
+        onClick={() => run.mutate()}
+      >
         {label}
       </Button>
-      {jobId !== null && progress.status !== 'idle' && (
-        <ProgressBar
-          value={progress.progress}
-          label={progress.status === 'failed' ? `失敗: ${progress.error?.split('\n')[0]}` : undefined}
-        />
-      )}
+      <JobStatus
+        progress={progress}
+        running={runningLabel}
+        done="完了"
+        data-testid={`job-${type}-progress`}
+      />
     </div>
   )
 }
 
-export function ExportTab({ mediaId }: { mediaId: number }) {
+export function ExportTab({
+  mediaId,
+  onGoToClips,
+}: {
+  mediaId: number
+  /** クリップタブへ切り替える(切り抜きの書き出しはそちらが本線) */
+  onGoToClips?: () => void
+}) {
   const queryClient = useQueryClient()
   const media = useQuery({ queryKey: ['mediaItem', mediaId], queryFn: () => api.getMedia(mediaId) })
   const duration = media.data?.duration ?? 60
@@ -109,10 +72,10 @@ export function ExportTab({ mediaId }: { mediaId: number }) {
   const [start, setStart] = useState(0)
   const [end, setEnd] = useState(Math.min(60, Math.round(duration)))
   const [burn, setBurn] = useState(true)
-  const [jobId, setJobId] = useState<number | null>(null)
   const [resultPath, setResultPath] = useState<string | null>(null)
 
-  const progress = useJobProgress(jobId, async (job) => {
+  // ジョブIDはタブの外に預ける(タブ切替・再読み込みで進捗を失わない)
+  const exportJob = useTrackedJob(jobSlots.exportRange(mediaId), async (job) => {
     if (job.status === 'completed') {
       const full = await api.getJob(job.id)
       setResultPath((full.result as { path?: string } | null)?.path ?? null)
@@ -123,10 +86,11 @@ export function ExportTab({ mediaId }: { mediaId: number }) {
       api.createJob(mediaId, 'export', { start, end, burn_subtitles: burn }),
     onSuccess: (job) => {
       setResultPath(null)
-      setJobId(job.id)
+      exportJob.start(job.id)
     },
   })
-  const running = progress.status === 'running' || progress.status === 'queued'
+  const { progress } = exportJob
+  const running = exportJob.busy || exportRun.isPending
   const invalidateAll = () => {
     queryClient.invalidateQueries({ queryKey: ['segments'] })
     queryClient.invalidateQueries({ queryKey: ['edits'] })
@@ -135,7 +99,19 @@ export function ExportTab({ mediaId }: { mediaId: number }) {
 
   return (
     <div className="flex h-full flex-col overflow-y-auto">
-      <BriefEditor mediaId={mediaId} />
+      <div
+        data-testid="export-guide"
+        className="space-y-1 border-b border-neutral-200 p-3 text-sm dark:border-neutral-800"
+      >
+        <p>
+          切り抜き動画は<strong>クリップタブ</strong>で範囲を選んで書き出します。
+        </p>
+        {onGoToClips && (
+          <Button variant="ghost" data-testid="export-go-clips" onClick={onGoToClips}>
+            クリップタブを開く
+          </Button>
+        )}
+      </div>
 
       <div className="space-y-2 border-b border-neutral-200 p-3 dark:border-neutral-800">
         <h3 className="text-xs font-semibold text-neutral-500">AI処理</h3>
@@ -144,19 +120,29 @@ export function ExportTab({ mediaId }: { mediaId: number }) {
             mediaId={mediaId}
             type="filler"
             label="フィラーを検出"
+            running="フィラーを検出中"
             onDone={invalidateAll}
           />
           <JobButton
             mediaId={mediaId}
             type="judge_subtitles"
             label="字幕採用をジャッジ"
+            running="字幕採用をジャッジ中"
             onDone={invalidateAll}
           />
         </div>
       </div>
 
-      <div className="space-y-2 p-3">
-        <h3 className="text-xs font-semibold text-neutral-500">クリップ書き出し</h3>
+      {/* この欄から書き出したことがあれば(タブを切り替えて戻っても)開いておく。
+          進捗と保存先が畳まれて見えなくならないように */}
+      <details
+        data-testid="export-advanced"
+        className="space-y-2 p-3"
+        open={exportJob.jobId !== null ? true : undefined}
+      >
+        <summary className="cursor-pointer text-xs font-semibold text-neutral-500">
+          詳細: 開始秒と終了秒を指定して書き出す
+        </summary>
         <div className="flex items-center gap-2 text-sm">
           <label>
             開始(秒)
@@ -194,24 +180,16 @@ export function ExportTab({ mediaId }: { mediaId: number }) {
         >
           書き出し
         </Button>
-        {jobId !== null && progress.status !== 'idle' && (
-          <ProgressBar
-            value={progress.progress}
-            label={
-              progress.status === 'failed'
-                ? `失敗: ${progress.error?.split('\n')[0]}`
-                : progress.status === 'completed'
-                  ? '書き出し完了'
-                  : `書き出し中... ${Math.round(progress.progress * 100)}%`
-            }
-          />
+        <JobStatus
+          progress={progress}
+          running="書き出し中"
+          done="書き出し完了"
+          data-testid="export-status"
+        />
+        {exportJob.jobId !== null && resultPath && (
+          <ExportResult jobId={exportJob.jobId} path={resultPath} testId="export-result" />
         )}
-        {resultPath && (
-          <p data-testid="export-result" className="break-all text-xs text-emerald-600">
-            出力: {resultPath}
-          </p>
-        )}
-      </div>
+      </details>
     </div>
   )
 }

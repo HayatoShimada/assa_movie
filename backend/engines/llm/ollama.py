@@ -7,6 +7,7 @@ from dataclasses import dataclass
 import requests
 
 from backend.engines.llm.base import LLMError
+from backend.engines.llm.errors import FailureInfo, is_retryable
 
 
 @dataclass
@@ -18,7 +19,7 @@ class OllamaClient:
     name: str = "ollama"
 
     def complete_json(self, system: str, user: str, schema: dict) -> dict:
-        last_error = None
+        last_error: LLMError | None = None
         for _ in range(self.retries):
             try:
                 resp = requests.post(
@@ -36,9 +37,17 @@ class OllamaClient:
                     },
                     timeout=self.timeout,
                 )
-                resp.raise_for_status()
+                if resp.status_code >= 400:
+                    # 404=モデル未インストール、500=メモリ不足など。本文に理由がある
+                    raise LLMError.from_info(
+                        "ollama", self.model,
+                        FailureInfo(status=resp.status_code, body=resp.text[:500]),
+                    )
                 return json.loads(resp.json()["message"]["content"])
             except Exception as e:  # 接続断・JSON不正など。リトライで解消することが多い
-                last_error = e
+                last_error = LLMError.from_exception("ollama", self.model, e)
+                if not is_retryable(last_error.code):
+                    break  # 入っていないモデルは何度呼んでも入っていない
                 time.sleep(2)
-        raise LLMError(f"Ollama呼び出しに{self.retries}回失敗: {last_error}")
+        assert last_error is not None
+        raise last_error

@@ -36,7 +36,10 @@ cd frontend && npm run gen:api   # APIを変えたら型を再生成
 ## 画面構成
 
 ### 1. プロジェクト一覧(ホーム)
-- プロジェクト作成・動画ファイル登録(パス指定 or ドラッグ&ドロップ)
+- プロジェクト作成・動画ファイル登録(パス指定 or ドラッグ&ドロップ)。名前が空なら「作成」は押せない。
+  選んだテンプレートで何が起きるか(切り落とす/ぼかしで埋める)を1行で出す(`templateDescription`)
+- ヘッダーの「全体の設定」から全体の設定(`#/settings`、`pages/GlobalSettings`)を開ける。
+  文字起こし前でも設定を見直せるように。フォームは編集画面の設定タブと同じ
 - 各メディアの処理状態バッジ(未処理/文字起こし中/完了)と進捗バー
 
 ### 2. 編集画面(メイン)
@@ -57,7 +60,10 @@ cd frontend && npm run gen:api   # APIを変えたら型を再生成
 
 #### トランスクリプトタブ
 - セグメントを話者色付きで一覧(仮想スクロール)。クリックで動画シーク、再生位置に追従してハイライト
-- インライン編集(テキスト・話者変更)→ `PATCH /api/segments/{id}`
+- インライン編集: 行のダブルクリックか鉛筆ボタンで本文を直す → `PATCH /api/segments/{id}`。
+  原文は残り、「手直しを取り消す」→ `POST /api/segments/{id}/restore` でいつでも戻せる
+- 話者名を押すと、名前の変更(この動画の全行 → `POST /api/media/{id}/speakers/rename`)と
+  この行だけの付け替え(`PATCH`)ができる
 - 相槌セグメントはグレー表示(設定により非表示/復活切替)。フィラー除去語は取り消し線表示、クリックで復活
 - 指示語置換済みの箇所は下線表示。ホバーで原文をツールチップ表示
 - 選択字幕モード時: 各行に字幕採用バッジ(採用/不採用+根拠タグ)。クリックで切替(→ user_show/user_hide、feedbackに記録)。字幕プレビューは採用分のみ表示
@@ -75,12 +81,14 @@ cd frontend && npm run gen:api   # APIを変えたら型を再生成
 - ヘッダに未回答件数バッジ。カード形式で1問ずつ表示:
   「『反動体』(12回出現)は『半導体』の誤認識と思われます。正式表記は?」
   - 推定候補をボタンで提示(ワンタップ回答)+ 自由入力欄。出現箇所へのジャンプリンク付き
-- 回答すると: 用語集に自動登録 → 全出現箇所を一括修正 → 修正件数をトースト表示
+- 回答すると: 用語集に自動登録+「名前・用語の辞書」に記憶 → 全出現箇所を一括修正 →
+  「N箇所を修正し、「半導体」を辞書に覚えました(次の文字起こしから使います)」と表示
 - 「後で」「この質問を却下」も可能。未回答でも他の作業はブロックされない
 
 #### 対話アシスト(セグメント選択時)
 - トランスクリプトでセグメントを選択 → 「AIに指示」ボタンでミニチャットを開く
 - 例:「この『それ』は文字起こしアプリのこと」→ `POST /api/segments/{id}/assist` → 編集提案カードが返り、承認で適用
+- 提案は承認するまで反映されない。カードに「承認待ち」と承認後の行を出し、応答文も状態どおりにする
 - 会話の結論がルール化できる場合、「カスタム指示に追加しますか?」の昇格提案を表示
 
 #### 切り抜き候補タブ(Phase 2)
@@ -116,12 +124,18 @@ cd frontend && npm run gen:api   # APIを変えたら型を再生成
 画面ごとに出すセクションを選べる。**どのエンジンで動かすかはここに無い**
 (実行環境で確定しているため。`EnvironmentPanel` が表示と再検出を担当する)。
 
-- 文字起こし(`TranscriptionSection`): モデル・話者分離の有無・話者名
+- 文字起こし(`TranscriptionSection`): モデル・名前と用語の辞書を使うか・話者分離の有無・話者名
 - 整形(`TextSection`): フィラー排除・指示語置換(積極性/表現形式/適用モード)
 - 字幕(`SubtitleSection`): 採用率・フォント・サイズ・色・背景・位置・上下微調整・
   話者別色・1行最大文字数
 - レイアウト(`LayoutSection`): 向き変換(中央クロップ/ぼかし余白/顔検出)
-- LLM(`LlmSection`): プロバイダとモデル。未登録のクラウドはその場でキーを登録できる
+- AI(`LlmSection`): プロバイダとモデル。未登録のクラウドはその場でキーを登録できる。
+  Ollamaのモデルはインストール済みを先に並べ、おすすめに印を付ける(`lib/llm.ts`)
+
+項目は「基本」(話者分離・話者名・字幕の見た目・レイアウト・AI)と、折りたたんだ
+「詳しい設定」(文字起こしモデル・辞書の利用・整形・採用率・微調整・1行の文字数)に分け、
+各項目に1行の説明(`Row` の `hint`)を付ける(2026-10 初心者評価。専門用語が説明なしで
+一列に並んでいた)。区分は各セクションが `showTier` で持つ。
 
 設定は3層(グローバル → プロジェクト → クリップ)。プロジェクトはグローバルとの
 **差分だけ**を持つので、上書きしていない項目はグローバルの変更に自動で追従する。
@@ -135,7 +149,14 @@ cd frontend && npm run gen:api   # APIを変えたら型を再生成
   (エンジン名を保存すると、同梱物が増えても追従しなくなる)
 - `SetupPanel`: 足りていないモデルの案内とその場での取得(進捗はSSE)
 - `ApiKeysPanel`: Gemini / Claude のAPIキー登録。平文ファイル+0600で保存する
-- `LicensePanel`: ライセンスキーの登録と状態
+- `UserTermsPanel`: 名前・用語の辞書(全プロジェクト共通)。追加・修正・削除はその場で保存。
+  上限でWhisperに渡らない語には「上限のため今回は使いません」と出す
+- `LicensePanel`: ライセンスキーの登録と状態。未登録による機能制限は無い(V1_PLAN M26)ので、
+  未登録時は「登録は任意です。未登録でもすべての機能を使えます。」と出す
+- `LlmStatusBanner`(ホーム・編集画面の上): 保存済みのAI設定が実際に動くか
+  (`GET /api/llm/status`)を押す前に調べ、モデル未インストール・Ollama未起動・
+  キー未登録なら直し方(おすすめに切り替え・インストール済みから選ぶ・`ollama pull`・
+  キー登録)をその場で出す。黙って別のモデルに切り替えることはしない
 - `OpenSourcePanel`: 同梱物のライセンス表記(LGPLのFFmpegはここに出す義務がある)
 
 ### 3. 字幕プレビューの方式
@@ -151,24 +172,25 @@ cd frontend && npm run gen:api   # APIを変えたら型を再生成
 frontend/
 ├── src/
 │   ├── api/            client.ts(型付きクライアント)+ schema.d.ts(自動生成物)
-│   ├── stores/         Zustand(再生位置・選択セグメント)
+│   ├── stores/         Zustand(再生位置・選択セグメント・画面から始めたジョブID)
 │   ├── components/
 │   │   ├── player/     VideoPlayer(字幕オーバーレイを含む)
-│   │   ├── transcript/ SegmentList, AssistChat
+│   │   ├── transcript/ TranscriptPanel, SegmentList, AssistChat
 │   │   ├── edits/      ReviewTab
 │   │   ├── questions/  QuestionsTab
 │   │   ├── clips/      ClipsTab, ClipTimeline
 │   │   ├── export/     ExportTab
 │   │   ├── project/    CreateProjectForm, ProjectSettingsPanel
 │   │   ├── settings/   SettingsForm, SettingsFields, SaveBar,
-│   │   │               EnvironmentPanel, SetupPanel, ApiKeysPanel,
+│   │   │               EnvironmentPanel, SetupPanel, ApiKeysPanel, UserTermsPanel,
 │   │   │               LicensePanel, OpenSourcePanel
 │   │   ├── setup/      SetupWizard(初回セットアップ)
 │   │   ├── ui.tsx      Button など最小限の共通部品
 │   │   └── icons.tsx
-│   ├── hooks/          useHashRoute, useSplitPane, useJobProgress
-│   ├── lib/            subtitle.ts(折返し・禁則), subtitleLayout.ts
-│   └── pages/          Home, Editor
+│   ├── hooks/          useHashRoute, useSplitPane, useJobProgress, useTrackedJob
+│   ├── lib/            subtitle.ts(折返し・禁則), subtitleLayout.ts, userTerms.ts,
+│   │                   jobs.ts(操作とジョブの対応・進捗の文言)
+│   └── pages/          Home, Editor, GlobalSettings
 ├── e2e/                Playwright
 └── src-tauri/          デスクトップシェル(Rust)。画面は持たない
 ```
@@ -179,6 +201,10 @@ frontend/
 ## 状態管理の設計
 
 - **サーバー状態**(TanStack Query): segments / edits / clips / jobs。SSE進捗イベント受信時に該当queryを無効化して再取得
+- **ジョブの進捗**: ジョブを投げる操作は `useTrackedJob(jobSlots.〜)` を使う。ジョブIDをタブの
+  stateに持つと、タブ切替(アンマウント)や再読み込みで進捗が消え、実行中なのにボタンがまた押せた。
+  IDはストア(`stores/jobs.ts`)に預け、無ければ `GET /api/jobs/active` から拾い直す。
+  表示は `JobStatus` に寄せ、順番待ち・実行中・完了・失敗(バックエンドの文言)・中止を出し分ける
 - **UI状態**(Zustand): 再生位置(60fps更新のためReact re-render外で保持し、購読コンポーネントのみ更新)・選択セグメント・タイムラインズーム・タブ
 - 再生位置とトランスクリプトの同期: `timeupdate` → ストア更新 → 二分探索で現在セグメント特定 → ハイライト&自動スクロール(手動スクロール中は追従を一時停止)
 

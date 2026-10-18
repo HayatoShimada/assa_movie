@@ -1,7 +1,7 @@
 {
   "name": "kirinuki-studio-frontend",
   "private": true,
-  "version": "1.0.1",
+  "version": "2.0.0",
   "type": "module",
   "engines": {
     "node": ">=24.0.0"
@@ -32,6 +32,7 @@
   "dependencies": {
     "@tanstack/react-query": "^5.101.4",
     "@tanstack/react-virtual": "^3.14.9",
+    "budoux": "0.9.3",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "zustand": "^5.0.14"

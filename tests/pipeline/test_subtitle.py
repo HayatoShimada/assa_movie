@@ -12,6 +12,7 @@ from backend.pipeline.subtitle import (
     format_ass_time,
     min_display_duration,
     segments_to_events,
+    wrap_chars,
     wrap_subtitle,
 )
 
@@ -22,15 +23,30 @@ from backend.pipeline.subtitle import (
 # フロント(frontend/src/lib/subtitle.test.ts)が同じ表を読むので、
 # **両実装の見た目が必ず揃う**。以前は手でコピーしており、
 # Python 25件 / TS 15件と気付かないうちに乖離していた
+FIXTURES = Path(__file__).resolve().parents[1] / "fixtures"
 WRAP_CASES = json.loads(
-    (Path(__file__).resolve().parents[1] / "fixtures/subtitle_wrap_cases.json")
-    .read_text(encoding="utf-8")
+    (FIXTURES / "subtitle_wrap_cases.json").read_text(encoding="utf-8")
+)["cases"]
+# 文節(BudouX)で改行する本体のケース表。文字数での折返しは文節が
+# 1行に収まらないときの受け皿になる
+PHRASE_WRAP_CASES = json.loads(
+    (FIXTURES / "subtitle_phrase_wrap_cases.json").read_text(encoding="utf-8")
 )["cases"]
 
 
 @pytest.mark.parametrize("text,max_chars,expected", WRAP_CASES)
+def test_wrap_chars(text, max_chars, expected):
+    assert wrap_chars(text, max_chars) == expected
+
+
+@pytest.mark.parametrize("text,max_chars,expected", PHRASE_WRAP_CASES)
 def test_wrap_subtitle(text, max_chars, expected):
     assert wrap_subtitle(text, max_chars) == expected
+
+
+def test_文節改行は文字を足しも削りもしない():
+    for text, max_chars, _ in PHRASE_WRAP_CASES + WRAP_CASES:
+        assert "".join(wrap_subtitle(text, max_chars)) == text
 
 
 def test_wrap_lines_respect_kinsoku_invariants():

@@ -8,10 +8,12 @@ KirinukiStudio 本体は MIT ライセンスです([LICENSE](LICENSE))。
 
 | コンポーネント | 対象OS | ライセンス | 用途 |
 |---|---|---|---|
-| [FFmpeg](https://ffmpeg.org/) | Windows | LGPL v2.1 | 動画の書き出し・メディア情報の取得 |
+| [FFmpeg](https://ffmpeg.org/) | Windows / macOS | LGPL v2.1 | 動画の書き出し・メディア情報の取得 |
 | [whisper.cpp](https://github.com/ggml-org/whisper.cpp) | Linux / macOS / Windows | MIT | 高速な文字起こし |
 | 話者分離モデル(ONNX) | 全OS | MIT / Apache-2.0 | だれが話しているかの判定 |
 | Python の依存パッケージ | 全OS | MIT / BSD / Apache-2.0 ほか | バックエンド(PyInstallerが取り込む) |
+| [BudouX](https://github.com/google/budoux) | 全OS | Apache-2.0 | 字幕の改行位置(文節の区切り) |
+| 画面の依存パッケージ(React など) | 全OS | MIT / Apache-2.0 | 画面(Viteが1つにまとめる) |
 
 ### FFmpeg (LGPL v2.1)
 
@@ -54,6 +56,24 @@ FFmpeg は本体とリンクしておらず、独立した実行ファイルを�
 `scripts/build_sidecar.sh` から自動実行)。
 
 インストール後は `licenses/python/THIRD-PARTY-NOTICES.txt` に入ります。
+
+### BudouX (Apache-2.0)
+
+字幕の改行位置(文節の区切り)を決めるのに、Google の
+[BudouX](https://github.com/google/budoux) を使っています。
+バックエンド(書き出しの焼き込み)は Python 版、画面のプレビューは JavaScript 版で、
+両者の改行を一致させるため同じバージョンに固定しています。
+Python 版の表記(Apache-2.0 の本文を含む)は上の `THIRD-PARTY-NOTICES.txt` に入ります。
+
+### 画面(JavaScript)の依存パッケージ
+
+画面は React などを1つのファイルにまとめてアプリに組み込んでいます。
+圧縮すると各ファイルの `@license` コメントが消えるため、ビルド時に
+Vite が組み込んだ依存の一覧と本文を
+`licenses/javascript-THIRD-PARTY-NOTICES.md` に書き出し、画面と一緒に同梱します
+(`frontend/vite.config.ts` の `build.license`)。
+BudouX の npm パッケージには本文が入っていないため一覧には名前だけが載りますが、
+本文は Python 版の表記に含まれる同じ Apache-2.0 です。
 
 ### whisper.cpp (MIT)
 
@@ -102,6 +122,6 @@ uv run --no-project python scripts/fetch_diarization_models.py   # 話者分離�
 
 ## 残っているもの
 
-- macOS版・AppImage版の ffmpeg 同梱(現在はWindows版のみ)。
-  macOSは `brew install ffmpeg`、`.deb` はパッケージの依存で解決。
-  AppImage だけは自動で入る経路が無いため、書き出し時に導入手順を案内している
+- AppImage版の ffmpeg 同梱(Windows版・macOS版は同梱済み)。
+  `.deb` はパッケージの依存で解決している。AppImage だけは自動で入る経路が
+  無いため、書き出し時に導入手順を案内している

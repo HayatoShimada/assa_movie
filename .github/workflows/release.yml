@@ -227,11 +227,17 @@ jobs:
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          if [ -z "$APPLE_CERTIFICATE" ]; then
-            echo "::warning::署名用Secretsが無いので無署名でビルドします(利用者にxattrでの回避が必要)"
+          # 空のまま渡すとTauriが「署名しようとして失敗」する。揃ったときだけ出す
+          # (証明書だけ見ていた頃は、APPLE_ID等が欠けていると空で渡して落ちた)
+          missing=""
+          for name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY \
+                      APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+            [ -n "${!name}" ] || missing="$missing $name"
+          done
+          if [ -n "$missing" ]; then
+            echo "::warning::署名用Secretsが揃っていない($missing)ので無署名でビルドします(利用者にxattrでの回避が必要)"
             exit 0
           fi
-          # 空のまま渡すとTauriが「署名しようとして失敗」する。揃ったときだけ出す。
           # 証明書のbase64は改行を含みうるのでヒアドキュメント形式で書く
           for name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY \
                       APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do

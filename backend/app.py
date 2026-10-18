@@ -2,8 +2,9 @@
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from backend.api import assist as assist_api
 from backend.api import clips as clips_api
@@ -15,8 +16,11 @@ from backend.api import projects as projects_api
 from backend.api import questions as questions_api
 from backend.api import settings_api
 from backend.api import transcripts as transcripts_api
+from backend.api import user_terms as user_terms_api
 from backend.core import hwprofile, paths, project_settings
 from backend.core.config import settings
+from backend.engines.llm.base import LLMError
+from backend.engines.llm.errors import http_status as llm_http_status
 from backend.jobs import attention_job  # noqa: F401  ジョブハンドラの登録に必要
 from backend.jobs import export_job  # noqa: F401
 from backend.jobs import filler_job  # noqa: F401
@@ -58,6 +62,13 @@ def _report_startup_checks() -> None:
         print(
             f"⚠ 環境変数の接頭辞が KS_ に変わりました。{', '.join(legacy)} は無視されます。"
         )
+
+    # 字幕の文節モデル(BudouX)はJSONファイルから読む。配布版でPyInstallerが
+    # 取りこぼすと書き出しの瞬間まで気付けないので、起動時に読んで落とす
+    # (実機検証 scripts/verify_unix.sh / verify_windows.ps1 がここで気付く)
+    from backend.pipeline.subtitle import wrap_subtitle
+
+    wrap_subtitle("起動時の確認です", 4)
 
     encoder = detect_encoder()  # ffmpeg -encoders の実行のみ(実測33ms)
     if encoder is None:
@@ -105,6 +116,20 @@ app.include_router(assist_api.router)
 app.include_router(clips_api.router)
 app.include_router(license_api.router)
 app.include_router(keys_api.router)
+app.include_router(user_terms_api.router)
+
+
+@app.exception_handler(LLMError)
+async def _llm_error_handler(request: Request, exc: LLMError) -> JSONResponse:
+    """AIの失敗を「500 Internal Server Error」で返さない。
+
+    detail は利用者向けの文言(直し方付き)、code は失敗の分類
+    (backend/engines/llm/errors.py)。AIに指示(assist)などHTTPで直接AIを呼ぶAPI用
+    """
+    return JSONResponse(
+        status_code=llm_http_status(exc.code),
+        content={"detail": str(exc), "code": exc.code},
+    )
 
 
 @app.get("/api/health")

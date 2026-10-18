@@ -68,13 +68,13 @@ def _blur_pad_filter(out_w: int, out_h: int) -> str:
     背景のぼかしは gblur(ガウスぼかし)を使う。boxblur はffmpegの
     GPL専用フィルタで、同梱しているLGPLビルドには入っていない
     (指定すると `No such filter: 'boxblur'` で書き出しが落ちる。実測)。
-    gblur は LGPL で同じ用途に使える。sigma=20 が boxblur の
-    luma_radius=40:luma_power=2 とおおよそ同じ見た目。
+    gblur は LGPL で同じ用途に使える。sigma=33 が boxblur の
+    luma_radius=40:luma_power=2 と同じぼけ具合(幅81の箱型2回分の分散から換算)。
     """
     return (
         "[0:v]split[bg][fg];"
         f"[bg]scale={out_w}:{out_h}:force_original_aspect_ratio=increase,"
-        f"crop={out_w}:{out_h},gblur=sigma=20[bgb];"
+        f"crop={out_w}:{out_h},gblur=sigma=33[bgb];"
         f"[fg]scale={out_w}:{out_h}:force_original_aspect_ratio=decrease[fgs];"
         "[bgb][fgs]overlay=(W-w)/2:(H-h)/2[vlay]"
     )

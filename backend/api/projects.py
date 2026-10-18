@@ -1,5 +1,6 @@
 """プロジェクトとメディアの登録API。"""
 
+import contextlib
 import shutil
 import sqlite3
 import uuid
@@ -11,7 +12,7 @@ from pydantic import BaseModel
 
 from backend.api.deps import get_db, get_jobs
 from backend.core.config import settings
-from backend.core.project_settings import PROJECT_OVERRIDABLE
+from backend.core.project_settings import PROJECT_OVERRIDABLE, with_orientation_defaults
 from backend.models.dto import Media, MediaCreate, Project, ProjectCreate, ProjectUpdate
 
 router = APIRouter(prefix="/api", tags=["projects"])
@@ -44,7 +45,10 @@ def create_project(body: ProjectCreate, db: sqlite3.Connection = Depends(get_db)
         "INSERT INTO projects (name, input_orientation, output_orientation, settings_json)"
         " VALUES (?,?,?,?)",
         (body.name, body.input_orientation, body.output_orientation,
-         _validate_project_settings(body.settings)),
+         # 縦向きのテンプレートは字幕を縦動画向けの値で始める(既定値は差分として保存)
+         _validate_project_settings(
+             with_orientation_defaults(body.settings, body.output_orientation)
+         )),
     )
     db.commit()
     row = db.execute("SELECT * FROM projects WHERE id=?", (cur.lastrowid,)).fetchone()
@@ -79,8 +83,20 @@ def update_project(
         updates.append(("input_orientation", body.input_orientation))
     if body.output_orientation is not None:
         updates.append(("output_orientation", body.output_orientation))
-    if body.settings is not None:
-        updates.append(("settings_json", _validate_project_settings(body.settings)))
+    new_settings = body.settings
+    if (
+        body.output_orientation is not None
+        and body.output_orientation != row["output_orientation"]
+    ):
+        # テンプレートを切り替えたときだけ、新しい向きの既定値を織り込む。
+        # 名前の変更などでは保存値に触らない
+        new_settings = with_orientation_defaults(
+            body.settings if body.settings is not None else _to_project(row).settings,
+            body.output_orientation,
+            row["output_orientation"],
+        )
+    if new_settings is not None:
+        updates.append(("settings_json", _validate_project_settings(new_settings)))
     if updates:
         sets = ", ".join(f"{k}=?" for k, _ in updates)
         db.execute(
@@ -120,10 +136,23 @@ def delete_project(
 
     db.execute("DELETE FROM projects WHERE id=?", (project_id,))
     db.commit()
-    # アップロードされた実ファイルも掃除する(外部パス登録のメディアは消さない)
+    # アップロードされた実ファイルも掃除する(外部パス登録のメディアは消さない)。
+    # ただし書き出した切り抜き(exports/)は完成品なので残す。丸ごと消していた頃は
+    # 「一覧を片付けたら完成品も消えた」になっていた
     upload_dir = settings.db_path.parent / "uploads" / f"project_{project_id}"
     if upload_dir.exists():
-        shutil.rmtree(upload_dir, ignore_errors=True)
+        for entry in upload_dir.iterdir():
+            if entry.name == "exports" and entry.is_dir() and any(entry.iterdir()):
+                continue
+            if entry.is_dir():
+                shutil.rmtree(entry, ignore_errors=True)
+            else:
+                # Windowsで掴まれたままのファイルは消せない。rmtree同様に黙って残す
+                with contextlib.suppress(OSError):
+                    entry.unlink(missing_ok=True)
+        with contextlib.suppress(OSError):
+            if not any(upload_dir.iterdir()):
+                upload_dir.rmdir()
     return {"deleted": project_id}
 
 

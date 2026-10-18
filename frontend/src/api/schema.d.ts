@@ -178,6 +178,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/jobs/active": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Active Jobs
+         * @description 待機中・実行中のジョブ(メディアに紐づかないセットアップも含む)。
+         *
+         *     画面はジョブIDをタブのstateに持つので、タブ切替や再読み込みで失う。
+         *     処理中の進捗表示と二重実行の防止を保つため、画面はここから取り直す。
+         *     同時に動くジョブは数件なので、メディアでは絞らず全部返す
+         */
+        get: operations["list_active_jobs_api_jobs_active_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/jobs/{job_id}": {
         parameters: {
             query?: never;
@@ -204,6 +228,49 @@ export interface paths {
         };
         /** Job Progress Events */
         get: operations["job_progress_events_api_jobs__job_id__events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/{job_id}/reveal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reveal Export
+         * @description 書き出したファイルのあるフォルダをOSのファイラーで開く。
+         *
+         *     デスクトップ版(Tauri)でもブラウザの開発版でも同じように動くよう、
+         *     バックエンドが開く(Linux=xdg-open / macOS=open -R / Windows=explorer)。
+         */
+        post: operations["reveal_export_api_jobs__job_id__reveal_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/{job_id}/output": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Export Output
+         * @description 書き出した動画そのもの(画面内で再生して確かめる用。Range対応はFileResponse任せ)
+         */
+        get: operations["get_export_output_api_jobs__job_id__output_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -246,6 +313,53 @@ export interface paths {
         patch: operations["update_segment_api_segments__segment_id__patch"];
         trace?: never;
     };
+    "/api/segments/{segment_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore Segment
+         * @description 手直しを取り消す。原文に、承認済みのAIの修正だけを当てた本文に戻す。
+         *
+         *     手直しした文に対して承認した編集は、原文には当てる場所が無いので取り消し扱いにする
+         *     (適用済みのまま残すと、レビュー画面の表示と本文が食い違う)。
+         */
+        post: operations["restore_segment_api_segments__segment_id__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/media/{media_id}/speakers/rename": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rename Speaker
+         * @description この動画の話者名を変える(その話者の全行)。
+         *
+         *     話者名は文字起こしのときに行ごとに付く(segments.speaker)ので、変える単位は動画。
+         *     既にいる別の話者の名前にはしない。2人が混ざると元に戻せなくなるため
+         *     (同じ人だったなら、行ごとの付け替えを使う)。
+         */
+        post: operations["rename_speaker_api_media__media_id__speakers_rename_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/environment": {
         parameters: {
             query?: never;
@@ -258,6 +372,26 @@ export interface paths {
          * @description 確定済みプロファイルと、VRAMに収まるASR/LLMモデルの推奨(設定タブの環境パネル用)
          */
         get: operations["get_environment_api_environment_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/llm/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Llm Status
+         * @description AI機能を押す前に、設定どおりのAIが使えるかを調べる(ホーム/編集画面の警告用)
+         */
+        get: operations["get_llm_status_api_llm_status_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -720,6 +854,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/user-terms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List User Terms */
+        get: operations["list_user_terms_api_user_terms_get"];
+        put?: never;
+        /**
+         * Create User Term
+         * @description 語を足す。すでにあれば1件にまとめる(確認回数を足す)
+         */
+        post: operations["create_user_term_api_user_terms_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/user-terms/{term_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete User Term */
+        delete: operations["delete_user_term_api_user_terms__term_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update User Term */
+        patch: operations["update_user_term_api_user_terms__term_id__patch"];
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -746,6 +919,33 @@ export interface components {
             /** Text */
             text: string;
         };
+        /** AssistEdit */
+        AssistEdit: {
+            /** Id */
+            id: number;
+            /** Media Id */
+            media_id: number;
+            /** Segment Id */
+            segment_id: number;
+            /** Kind */
+            kind: string;
+            /** Original */
+            original: string;
+            /** Replacement */
+            replacement: string;
+            /** Referent */
+            referent?: string | null;
+            /** Status */
+            status: string;
+            /** Confidence */
+            confidence: string;
+            /** Created By */
+            created_by: string;
+            /** Created At */
+            created_at: string;
+            /** After Text */
+            after_text: string;
+        };
         /** AssistRequest */
         AssistRequest: {
             /** Message */
@@ -756,7 +956,7 @@ export interface components {
             /** Reply */
             reply: string;
             /** Edits */
-            edits: components["schemas"]["Edit"][];
+            edits: components["schemas"]["AssistEdit"][];
             /** Instruction Suggestion */
             instruction_suggestion?: string | null;
         };
@@ -950,6 +1150,10 @@ export interface components {
             result?: {
                 [key: string]: unknown;
             } | null;
+            /** Params */
+            params?: {
+                [key: string]: unknown;
+            } | null;
             /** Created At */
             created_at: string;
         };
@@ -974,6 +1178,41 @@ export interface components {
         LicenseRegistration: {
             /** Key */
             key: string;
+        };
+        /**
+         * LlmStatus
+         * @description 保存済みのAI設定で、AI機能が実際に動くか
+         */
+        LlmStatus: {
+            /** Ok */
+            ok: boolean;
+            /** Code */
+            code?: string | null;
+            /**
+             * Message
+             * @default
+             */
+            message: string;
+            /** Provider */
+            provider: string;
+            /** Provider Label */
+            provider_label: string;
+            /** Model */
+            model: string;
+            /**
+             * Installed Models
+             * @default []
+             */
+            installed_models: string[];
+            /** Recommended Model */
+            recommended_model?: string | null;
+            /** Pull Command */
+            pull_command?: string | null;
+            /**
+             * Overridden By Project
+             * @default false
+             */
+            overridden_by_project: boolean;
         };
         /** Media */
         Media: {
@@ -1090,6 +1329,11 @@ export interface components {
             /** Created At */
             created_at: string;
         };
+        /** RevealResult */
+        RevealResult: {
+            /** Folder */
+            folder: string;
+        };
         /** Segment */
         Segment: {
             /** Id */
@@ -1147,6 +1391,8 @@ export interface components {
             asr_language?: string | null;
             /** Asr Model */
             asr_model?: string | null;
+            /** Asr Use User Terms */
+            asr_use_user_terms?: boolean | null;
             /** Asr Vad Filter */
             asr_vad_filter?: boolean | null;
             /** Claude Model */
@@ -1199,6 +1445,54 @@ export interface components {
             subtitle_speaker_colors?: boolean | null;
             /** Subtitle Text Color */
             subtitle_text_color?: string | null;
+        };
+        /** SpeakerRename */
+        SpeakerRename: {
+            /** Current */
+            current: string;
+            /** New */
+            new: string;
+        };
+        /** SpeakerRenameResult */
+        SpeakerRenameResult: {
+            /** Changed */
+            changed: number;
+        };
+        /** UserTerm */
+        UserTerm: {
+            /** Id */
+            id: number;
+            /** Term */
+            term: string;
+            /** Misrecognitions */
+            misrecognitions: string[];
+            /** Hits */
+            hits: number;
+            /** Source */
+            source: string;
+            /** Created At */
+            created_at: string;
+            /** Updated At */
+            updated_at: string;
+            /** Used For Asr */
+            used_for_asr: boolean;
+        };
+        /** UserTermCreate */
+        UserTermCreate: {
+            /** Term */
+            term: string;
+            /**
+             * Misrecognitions
+             * @default []
+             */
+            misrecognitions: string[];
+        };
+        /** UserTermUpdate */
+        UserTermUpdate: {
+            /** Term */
+            term?: string | null;
+            /** Misrecognitions */
+            misrecognitions?: string[] | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -1676,6 +1970,26 @@ export interface operations {
             };
         };
     };
+    list_active_jobs_api_jobs_active_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Job"][];
+                };
+            };
+        };
+    };
     get_job_api_jobs__job_id__get: {
         parameters: {
             query?: never;
@@ -1708,6 +2022,68 @@ export interface operations {
         };
     };
     job_progress_events_api_jobs__job_id__events_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reveal_export_api_jobs__job_id__reveal_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevealResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_export_output_api_jobs__job_id__output_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -1806,6 +2182,72 @@ export interface operations {
             };
         };
     };
+    restore_segment_api_segments__segment_id__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                segment_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Segment"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rename_speaker_api_media__media_id__speakers_rename_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                media_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SpeakerRename"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpeakerRenameResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_environment_api_environment_get: {
         parameters: {
             query?: never;
@@ -1824,6 +2266,37 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    get_llm_status_api_llm_status_get: {
+        parameters: {
+            query?: {
+                project_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LlmStatus"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -2811,6 +3284,127 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_user_terms_api_user_terms_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserTerm"][];
+                };
+            };
+        };
+    };
+    create_user_term_api_user_terms_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserTermCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserTerm"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_user_term_api_user_terms__term_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                term_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_user_term_api_user_terms__term_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                term_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserTermUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserTerm"];
                 };
             };
             /** @description Validation Error */

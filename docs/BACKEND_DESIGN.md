@@ -48,6 +48,8 @@ backend/
 │       ├── base.py         # LLMClient抽象 + FakeLLMClient(テスト用)
 │       ├── ollama.py       # ローカル(qwen3:32b等)
 │       ├── gemini.py       # クラウド(Gemini API)
+│       ├── errors.py       # 失敗→利用者向けの日本語+直し方(純関数)。HTTPは503/504/502で返す
+│       ├── status.py       # 保存済み設定でAIが動くかの事前診断(GET /api/llm/status)
 │       └── registry.py     # プロバイダ選択
 ├── pipeline/
 │   ├── audio.py            # PyAVデコード(16kHz mono)・silero-VAD
@@ -186,8 +188,10 @@ LLMへのプロンプトは毎回、次の順で合成する:
 + 処理対象チャンク
 ```
 
-- **用語集はASRにも共用する**: Whisper系の `initial_prompt` / ホットワードに用語を渡し、
-  固有名詞の文字起こし精度も同じデータで改善する(一度の入力が全工程に効く)
+- **ASRには利用者の辞書を渡す**: 質問への回答は用語集と同時に「名前・用語の辞書」
+  (`user_terms`、全プロジェクト共通)にも入り、次の文字起こしでWhisperの初期プロンプト
+  (whisper.cppは `--prompt`、faster-whisperは `initial_prompt`)に渡る。
+  用語集そのものはASRに渡さない(下の「利用者の辞書」)
 - カスタム指示は有効/無効を個別に切替可能(効果の切り分けができるように)
 
 ### 2. 提案 → レビュー → 適用のサイクル(実行後)
@@ -219,7 +223,28 @@ LLMへのプロンプトは毎回、次の順で合成する:
 - **指示語の質問**: 解決の確信が持てないがユーザーに聞けば分かりそうな場合、editの代わりに
   質問を出せる(「この『あの話』は何を指しますか?」+ 該当箇所へのジャンプリンク)
 - 回答の処理: 固有名詞 → 用語集に登録 + 全出現箇所を一括修正(edits kind='term') +
-  以後のASR initial_prompt に反映(再文字起こしでも正しくなる)。指示語 → 編集として適用
+  利用者の辞書に記憶(以後の文字起こしの初期プロンプトに反映。別プロジェクトでも効く)。
+  指示語 → 編集として適用
+- 辞書にある「以前の聞き間違い」が新しい動画に出ていれば、スキャン時にAIを呼ぶ前に
+  質問にする(候補は辞書の表記)。辞書で確定済みの表記はAIが挙げても質問にしない
+
+### 6. 利用者の辞書(名前・用語)
+質問タブで答えた固有名詞の正しい表記を、プロジェクトや動画をまたいで覚える
+(`backend/core/user_terms.py`、API `/api/user-terms`、設定タブ「名前・用語の辞書」)。
+
+- 1語1行。NFKC・空白を揃えて同じなら1件にまとめ、確認回数(hits)を足す
+- 並び順 = Whisperに渡す優先順(確認回数 → 新しさ)
+- 初期プロンプトの組み立ては純関数(`engines/asr/prompt.py`)。形は従来どおり
+  `文体例 語1、語2、…。`。**辞書が空なら辞書導入前と一字一句同じ**になる
+- **上限**: Whisperがプロンプトに使えるのは直近223トークン(超過分は先頭から捨てられる)。
+  トークナイザはGPU機(whisper.cpp)ではPythonから読めないので、
+  「ASCIIと頻出の日本語1083字は1、その他のかなは2、残りはUTF-8のバイト数」で
+  実際より少なく見積もらない値を出し、収まる分だけ優先順に詰める(最大30語)。
+  実測(large-v3)の1.1〜1.3倍の見積もりになる。手元にtokenizer.jsonがあれば
+  テストで本物と突き合わせる
+- hotwords(faster-whisper)と `--carry-initial-prompt`(whisper.cpp)は使わない
+  (理由は DESIGN.md 2026-10-17)
+- 設定 `asr_use_user_terms`(既定ON・プロジェクト単位で上書き可)で使わないようにできる
 - 質問はまとめて表示し、後回し・却下も可能。未回答でもパイプラインは止めない(非ブロッキング)
 
 ### 5. 対話を挟む場所(プロセス設計)
@@ -246,7 +271,10 @@ edits(id, media_id, segment_id, kind='pronoun', original, replacement,
       confidence='auto|review', created_by='llm|user')
 llm_instructions(id, project_id, media_id?, scope='pronoun|asr|attention|all',
                  text, enabled, created_at)
-glossary(id, project_id, term, reading?, description)   -- ASRのinitial_promptにも共用
+glossary(id, project_id, term, reading?, description)   -- LLMのプロンプト用(指示語置換など)
+user_terms(id, term UNIQUE, misrecognitions_json, hits,   -- 利用者の辞書(全プロジェクト共通)
+           source='question|manual|glossary',            -- ASRの初期プロンプトに渡す
+           created_at, updated_at)
 feedback(id, media_id, edit_id?, kind='rejection|correction|instruction',
          before, after?, note?, created_at)             -- 次回実行のfew-shot例
 questions(id, media_id, kind='term|pronoun', target_json,  -- 対象語/セグメントID
@@ -262,6 +290,13 @@ jobs(id, media_id, type, params_json, status, progress, error, created_at)
 ```
 
 - `original_text` を必ず保持(指示語置換・ユーザー編集後も原文に戻せる)
+- 本文の組み立ては `pipeline/segment_text.py`(純関数)。手直しの無い行は「原文+適用済みの編集」から
+  作り直す(term は置き換え、filler は本文を変えない)。手直しした行は作り直すと手直しが消えるので、
+  取り消す編集の部分だけを戻す。手直しした行には resolve の自動適用をせず承認待ちに回す
+- 話者名は文字起こし時に `male_name`/`female_name`(声の高さで判定できた2人のときだけ)で付き、
+  以後は動画単位の rename と行ごとの付け替えで変える
+- 対話アシストの応答文は LLM の返事ではなく、承認待ちの案の件数・安全確認の結果から機械側で作る
+  (`pipeline/assist_reply.py`。LLMは「変更しました」と返しがちだが、承認するまで何も変わらない)
 - 指示語置換は `edits` に記録 → 置換ログUIと取り消しがそのまま実現できる
 
 ## API(抜粋)
@@ -272,7 +307,9 @@ POST /api/projects/{id}/media             動画登録(パス指定)
 POST /api/media/{id}/jobs                 {type: transcribe|resolve|export, params}
 GET  /api/jobs/{id}/events                SSE進捗
 GET  /api/media/{id}/segments             セグメント一覧(UI表示・編集)
-PATCH /api/segments/{id}                  テキスト・話者の手動修正
+PATCH /api/segments/{id}                  テキスト・話者の手動修正(本文を直すと edited_by_user=1)
+POST /api/segments/{id}/restore           手直しを取り消す(原文+承認済みの編集に戻す)
+POST /api/media/{id}/speakers/rename      この動画の話者名を変える {current, new}(既にいる名前には不可)
 GET  /api/media/{id}/edits?status=        置換の提案/適用済み一覧
 POST /api/edits/{id}/accept               提案の承認(修正付き承認は body で replacement 上書き)
 POST /api/edits/{id}/reject               提案の却下(理由付き → feedbackに記録)
@@ -283,7 +320,11 @@ POST /api/media/{id}/jobs                 type=resolve, params={level, scope: al
 POST /api/segments/{id}/assist            対話アシスト {message} → 編集提案を返す(SSE)
 POST /api/media/{id}/jobs                 type=extract_terms(固有名詞スキャン→質問生成)
 GET  /api/media/{id}/questions?status=    LLMからの質問一覧
-POST /api/questions/{id}/answer           回答 {text} → 用語集登録+一括修正を実行
+POST /api/questions/{id}/answer           回答 {text} → 用語集登録+辞書に記憶+一括修正を実行
+GET  /api/user-terms                      利用者の辞書(優先順。各語がWhisperに渡るか used_for_asr 付き)
+POST /api/user-terms                      語を追加 {term, misrecognitions?}(同じ語は1件にまとめる)
+PATCH /api/user-terms/{id}                表記・以前の聞き間違いを修正(既にある語にすると409)
+DELETE /api/user-terms/{id}               語を削除
 POST /api/questions/{id}/dismiss          質問の却下
 POST /api/media/{id}/clips/suggest        切り抜き候補生成 {target_duration?, theme?}
 POST /api/clips/{id}/jetcut               中抜き提案(無音・相槌・脱線)を生成

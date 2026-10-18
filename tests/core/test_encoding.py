@@ -96,8 +96,9 @@ def test_bytesで読むなら対象外():
 # バイナリ(read_bytes/write_bytes)は対象外。
 REPO = Path(__file__).resolve().parents[2]
 TEXT_IO_METHODS = {"read_text", "write_text"}
-# 生成物・外部コードは見ない
-SKIP_DIRS = {".venv", "build", "node_modules", "__pycache__", ".git", "frontend"}
+# 生成物・外部コードは見ない。.claude/ はAIエージェントの作業コピー(git worktree)が
+# 置かれる場所で、同じコードを重複して数えてしまう
+SKIP_DIRS = {".venv", "build", "node_modules", "__pycache__", ".git", "frontend", ".claude"}
 
 
 def _text_io_without_encoding(tree: ast.AST) -> list[int]:

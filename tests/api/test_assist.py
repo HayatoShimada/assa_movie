@@ -87,3 +87,69 @@ def test_assist_blocks_invalid_edit_with_guard(client, seg_ids):
 
 def test_assist_unknown_segment_404(client):
     assert client.post("/api/segments/999/assist", json={"message": "x"}).status_code == 404
+
+
+# ---- 応答文は実際の状態どおりにする(LLMの「変更しました」を信じない) ----
+def test_assist_reply_says_proposal_is_pending_even_if_llm_claims_done(client, seg_ids):
+    use_fake([{
+        "reply": "『それ』をハッカソンに変更しました。",
+        "edits": [{"original": "それ", "replacement": "去年のハッカソン",
+                   "referent": "去年のハッカソン"}],
+    }])
+    body = client.post(f"/api/segments/{seg_ids['ids'][1]}/assist",
+                       json={"message": "このそれはハッカソンのこと"}).json()
+    assert "変更しました" not in body["reply"]
+    assert "案を作りました" in body["reply"]
+    assert "まだ反映していません" in body["reply"]
+    # 承認したときに行がどうなるかを、そのまま見せられるように返す
+    assert body["edits"][0]["after_text"] == "はやまる: それ(去年のハッカソン)がすごく良くて"
+    # まだ何も変わっていない
+    segs = client.get(f"/api/media/{seg_ids['media_id']}/segments").json()
+    assert segs[1]["text"] == TEXTS[1]
+
+
+def test_assist_reply_when_guard_rejects_everything(client, seg_ids):
+    use_fake([{
+        "reply": "消しておきました。",
+        "edits": [{"original": "それ", "replacement": "そ", "referent": ""}],
+    }])
+    body = client.post(f"/api/segments/{seg_ids['ids'][1]}/assist", json={"message": "..."}).json()
+    assert "この行は変わっていません" in body["reply"]
+    assert "消しておきました" not in body["reply"]
+
+
+def test_assist_reply_for_plain_question_includes_ai_answer(client, seg_ids):
+    use_fake([{"reply": "この『それ』はハッカソンを指しています。", "edits": []}])
+    body = client.post(f"/api/segments/{seg_ids['ids'][1]}/assist", json={"message": "?"}).json()
+    assert body["reply"].startswith("この行は変わっていません。")
+    assert "ハッカソンを指しています" in body["reply"]
+
+
+# ---- AIが使えないときの伝え方 ----
+def test_AIの失敗は500ではなく日本語の直し方を返す(client, seg_ids):
+    """以前は「API 500: Internal Server Error」とだけ出て、何をすればよいか分からなかった"""
+    from backend.engines.llm.base import LLMError
+
+    use_fake([LLMError.from_failure(
+        "ollama", "qwen3:32b", status=404, body='{"error":"model \\"qwen3:32b\\" not found"}'
+    )])
+    r = client.post(f"/api/segments/{seg_ids['ids'][1]}/assist", json={"message": "x"})
+    assert r.status_code == 503
+    body = r.json()
+    assert "qwen3:32b" in body["detail"]
+    assert "ollama pull qwen3:32b" in body["detail"]
+    assert body["code"] == "model_not_installed"
+
+
+def test_キー未登録のクラウドAIは登録を促す(client, seg_ids, monkeypatch, tmp_path):
+    from backend.core.config import settings
+    from backend.jobs import resolve_job
+
+    resolve_job.set_client_factory(None)  # 実際の組み立て(build_client)を通す
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    client.patch("/api/settings", json={"llm_provider": "gemini"})
+    settings.gemini_key_file = tmp_path / "none.txt"
+    r = client.post(f"/api/segments/{seg_ids['ids'][1]}/assist", json={"message": "x"})
+    assert r.status_code == 503
+    assert "APIキー" in r.json()["detail"]
+    assert r.json()["code"] == "no_key"

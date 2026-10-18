@@ -29,6 +29,34 @@ export const TEMPLATES: Template[] = [
   { id: 'p2l', label: '縦 → 横', input: 'portrait', output: 'landscape' },
 ]
 
+const ORIENTATION_NAME: Record<Orientation, string> = {
+  landscape: '横長(1920×1080)',
+  portrait: '縦長(1080×1920)',
+}
+
+/**
+ * 選んだテンプレートで何が起きるかの1行説明(作成フォームに出す)。
+ *
+ * 向きを変えるときの「収まらない部分の扱い」は変換方式(convert_method)で決まるので、
+ * いま効いている方式を受け取って書く。書き出し側の実装は backend/pipeline/layout.py
+ */
+export function templateDescription(t: Template, method: ConvertMethod): string {
+  const from = t.input === 'landscape' ? '横長' : '縦長'
+  if (t.input === t.output) {
+    return `${from}の動画を、そのまま${ORIENTATION_NAME[t.output]}で書き出します。`
+  }
+  const head = `${from}の動画から${ORIENTATION_NAME[t.output]}の切り抜きを作ります。`
+  // 横→縦は左右がはみ出し上下が余る。縦→横はその逆
+  const cut = t.output === 'portrait' ? '左右' : '上下'
+  const pad = t.output === 'portrait' ? '上下' : '左右'
+  const how: Record<ConvertMethod, string> = {
+    crop: `${cut}を切り落とします(残す位置はクリップごとに調整できます)。`,
+    blur_pad: `映像は切らずに全体を表示し、${pad}の余白をぼかした映像で埋めます。`,
+    face: '顔を検出し、1人なら顔に合わせて切り出し、2人なら上下に並べます(見つからなければぼかし背景)。',
+  }
+  return head + (how[method] ?? '')
+}
+
 export function templateFor(project: Pick<Project, 'input_orientation' | 'output_orientation'>) {
   return TEMPLATES.find(
     (t) => t.input === project.input_orientation && t.output === project.output_orientation,

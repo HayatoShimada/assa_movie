@@ -14,6 +14,7 @@ import requests
 
 from backend.core import keyfile
 from backend.engines.llm.base import LLMError
+from backend.engines.llm.errors import FailureInfo, is_retryable
 
 API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 DEFAULT_MODEL = "gemini-3.5-flash"
@@ -93,7 +94,7 @@ class GeminiClient:
             },
         }
 
-        last_error = None
+        last_error: LLMError | None = None
         for attempt in range(self.retries):
             try:
                 resp = self._session.post(
@@ -101,13 +102,19 @@ class GeminiClient:
                     headers={"x-goog-api-key": self.api_key},
                     timeout=self.timeout,
                 )
-                if resp.status_code in (429, 500, 502, 503):
-                    raise LLMError(f"一時的なエラー {resp.status_code}: {resp.text[:200]}")
-                resp.raise_for_status()
+                if resp.status_code >= 400:
+                    # 429/5xxは一時的、400/401/403(キー不正)・404(モデル名違い)は再試行しない
+                    raise LLMError.from_info(
+                        "gemini", self.model,
+                        FailureInfo(status=resp.status_code, body=resp.text[:500]),
+                    )
                 data = resp.json()
                 text = data["candidates"][0]["content"]["parts"][0]["text"]
                 return json.loads(text)
             except Exception as e:
-                last_error = e
+                last_error = LLMError.from_exception("gemini", self.model, e)
+                if not is_retryable(last_error.code):
+                    break
                 time.sleep(2 * (attempt + 1))  # レート制限に配慮して待ち時間を伸ばす
-        raise LLMError(f"Gemini呼び出しに{self.retries}回失敗: {last_error}")
+        assert last_error is not None
+        raise last_error

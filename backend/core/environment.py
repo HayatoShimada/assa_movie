@@ -76,11 +76,29 @@ def scan_environment(settings) -> dict:
     }
 
 
+def gpu_vram_mb(profile: dict) -> int:
+    """モデル選びの前提にするVRAM(純関数)。GPUなしの機体は0"""
+    if profile.get("gpu", "cpu") == "cpu":
+        return 0
+    return int(profile.get("vram_total_mb") or 0)
+
+
+def llm_fits(model_vram_mb: int, vram_mb: int) -> bool:
+    """OllamaのモデルがGPUに収まるか(純関数)。
+
+    文字起こしとAIは同時には動かない(ジョブは直列で、ASRはunloadしてから次へ進む)ので、
+    AIはVRAM全体で判定する。収まらないモデルも動くが、一部がCPUで動くため遅くなる。
+    """
+    return vram_mb > 0 and 0 < model_vram_mb <= vram_mb
+
+
 def recommend(vram_mb: int, engine: str, ollama_models: list[dict]) -> dict:
     """VRAMに収まる範囲で最良のASRモデルとLLMを選ぶ(純関数)。
 
     エンジンの選択はプロファイルで確定済みなので、ここではモデルだけを決める。
     ASRとLLMは直列実行(ASRはunloadしてからLLM)なので、それぞれ個別に判定する。
+    vram_mb はGPUのVRAM(GPUなしは0)。文字起こしがCPU構成でもOllamaはGPUを使うので、
+    LLMの判定には文字起こしの構成を使わない。
     """
     from backend.engines.asr.registry import MODELS
 
@@ -96,7 +114,7 @@ def recommend(vram_mb: int, engine: str, ollama_models: list[dict]) -> dict:
         )
 
     # LLM: インストール済みOllamaモデルのうち収まる最大(=最も高性能とみなす)
-    fitting = [m for m in ollama_models if 0 < m["vram_mb"] <= vram_mb]
+    fitting = [m for m in ollama_models if llm_fits(m["vram_mb"], vram_mb)]
     ollama_model = max(fitting, key=lambda m: m["vram_mb"])["name"] if fitting else None
 
     return {"asr_model": asr_model, "ollama_model": ollama_model}

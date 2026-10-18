@@ -21,6 +21,8 @@ hf_token.txt
 !requirements*.txt
 # 同梱物のライセンス本文(配布に必要なのでコミットする)
 !licenses/*.txt
+# PythonとシェルスクリプトとPowerShellで共有するケース表
+!tests/fixtures/*.txt
 
 # テスト資産(移植の回帰検証に必要なのでコミットする)
 !tests/golden/**

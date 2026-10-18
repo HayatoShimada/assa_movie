@@ -4,16 +4,23 @@ import { useState } from 'react'
 import { api } from '../api/client'
 import type { Clip } from '../api/clips'
 import type { ConvertMethod } from '../lib/catalogs'
+import { mediaDisplayName } from '../lib/media'
 import { resolveSettings } from '../lib/settings'
 import { VideoPlayer } from '../components/player/VideoPlayer'
+import { BriefPanel } from '../components/brief/BriefPanel'
+import type { SubtitlePosition } from '../lib/subtitleLayout'
 import { AssistChat } from '../components/transcript/AssistChat'
-import { SegmentList } from '../components/transcript/SegmentList'
+import { TranscriptPanel } from '../components/transcript/TranscriptPanel'
 import { ClipsTab } from '../components/clips/ClipsTab'
 import { ReviewTab } from '../components/edits/ReviewTab'
 import { ExportTab } from '../components/export/ExportTab'
 import { QuestionsTab } from '../components/questions/QuestionsTab'
 import { SettingsForm } from '../components/settings/SettingsForm'
+import { GlobalSettingsHeading } from './GlobalSettings'
+import { LlmStatusBanner } from '../components/settings/LlmStatusBanner'
+import { HelpTip } from '../components/HelpTip'
 import {
+  BackIcon,
   ClipIcon,
   ExportIcon,
   QuestionIcon,
@@ -96,14 +103,37 @@ export function Editor({ mediaId }: { mediaId: number }) {
 
   return (
     <main className="flex h-screen flex-col">
-      <header className="flex items-center gap-3 border-b border-neutral-200 px-4 py-2 dark:border-neutral-800">
-        <Button variant="ghost" onClick={() => navigate({ page: 'home' })}>
-          ← 戻る
+      {/* どのプロジェクトのどの動画を開いているかを常に見せる */}
+      <header
+        data-testid="editor-header"
+        className="flex items-center gap-3 border-b border-neutral-200 px-4 py-2 dark:border-neutral-800"
+      >
+        <Button
+          variant="ghost"
+          className="flex shrink-0 items-center gap-1"
+          onClick={() => navigate({ page: 'home' })}
+        >
+          <BackIcon />
+          プロジェクト一覧
         </Button>
-        <h1 className="truncate text-sm font-semibold">
-          {media.data?.path?.split('/').pop() ?? `メディア #${mediaId}`}
-        </h1>
+        <div className="flex min-w-0 flex-1 items-baseline gap-2 text-sm">
+          {project.data && (
+            <>
+              <span className="max-w-64 shrink truncate text-neutral-500">
+                {project.data.name}
+              </span>
+              <span aria-hidden="true" className="text-neutral-300 dark:text-neutral-600">
+                /
+              </span>
+            </>
+          )}
+          <h1 className="truncate font-semibold" title={media.data?.path}>
+            {media.data ? mediaDisplayName(media.data.path) : `メディア #${mediaId}`}
+          </h1>
+        </div>
       </header>
+      {/* AIが使えない設定なら、AI機能を押す前にここで知らせて直させる */}
+      <LlmStatusBanner projectId={media.data?.project_id} className="mx-4 mt-2" />
 
       {/* 幅は割合で持ち、境界バーのドラッグで変えられる。
           lg未満はflexの縦積みになり gridTemplateColumns は無視される */}
@@ -117,8 +147,12 @@ export function Editor({ mediaId }: { mediaId: number }) {
             segments={segments.data ?? []}
             styleValues={styleValues}
             outputOrientation={outputOrientation}
-            subtitlePosition={previewClip?.subtitle_position ?? 'bottom'}
-            subtitleOffsetY={previewClip?.subtitle_offset_y ?? 0}
+            // クリップ未選択ならプロジェクト設定(未設定なら全体設定)の字幕位置で見せる
+            subtitlePosition={
+              previewClip?.subtitle_position ??
+              ((styleValues.subtitle_position as SubtitlePosition | undefined) ?? 'bottom')
+            }
+            subtitleOffsetY={previewClip?.subtitle_offset_y ?? Number(styleValues.subtitle_offset_y ?? 0)}
             convertMethod={previewClip ? (previewClip.convert_method ?? projectConvertMethod) : null}
             cropX={previewClip?.crop_x ?? 0.5}
           />
@@ -182,15 +216,18 @@ export function Editor({ mediaId }: { mediaId: number }) {
                 onChange={(e) => setShowAizuchi(e.target.checked)}
               />
               相槌を表示
+              <HelpTip term="相槌" align="right" />
             </label>
           )}
 
           <div className="flex min-h-0 flex-1 flex-col">
             {tab === 'transcript' && (
               <>
+                {/* AIの精度に効くので、最初に開くこのタブの先頭に置く */}
+                <BriefPanel mediaId={mediaId} />
                 <div className="min-h-0 flex-1">
                   {segments.data?.length ? (
-                    <SegmentList segments={segments.data} />
+                    <TranscriptPanel mediaId={mediaId} segments={segments.data} />
                   ) : (
                     <p className="p-4 text-sm text-neutral-500">
                       {segments.isPending
@@ -209,11 +246,19 @@ export function Editor({ mediaId }: { mediaId: number }) {
             )}
             {tab === 'questions' && <QuestionsTab mediaId={mediaId} />}
             {tab === 'clips' && (
-              <ClipsTab mediaId={mediaId} onSelectedClipChange={setSelectedClip} />
+              <ClipsTab
+                mediaId={mediaId}
+                styleValues={styleValues}
+                onSelectedClipChange={setSelectedClip}
+              />
             )}
-            {tab === 'export' && <ExportTab mediaId={mediaId} />}
+            {tab === 'export' && (
+              <ExportTab mediaId={mediaId} onGoToClips={() => setTab('clips')} />
+            )}
             {tab === 'settings' && (
               <div className="h-full overflow-y-auto">
+                {/* ここで変えるのは全体の設定。このプロジェクトだけの設定ではないことを先に示す */}
+                <GlobalSettingsHeading className="px-4 pt-4" />
                 <SettingsForm />
               </div>
             )}

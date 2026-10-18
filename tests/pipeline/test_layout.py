@@ -59,6 +59,18 @@ def test_landscape_to_portrait_blur_pad():
     assert f.endswith("[vlay]")
 
 
+def test_blur_pad_matches_former_boxblur_strength():
+    """v1.0.0までの boxblur=luma_radius=40:luma_power=2 と同じぼけ具合にする。
+
+    幅81pxの箱型を2回かけた分散は (81²-1)/12×2 ≈ 1093 → σ≈33。
+    v1.0.1 で sigma=20 にしてしまい、背景が約6割のぼけに弱まっていた。
+    """
+    f = build_layout_filter(1920, 1080, 1080, 1920, "blur_pad")
+    width = 2 * 40 + 1
+    sigma = round(((width**2 - 1) / 12 * 2) ** 0.5)
+    assert f"gblur=sigma={sigma}[" in f
+
+
 # ---- 縦→横 ----
 
 def test_portrait_to_landscape_crop():
@@ -142,35 +154,4 @@ def test_odd_source_produces_even_crop():
 
 
 # ---- 同梱ビルドに無いフィルタを使っていないか ----
-#
-# 同梱ffmpegはLGPLビルド(--enable-gplを付けない)。GPL専用フィルタを
-# レイアウトに使うと、開発機のフルビルドffmpegでは通るのに、配布物では
-# `No such filter` で書き出しが落ちる。boxblurでこれを踏んだ(実測)。
-# GPL専用フィルタの名前を弾いて、同じ穴を二度踏まないようにする。
-GPL_ONLY_FILTERS = frozenset({
-    "boxblur", "smartblur", "delogo", "cover_rect", "find_rect",
-    "geq", "histogram", "owdenoise", "perspective", "pp", "pp7",
-    "repeatfields", "spp", "stereo3d", "super2xsai", "tinterlace",
-    "vidstabdetect", "vidstabtransform", "mcdeint", "nnedi", "eq",
-})
-
-
-@pytest.mark.parametrize("method", ["crop", "blur_pad", "face"])
-def test_レイアウトはGPL専用フィルタを使わない(method):
-    import re
-
-    variants = [
-        build_layout_filter(1920, 1080, 1080, 1920, method,
-                            face_plan=FacePlan(mode="single", centers=(0.5,))),
-        build_layout_filter(1920, 1080, 1080, 1920, method,
-                            face_plan=FacePlan(mode="stack", centers=(0.3, 0.7),
-                                               centers_y=(0.4, 0.6))),
-        build_layout_filter(1080, 1920, 1920, 1080, method),
-    ]
-    for f in variants:
-        if f is None:
-            continue
-        used = set(re.findall(r"(?:^|[;,\]])([a-z][a-z0-9_]*)=", f))
-        used |= set(re.findall(r"(?:^|[;,\]])(vstack|hstack|overlay)(?=[;,\[])", f))
-        bad = used & GPL_ONLY_FILTERS
-        assert not bad, f"{method}: GPL専用フィルタ {bad} を使っている: {f}"
+# 書き出し全体のグラフを許可リストで見張る(tests/pipeline/test_ffmpeg_filters.py)

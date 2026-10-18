@@ -141,6 +141,21 @@ if [ -f "$ROOT/bin/whisper-cli" ]; then
                                  || ng "whisper-cli の実行ビットが落ちている"
 fi
 
+# 同梱ffmpegはLGPLの範囲だけでビルドしている。アプリが使うフィルタが
+# 1つでも欠けていると、書き出しが `No such filter` で落ちる(v1.0.0のboxblur)。
+# 一覧はテストと共有する(tests/fixtures/ffmpeg_filters.txt)
+FILTER_LIST="$(cd "$(dirname "$0")/.." && pwd)/tests/fixtures/ffmpeg_filters.txt"
+if [ -x "$ROOT/bin/ffmpeg" ] && [ -f "$FILTER_LIST" ]; then
+  have="$("$ROOT/bin/ffmpeg" -hide_banner -filters 2>/dev/null | awk '{print $2}')"
+  missing=""
+  while read -r name; do
+    case "$name" in ''|'#'*) continue ;; esac
+    grep -qxF "$name" <<< "$have" || missing="$missing $name"
+  done < "$FILTER_LIST"
+  [ -z "$missing" ] && ok "同梱ffmpegにアプリが使うフィルタが揃っている" \
+                    || ng "同梱ffmpegに無いフィルタ:$missing"
+fi
+
 # ---- 3. 起動と疎通 -------------------------------------------------------
 step "3. 起動と疎通"
 if [ ! -x "$SIDECAR" ]; then

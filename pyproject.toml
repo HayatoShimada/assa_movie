@@ -1,6 +1,6 @@
 [project]
 name = "kirinuki-studio"
-version = "1.0.1"
+version = "2.0.0"
 description = "対談動画からローカルで文字起こし・話者分離・切り抜きを作る (CUDA / ROCm 両対応)"
 readme = "README.md"
 authors = [
@@ -25,6 +25,10 @@ dependencies = [
     # 明示しないと `uv sync` が黙って削除し、話者分離が
     # 「libonnxruntime.so が無い」で落ちる。バージョンは本体と一致必須
     "sherpa-onnx-core==1.13.4",
+    # 字幕の改行位置を文節で決める(Google製・Apache-2.0・依存なし)。
+    # フロントのプレビューも同じ版のnpmパッケージを使い、改行を一致させる
+    # (frontend/package.json の budoux と必ず同じバージョンにする)
+    "budoux==0.9.3",
     # Ollama APIを叩くのに使用
     "requests>=2.31",
     # ライセンスキーのEd25519署名検証(オフライン)。

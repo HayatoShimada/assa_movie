@@ -47,6 +47,10 @@ INSTALLED = [
         ("1GB/GPU", 1000, "whispercpp", "large-v3-turbo", "なし"),
         # CPU実行: VRAM制約なし。実用速度を優先して速い方
         ("CPU実行", 0, "faster_whisper", "large-v3-turbo", "なし"),
+        # GPUはあるが文字起こしはCPU(whisper.cppが起動できない機体)。
+        # OllamaはwhisperとはべつにGPUを使うので、LLMはVRAMで選ぶ
+        # (以前はここでVRAMを0扱いにして、24GB機の20GB級モデルが全部「VRAM超過」になっていた)
+        ("GPU機・文字起こしはCPU", 24560, "faster_whisper", "large-v3-turbo", "qwen3:32b"),
     ],
 )
 def test_recommend_table(name, vram_mb, engine, expected_model, expected_llm):
@@ -142,6 +146,36 @@ def test_environment_api_はGPU機の情報を出す(client):
     assert body["resolved"]["engine"] == "whispercpp"
     # GPU実行なのでVRAMに収まるモデルが推奨される
     assert body["recommendations"]["asr_model"] == "large-v3"
+
+
+REAL_INSTALLED = {
+    "reachable": True,
+    "models": [
+        # 24GB(RX 7900 XTX)の評価機に実際に入っていたもの(VRAM目安=サイズ×1.15)
+        {"name": "gemma4:26b", "vram_mb": 20402},
+        {"name": "qwen2.5:32b", "vram_mb": 21771},
+    ],
+}
+
+
+@pytest.mark.parametrize("whispercpp_ok", [True, False])
+def test_environment_api_LLMのVRAM判定は文字起こしの構成に依らない(client, monkeypatch, whispercpp_ok):
+    """24GB機に20GB前後のモデルは収まる。文字起こしがCPU構成でもOllamaはGPUを使う"""
+    profile = HwProfile(os="linux", gpu="radeon", gpu_name="RX 7900 XTX",
+                        vram_total_mb=24560, whispercpp_ok=whispercpp_ok, detected_at="t")
+    hwprofile.set_current(profile)
+    monkeypatch.setattr("backend.core.environment.scan_ollama", lambda url: REAL_INSTALLED)
+    body = client.get("/api/environment").json()
+    assert [m["fits"] for m in body["ollama_options"]] == [True, True]
+    assert body["recommendations"]["ollama_model"] == "qwen2.5:32b"
+
+
+def test_environment_api_GPUなしの機体はLLMを収まる扱いにしない(client, monkeypatch):
+    hwprofile.set_current(CPU)
+    monkeypatch.setattr("backend.core.environment.scan_ollama", lambda url: REAL_INSTALLED)
+    body = client.get("/api/environment").json()
+    assert [m["fits"] for m in body["ollama_options"]] == [False, False]
+    assert body["recommendations"]["ollama_model"] is None
 
 
 def test_再検出APIでプロファイルが更新される(client, monkeypatch):

@@ -8,7 +8,9 @@ import sqlite3
 from pathlib import Path
 from typing import Callable
 
+from backend.core import user_terms
 from backend.core.project_settings import resolve_settings
+from backend.engines.asr import prompt as asr_prompt
 from backend.engines.asr.registry import build_engine
 from backend.engines.diarize import labels as diarize_labels
 from backend.engines.diarize import registry as diarize
@@ -66,19 +68,12 @@ def run_transcribe(
 
     # ---- 文字起こし ----
     # initial_prompt: フィラーを含む文体例を与えるとWhisperが言い淀みを忠実に転写する。
-    # 用語集の語も併せて渡し、固有名詞の認識精度を上げる(量子化段階の工夫)
-    project_id = conn.execute(
-        "SELECT project_id FROM media WHERE id=?", (media_id,)
-    ).fetchone()["project_id"]
-    terms = [r["term"] for r in conn.execute(
-        "SELECT term FROM glossary WHERE project_id=?", (project_id,)
-    )]
-    prompt_parts = []
-    if s.asr_verbatim_style:
-        prompt_parts.append("えーと、あのー、そのー、なんか、うん。")
-    if terms:
-        prompt_parts.append("、".join(terms[:30]) + "。")
-    initial_prompt = " ".join(prompt_parts) or None
+    # 利用者の辞書(名前・用語。全プロジェクト共通)の語も併せて渡し、固有名詞の
+    # 認識精度を上げる。Whisperの上限(223トークン)に収まる分だけ優先順に詰める
+    terms = user_terms.prompt_terms(conn) if s.asr_use_user_terms else []
+    initial_prompt = asr_prompt.build_initial_prompt(
+        asr_prompt.VERBATIM_STYLE if s.asr_verbatim_style else None, terms
+    )
 
     engine = build_engine(s)
     try:

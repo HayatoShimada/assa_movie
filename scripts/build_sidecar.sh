@@ -52,18 +52,21 @@ mkdir -p "$BUILD_DIR"
 rm -rf "$VENV"
 uv venv --python 3.12 "$VENV"
 
-# [project.dependencies] だけを取り出す(dependency-groupsは開発用なので入れない)
-uv run --no-sync python - > "$BUILD_DIR/requirements.txt" <<'PY'
-import tomllib
-with open("pyproject.toml", "rb") as f:
-    print("\n".join(tomllib.load(f)["project"]["dependencies"]))
-PY
+# [project.dependencies] だけを uv.lock の版で取り出す(dependency-groupsは開発用なので入れない)。
+# 以前は pyproject.toml の範囲指定をそのまま渡しており、ビルドのたびに最新版が入っていた
+# (開発・テストは anthropic 0.121 なのに配布物は 1.15、など)。
+# 開発環境と配布物の構成が一致していること自体が仕様なので、ロックに固定する
+uv export --frozen --no-default-groups --no-hashes --no-emit-project --no-header \
+  > "$BUILD_DIR/requirements.txt"
 VIRTUAL_ENV="$VENV" uv pip install -q -r "$BUILD_DIR/requirements.txt" pyinstaller
 
 echo "=== 1ファイルに固める ==="
 # --collect-all: 動的importで拾えない同梱データ(ONNXの共有ライブラリ、
 # ctranslate2のバイナリ、opencvのカスケードxml、faster-whisperのVADモデル)を
 # 取りこぼさないため。
+#
+# budoux は字幕の文節モデル(models/ja.json)をファイルから読む。忘れると
+# 書き出しが FileNotFoundError で落ちる(起動時に読むのでそこで気付ける)。
 #
 # faster_whisper を忘れると silero_vad_v6.onnx が入らず、VAD(既定で有効)を通る
 # 文字起こしが必ず NO_SUCHFILE で落ちる。v0.9.3までこれが入っておらず、
@@ -79,6 +82,7 @@ echo "=== 1ファイルに固める ==="
   --collect-all cv2 \
   --collect-all anthropic \
   --collect-all faster_whisper \
+  --collect-data budoux \
   --hidden-import uvicorn.lifespan.on \
   --hidden-import uvicorn.protocols.http.httptools_impl \
   --hidden-import uvicorn.protocols.websockets.websockets_impl \
