@@ -6,6 +6,8 @@
 //!   3. そのURLをwebviewに注入して画面を出す
 //!
 //! 画面そのものは frontend/(React)で、シェルはロジックを持たない。
+//! 例外はOSのフォルダ選択ダイアログ(書き出し先を選ぶ)だけ。webviewからは
+//! 選んだフォルダの絶対パスを取れないので、プラグインをそのまま貸している。
 
 pub mod backend;
 
@@ -46,13 +48,21 @@ pub fn injection_script(api_base: &str) -> String {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // フォルダ選択ダイアログ(書き出し先を選ぶ)。許可は capabilities/default.json
+        .plugin(tauri_plugin_dialog::init())
         .setup(move |app| {
             // 同梱物(whisper.cpp)の置き場所はパッケージ形式で変わる。
             // .debなら /usr/lib/KirinukiStudio、AppImageなら展開先。
             // 自分で組み立てず、Tauriに聞いてバックエンドへ渡す
             let resource_dir = app.path().resource_dir().ok();
             backend::start_log_session();
-            let mut server = match Backend::spawn(&exe_dir(), &dev_repo_root(), resource_dir) {
+            let app_version = app.package_info().version.to_string();
+            let mut server = match Backend::spawn(
+                &exe_dir(),
+                &dev_repo_root(),
+                resource_dir,
+                &app_version,
+            ) {
                 Ok(server) => server,
                 Err(e) => {
                     backend::report_fatal(&format!("バックエンドを起動できませんでした: {e}"));

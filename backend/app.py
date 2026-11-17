@@ -9,13 +9,16 @@ from fastapi.responses import JSONResponse
 from backend.api import assist as assist_api
 from backend.api import clips as clips_api
 from backend.api import edits as edits_api
+from backend.api import export_dir as export_dir_api
 from backend.api import jobs as jobs_api
 from backend.api import keys_api
 from backend.api import license_api
+from backend.api import preview as preview_api
 from backend.api import projects as projects_api
 from backend.api import questions as questions_api
 from backend.api import settings_api
 from backend.api import transcripts as transcripts_api
+from backend.api import update_api
 from backend.api import user_terms as user_terms_api
 from backend.core import hwprofile, paths, project_settings
 from backend.core.config import settings
@@ -117,6 +120,9 @@ app.include_router(clips_api.router)
 app.include_router(license_api.router)
 app.include_router(keys_api.router)
 app.include_router(user_terms_api.router)
+app.include_router(export_dir_api.router)
+app.include_router(update_api.router)
+app.include_router(preview_api.router)
 
 
 @app.exception_handler(LLMError)

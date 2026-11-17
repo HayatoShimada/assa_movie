@@ -1,7 +1,8 @@
 """書き出しジョブ: クリップ範囲の切り出し+字幕焼き込み。
 
 字幕は現在のセグメント状態(指示語置換・採用ジャッジ・フィラー除去)を反映して
-ASSを生成し、libassで焼き込む。出力は元動画の隣の exports/ ディレクトリ。
+ASSを生成し、libassで焼き込む。出力先は設定の「書き出し先」(既定は動画フォルダの
+中の KirinukiStudio/。backend/pipeline/export.py の resolve_export_dir)。
 ASSは焼き込み用の中間ファイルなので一時ディレクトリに作り、書き出し先には
 完成品(mp4)だけを置く(以前は exports/ に .ass が残り、利用者を迷わせていた)。
 """
@@ -22,6 +23,35 @@ from backend.pipeline import layout as layout_mod
 from backend.pipeline import subtitle as subtitle_mod
 
 
+def source_size(conn: sqlite3.Connection, media: sqlite3.Row) -> tuple[int | None, int | None]:
+    """元動画の解像度。旧データは保存されていないので、初回に調べて保存する"""
+    src_w, src_h = media["width"], media["height"]
+    if not src_w or not src_h:
+        _, src_w, src_h = export_mod.probe_media(Path(media["path"]))
+        if src_w and src_h:
+            conn.execute(
+                "UPDATE media SET width=?, height=? WHERE id=?",
+                (src_w, src_h, media["id"]),
+            )
+    return src_w, src_h
+
+
+def output_size(conn: sqlite3.Connection, media: sqlite3.Row) -> tuple[int, int]:
+    """書き出される動画の解像度(= 字幕のPlayRes)。
+
+    resolve_layout と同じ答えを、顔検出を走らせずに返す(プレビュー用)。
+    変換方式(crop / blur_pad / face)は映像の作り方を変えるだけで、
+    出力の解像度はプロジェクトの向きだけで決まる。
+    """
+    src_w, src_h = source_size(conn, media)
+    if not src_w or not src_h:
+        return subtitle_mod.BASE_RES_X, subtitle_mod.BASE_RES_Y
+    row = conn.execute(
+        "SELECT output_orientation FROM projects WHERE id=?", (media["project_id"],)
+    ).fetchone()
+    return layout_mod.OUTPUT_RES[row["output_orientation"] if row else "landscape"]
+
+
 def resolve_layout(
     conn: sqlite3.Connection,
     media: sqlite3.Row,
@@ -36,14 +66,7 @@ def resolve_layout(
     優先順位: クリップ上書き(params) > プロジェクト設定 > グローバル設定。
     """
     input_path = Path(media["path"])
-    src_w, src_h = media["width"], media["height"]
-    if not src_w or not src_h:
-        _, src_w, src_h = export_mod.probe_media(input_path)
-        if src_w and src_h:  # 旧データは遅延プローブして保存
-            conn.execute(
-                "UPDATE media SET width=?, height=? WHERE id=?",
-                (src_w, src_h, media["id"]),
-            )
+    src_w, src_h = source_size(conn, media)
     row = conn.execute(
         "SELECT output_orientation FROM projects WHERE id=?", (media["project_id"],)
     ).fetchone()
@@ -101,8 +124,10 @@ def run_export_job(
         if c["end"] > start and c["start"] < end
     ]
 
-    out_dir = export_mod.export_dir(input_path)
-    out_dir.mkdir(exist_ok=True)
+    problem = export_mod.check_export_dir(s.export_dir)
+    if problem:
+        raise ValueError(problem)
+    out_dir = export_mod.resolve_export_dir(s.export_dir)
     out_path = out_dir / export_mod.export_file_name(
         input_path, start, end, params.get("clip_id")
     )
@@ -143,17 +168,14 @@ def run_export_job(
     progress(1.0)
 
 
-def _build_subtitles(
-    conn: sqlite3.Connection,
-    media_id: int,
-    s,
-    params: dict,
-    start: float,
-    end: float,
-    out_w: int,
-    out_h: int,
-) -> str:
-    """現在のセグメント状態を反映したASSの中身を作る"""
+def subtitle_events(
+    conn: sqlite3.Connection, media_id: int, s, start: float, end: float | None
+) -> list[subtitle_mod.AssEvent]:
+    """現在のセグメント状態を反映した字幕イベント(クリップ相対時刻)。
+
+    書き出しとプレビューの両方がここを通る。別々に組み立てると、フィラー除去や
+    表示時間の延長が片方にだけ効いて見た目がずれる(issue #4)。
+    """
     segments = [dict(r) for r in conn.execute(
         "SELECT * FROM segments WHERE media_id=? ORDER BY idx", (media_id,)
     )]
@@ -167,12 +189,35 @@ def _build_subtitles(
         if s.filler_level in ("weak", "strong"):
             text = filler_mod.remove_fillers_weak(text)
         seg["text"] = text
+    return subtitle_mod.segments_to_events(segments, clip_start=start, clip_end=end)
 
-    # ASSのPlayResは出力解像度に合わせる(スタイル値は幅/高さ比率で自動換算)
-    style = subtitle_mod.scaled_style(
-        s, out_w, out_h,
-        str(params.get("subtitle_position", "bottom")),
-        int(params.get("subtitle_offset_y", 0)),
+
+def subtitle_style(s, params: dict, out_w: int, out_h: int) -> subtitle_mod.SubtitleStyle:
+    """書き出しの字幕スタイル。ASSのPlayResは出力解像度に合わせる
+    (スタイル値は幅/高さ比率で自動換算)。
+
+    位置はクリップの値(params)が優先、無ければ設定の値。以前は params に
+    無いと「下・ずらし0」に決め打ちしていて、秒指定の書き出しだけ設定の
+    字幕位置が効かず、プレビューと違う場所に焼かれていた(issue #4)。
+    """
+    position = params.get("subtitle_position") or s.subtitle_position
+    offset = params.get("subtitle_offset_y")
+    return subtitle_mod.scaled_style(
+        s, out_w, out_h, str(position),
+        int(s.subtitle_offset_y if offset is None else offset),
     )
-    events = subtitle_mod.segments_to_events(segments, clip_start=start, clip_end=end)
-    return subtitle_mod.build_ass(events, style)
+
+
+def _build_subtitles(
+    conn: sqlite3.Connection,
+    media_id: int,
+    s,
+    params: dict,
+    start: float,
+    end: float,
+    out_w: int,
+    out_h: int,
+) -> str:
+    """現在のセグメント状態を反映したASSの中身を作る"""
+    events = subtitle_events(conn, media_id, s, start, end)
+    return subtitle_mod.build_ass(events, subtitle_style(s, params, out_w, out_h))

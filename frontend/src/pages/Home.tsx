@@ -8,6 +8,7 @@ import { FilmIcon, SettingsIcon, TrashIcon, UploadIcon } from '../components/ico
 import { CreateProjectForm } from '../components/project/CreateProjectForm'
 import { ProjectSettingsPanel } from '../components/project/ProjectSettingsPanel'
 import { LlmStatusBanner } from '../components/settings/LlmStatusBanner'
+import { UpdateBanner } from '../components/update/UpdateNotice'
 import { templateFor } from '../lib/catalogs'
 import { jobSlots } from '../lib/jobs'
 import { mediaDisplayName, mediaState } from '../lib/media'
@@ -364,6 +365,7 @@ export function Home() {
         </Button>
       </header>
 
+      <UpdateBanner />
       <LlmStatusBanner />
       <CreateProjectForm />
 

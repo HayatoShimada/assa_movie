@@ -21,13 +21,19 @@ async function fetchSchema() {
   try {
     const res = await fetch(`${API_URL}/openapi.json`, { signal: AbortSignal.timeout(2000) })
     if (res.ok) {
-      console.log(`OpenAPIを取得: ${API_URL}`)
-      return JSON.stringify(await res.json())
+      const schema = await res.json()
+      // 8000番で別のアプリが動いていることがある。そのスキーマで型を上書きすると
+      // 3000行消えた差分になる(実際に起きた)。このアプリの応答だけを使う
+      if (schema?.info?.title === 'KirinukiStudio') {
+        console.log(`OpenAPIを取得: ${API_URL}`)
+        return JSON.stringify(schema)
+      }
+      console.log(`${API_URL} は別のアプリです(${schema?.info?.title ?? '不明'})。使いません`)
     }
   } catch {
     // サーバー未起動 → 直接生成にフォールバック
   }
-  console.log('サーバー未起動のためFastAPIアプリから直接生成します')
+  console.log('FastAPIアプリから直接生成します')
   return execFileSync(
     'uv',
     ['run', 'python', '-c', 'import json,backend.app as a;print(json.dumps(a.app.openapi()))'],

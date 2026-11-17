@@ -301,9 +301,13 @@ impl Backend {
         exe_dir: &Path,
         repo_root: &Path,
         resource_dir: Option<PathBuf>,
+        app_version: &str,
     ) -> std::io::Result<Self> {
         let port = free_port()?;
         let mut cmd = build_command(exe_dir, repo_root, port);
+        // いま動いている版(backend/core/update_check.py が新しい版と比べる)。
+        // インストーラの版そのものなので、Python側で別に持たせない
+        cmd.env("KS_APP_VERSION", app_version);
         // 同梱したwhisper.cppの探索先(backend/engines/asr/whispercpp.py が読む)
         if let Some(dir) = resource_dir {
             cmd.env("KS_RESOURCE_DIR", dir);

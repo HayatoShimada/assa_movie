@@ -3,6 +3,7 @@
 ffmpeg本体の場所は backend/core/ffmpeg.py が決める(配布版は同梱物を使う)。
 """
 
+import os
 import platform
 import re
 import shutil
@@ -11,6 +12,7 @@ from functools import lru_cache
 from pathlib import Path
 
 
+from backend.core import paths
 from backend.core.cancellation import register_process
 from backend.core.console import SUBPROCESS_TEXT
 from backend.core.ffmpeg import ffmpeg_path, ffprobe_path, missing_message
@@ -146,9 +148,44 @@ def probe_media(path: Path) -> tuple[float | None, int | None, int | None]:
 UPLOAD_PREFIX = re.compile(r"^[0-9a-f]{32}_(?=.)")
 
 
-def export_dir(media_path: Path) -> Path:
-    """書き出し先。元動画と同じフォルダの exports/(README「書き出した動画の保存先」)"""
-    return media_path.parent / "exports"
+def resolve_export_dir(configured: str = "", default: Path | None = None) -> Path:
+    """書き出し先のフォルダ(純関数)。設定が空なら既定の場所。
+
+    既定は動画フォルダの中の KirinukiStudio/(README「書き出した動画の保存先」)。
+    以前の「元動画の隣の exports/」は、取り込んだ動画だとアプリのデータフォルダ
+    (Finderでは隠れている)になり、書き出した動画が見つからなかった(issue #3)。
+    """
+    configured = (configured or "").strip()
+    if configured:
+        return Path(configured).expanduser()
+    return default if default is not None else paths.default_export_dir()
+
+
+def check_export_dir(configured: str) -> str | None:
+    """設定された書き出し先が使えるかを確かめる。問題があれば利用者向けの説明を返す。
+
+    保存する前と書き出す前の両方で呼ぶ(外付けドライブを外した、など
+    保存した後に使えなくなることがあるため)。フォルダが無ければ作る。
+    """
+    target = resolve_export_dir(configured)
+    if not target.is_absolute():
+        return (
+            f"書き出し先はフォルダの場所を先頭から書いてください(例: {paths.default_export_dir()})。"
+            f"入力された値: {configured}"
+        )
+    try:
+        target.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        return (
+            f"書き出し先のフォルダを作れませんでした: {target}({e.strerror or e})。"
+            "全体の設定の「書き出し先」で別のフォルダを選んでください"
+        )
+    if not os.access(target, os.W_OK):
+        return (
+            f"書き出し先のフォルダに書き込めません: {target}。"
+            "全体の設定の「書き出し先」で別のフォルダを選んでください"
+        )
+    return None
 
 
 def export_file_name(
@@ -164,7 +201,8 @@ def export_file_name(
     return f"{stem}_{int(start)}s-{int(end)}s{suffix}.mp4"
 
 
-def _escape_filter_path(path: Path) -> str:
+def escape_filter_path(path: Path) -> str:
+    """フィルタ引数に書けるパス(Windowsの `C:\\` の区切りとコロンを逃がす)"""
     return str(path).replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
 
 
@@ -221,7 +259,7 @@ def build_export_cmd(
         cmd += ["-vaapi_device", VAAPI_DEVICE]
     cmd += ["-ss", f"{start:.3f}", "-i", str(input_path), "-t", f"{duration:.3f}"]
 
-    ass_filter = f"ass='{_escape_filter_path(ass_path)}'" if ass_path else None
+    ass_filter = f"ass='{escape_filter_path(ass_path)}'" if ass_path else None
     keeps = keep_intervals(duration, cuts or []) if cuts else []
     has_cuts = bool(keeps) and keeps != [(0.0, duration)]
     hw_tail = "format=nv12,hwupload" if encoder == "h264_vaapi" else None

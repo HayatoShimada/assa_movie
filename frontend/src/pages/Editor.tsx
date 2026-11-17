@@ -8,7 +8,6 @@ import { mediaDisplayName } from '../lib/media'
 import { resolveSettings } from '../lib/settings'
 import { VideoPlayer } from '../components/player/VideoPlayer'
 import { BriefPanel } from '../components/brief/BriefPanel'
-import type { SubtitlePosition } from '../lib/subtitleLayout'
 import { AssistChat } from '../components/transcript/AssistChat'
 import { TranscriptPanel } from '../components/transcript/TranscriptPanel'
 import { ClipsTab } from '../components/clips/ClipsTab'
@@ -144,15 +143,15 @@ export function Editor({ mediaId }: { mediaId: number }) {
         <section className="min-w-0 p-4">
           <VideoPlayer
             mediaId={mediaId}
-            segments={segments.data ?? []}
+            segmentsVersion={segments.dataUpdatedAt}
             styleValues={styleValues}
             outputOrientation={outputOrientation}
-            // クリップ未選択ならプロジェクト設定(未設定なら全体設定)の字幕位置で見せる
-            subtitlePosition={
-              previewClip?.subtitle_position ??
-              ((styleValues.subtitle_position as SubtitlePosition | undefined) ?? 'bottom')
-            }
-            subtitleOffsetY={previewClip?.subtitle_offset_y ?? Number(styleValues.subtitle_offset_y ?? 0)}
+            // クリップを見ているときはそのクリップの位置と範囲。未選択なら渡さず、
+            // 設定の字幕位置で描かせる(秒指定の書き出しと同じ規則)
+            subtitlePosition={previewClip?.subtitle_position ?? null}
+            subtitleOffsetY={previewClip?.subtitle_offset_y ?? null}
+            clipStart={previewClip?.start ?? null}
+            clipEnd={previewClip?.end ?? null}
             convertMethod={previewClip ? (previewClip.convert_method ?? projectConvertMethod) : null}
             cropX={previewClip?.crop_x ?? 0.5}
           />

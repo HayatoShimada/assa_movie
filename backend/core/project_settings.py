@@ -29,13 +29,20 @@ MUTABLE_FIELDS = {
     "subtitle_font_family", "subtitle_text_color", "subtitle_speaker_colors",
     "subtitle_bg", "subtitle_bg_color", "subtitle_bg_opacity",
     "convert_method",
+    "export_dir",
+    "update_check_enabled",
     "llm_provider", "ollama_model", "gemini_model", "claude_model",
     "setup_completed",
 }
 
 # プロジェクト単位で上書きできる項目。
-# 初回セットアップの完了はマシン全体の状態なのでプロジェクト単位化しない
-PROJECT_OVERRIDABLE = set(MUTABLE_FIELDS) - {"setup_completed"}
+# 初回セットアップの完了はマシン全体の状態なのでプロジェクト単位化しない。
+# 書き出し先も全体で1つにする(「書き出した動画はどこ?」の答えを1つにするため。
+# プロジェクトごとに変えられると、また探すことになる)
+# 更新の確認もアプリ全体の話
+PROJECT_OVERRIDABLE = set(MUTABLE_FIELDS) - {
+    "setup_completed", "export_dir", "update_check_enabled",
+}
 
 
 # テンプレート(書き出しの向き)ごとのプロジェクト既定値。

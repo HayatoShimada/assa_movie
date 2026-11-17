@@ -81,6 +81,17 @@ class Settings(BaseSettings):
     # 入力と出力の向きが違うときの変換方式。クリップ単位でも上書き可能
     convert_method: str = "blur_pad"  # crop | blur_pad | face
 
+    # ---- 書き出し ----
+    # 書き出した動画を置くフォルダ(絶対パス)。空なら既定の場所
+    # (動画フォルダの中の KirinukiStudio/。backend/core/paths.py)。
+    # 既定を値として保存しないのは、ホームの場所が変わっても追従させるため
+    export_dir: str = ""
+
+    # ---- 更新の確認 ----
+    # 起動時に新しい版が出ているかをGitHubに尋ねる(backend/core/update_check.py)。
+    # 尋ねるだけで利用者の情報は送らないが、外に出る通信なので切れるようにする
+    update_check_enabled: bool = True
+
     # ---- 初回セットアップ ----
     # 初回起動時のウィザードを済ませたか。専用のファイルやテーブルを増やさず
     # 設定として持つ(設定タブから「やり直す」でfalseに戻せる)

@@ -17,7 +17,7 @@ Tauri(Rust)+ React + Python/FastAPI で、3OS向けのインストーラを配�
 ./dev.sh package      # 配布用の .deb / AppImage を作る
                       # (tauri build 単体ではPythonサイドカーが再ビルドされない)
 ./dev.sh check        # コミット前の全チェック(pytest + typecheck + lint + vitest + build)
-./dev.sh e2e          # E2E(FakeLLM・一時DBなのでGPUもOllamaも不要)
+./dev.sh e2e          # E2E(FakeLLM・一時DBなのでGPUもOllamaもffmpegも不要)
 ./dev.sh whispercpp   # GPU機のASR本体(Vulkan/Metal)をビルド+ggmlモデル取得
                       # 要 build-essential / libvulkan-dev / glslc
 
@@ -87,7 +87,15 @@ cd frontend && npm run gen:api    # バックエンドのAPIを変えたら必�
   ジョブ層でグローバルsettingsを直接importしない(テストで担保)。
 - **字幕のpx値は1920×1080基準で保存し、出力解像度へ比率換算する。**
   フォント・左右余白=幅比率、上下余白=高さ比率(subtitle.scaled_style)。
-  フロントのプレビューも同じ規則(cqw/cqh)で描く。
+- **プレビューの字幕は、書き出しと同じASSを同じffmpeg(libass)で描いた画像。**
+  画面側で字幕の見た目を計算しない(`backend/pipeline/subtitle_preview.py`)。
+  CSSで規則だけ揃えても見た目は揃わなかった(ASSのFontsizeは行の高さ、CSSは文字の
+  大きさで、プレビューが約1.45倍大きかった。v2.1.0)。字幕の材料(本文・表示時間・
+  話者の色・位置)は書き出しとプレビューで同じ関数から作る
+  (`export_job.subtitle_events` / `subtitle_style`)。片方だけに手を入れない。
+- **書き出し先は設定(`export_dir`)。空なら動画フォルダの中の `KirinukiStudio/`。**
+  元動画の隣やアプリのデータフォルダには書き出さない(取り込んだ動画だと
+  Finderで隠れている場所になり、利用者が見つけられなかった。issue #3)。
 - **LLMは提案するだけ、適用は機械ガードを通ったものだけ。**
   `pronoun.validate_edit()` が削除のみ・既出重複・慣用表現などを弾く。この構造を壊さない。
 - **配布物にtorchを入れない。** torchだけで11.5GB、入れないと644MB。

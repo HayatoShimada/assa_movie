@@ -1,7 +1,7 @@
 """字幕・テキストの書き出し(折返し・禁則処理・SRT/ASS生成)。
 
-すべて純関数。折返しロジックはフロントのCSSプレビューでも同一のテストケースを
-通すこと(FRONTEND_DESIGN.md)。
+すべて純関数。プレビューの字幕もここで作ったASSをlibassで描く
+(backend/pipeline/subtitle_preview.py)ので、折返しの実装はここだけにある。
 """
 
 from dataclasses import dataclass, field
@@ -247,13 +247,28 @@ class AssEvent:
     speaker: str | None = None
 
 
-def build_ass(events: list[AssEvent], style: SubtitleStyle = SubtitleStyle()) -> str:
+def speakers_of(events: list[AssEvent]) -> list[str]:
+    """色を割り当てる話者の並び(純関数)。書き出す範囲に出てくる話者を名前順に"""
+    return sorted({e.speaker for e in events if e.speaker})
+
+
+def build_ass(
+    events: list[AssEvent],
+    style: SubtitleStyle = SubtitleStyle(),
+    speakers: list[str] | None = None,
+) -> str:
     """字幕イベント列からASSファイルの内容を生成する。
 
     - 折返し・禁則は wrap_subtitle を適用(ASSの改行は \\N)
     - 話者ごとにスタイル(文字色)を割り当てる
+    - speakers: 色を割り当てる話者の並び。省略時は events から決める。
+      プレビューは字幕を1件ずつ描くので、書き出しと同じ色になるよう
+      書き出し範囲全体の並びを渡す(backend/pipeline/subtitle_preview.py)
     """
-    speakers = sorted({e.speaker for e in events if e.speaker}) if style.speaker_colors else []
+    if speakers is None:
+        speakers = speakers_of(events)
+    if not style.speaker_colors:
+        speakers = []
     style_of = {
         sp: (f"S{i}", SPEAKER_ASS_COLORS[i % len(SPEAKER_ASS_COLORS)])
         for i, sp in enumerate(speakers)

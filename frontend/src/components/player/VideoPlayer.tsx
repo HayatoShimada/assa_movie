@@ -1,19 +1,27 @@
 /**
  * 動画プレビュー。再生位置をストアに流し、シーク関数を登録する。
  *
- * 字幕の位置・サイズはバックエンド(pipeline/subtitle.py scaled_style)と
- * 同じ相対規則で描く。規則そのものは lib/subtitleLayout.ts の純関数にあり、
- * テストで期待値を固定している。
+ * 字幕は書き出しと同じ libass で描いた透過画像を映像に重ねる
+ * (backend/pipeline/subtitle_preview.py)。以前はCSSで描いていて、同じ設定でも
+ * プレビューの文字が約1.45倍大きく、縁取りや表示時間も書き出しと違った(issue #4)。
+ * 画面側は見た目を計算しない: 枠を書き出しと同じ縦横比にして、時刻表のとおりに
+ * 画像を枠いっぱいに重ねるだけ。
  *
  * 再生操作はブラウザ標準のコントロール(動画の上に重なる)を使わず、映像の枠の
  * 下に置く。標準のコントロールは映像の下端に重なり、下配置の字幕が隠れて
- * 読めなかった。枠(cqw/cqhの基準)は映像そのものなので、書き出しとの対応は変わらない。
+ * 読めなかった。
  */
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
-import { API_BASE, type Orientation, type Segment } from '../../api/client'
+import { API_BASE, api, type Orientation } from '../../api/client'
 import type { ConvertMethod } from '../../lib/catalogs'
-import { wrapSubtitle } from '../../lib/subtitle'
-import { hexToRgba, overlayGeometry, type SubtitlePosition } from '../../lib/subtitleLayout'
+import {
+  activeEvent,
+  previewQuery,
+  previewSignature,
+  upcomingKeys,
+  type SubtitlePosition,
+} from '../../lib/subtitlePreview'
 import type { SettingsValues } from '../../lib/settings'
 import { usePlayback } from '../../stores/playback'
 import { formatTime } from '../ui'
@@ -126,20 +134,27 @@ function PlayerControls({
 
 export function VideoPlayer({
   mediaId,
-  segments,
+  segmentsVersion = 0,
   styleValues,
-  subtitlePosition = 'bottom',
-  subtitleOffsetY = 0,
+  subtitlePosition = null,
+  subtitleOffsetY = null,
+  clipStart = null,
+  clipEnd = null,
   outputOrientation = 'landscape',
   convertMethod = null,
   cropX = 0.5,
 }: {
   mediaId: number
-  segments: Segment[]
+  /** 文字起こしが変わったら変わる値(字幕の時刻表を取り直す合図) */
+  segmentsVersion?: number
   /** プロジェクト設定を反映済みの設定値(lib/settings.ts の resolveSettings) */
   styleValues: SettingsValues
-  subtitlePosition?: SubtitlePosition
-  subtitleOffsetY?: number
+  /** クリップの字幕位置。null なら設定の値(書き出しと同じ規則をバックエンドが適用) */
+  subtitlePosition?: SubtitlePosition | null
+  subtitleOffsetY?: number | null
+  /** クリップの範囲。話者の色は書き出す範囲で決まるので、クリップを見ているときは渡す */
+  clipStart?: number | null
+  clipEnd?: number | null
   outputOrientation?: Orientation
   /** 縦横変換のプレビュー。cropのみ実映像で近似できる */
   convertMethod?: ConvertMethod | null
@@ -162,32 +177,51 @@ export function VideoPlayer({
     return () => setSeeker(null)
   }, [setSeeker])
 
-  const v = styleValues
-  const maxChars = Number(v.subtitle_max_chars_per_line ?? 15)
-  const fontSize = Number(v.subtitle_font_size ?? 48)
-  const fontFamily = String(v.subtitle_font_family ?? 'Noto Sans JP')
-  const textColor = String(v.subtitle_text_color ?? '#FFFFFF')
-  const bg = String(v.subtitle_bg ?? 'none')
-  const bgColor = String(v.subtitle_bg_color ?? '#000000')
-  const bgOpacity = Number(v.subtitle_bg_opacity ?? 0.5)
+  // 字幕の時刻表。見た目に効くもの(設定・文字起こし・クリップの位置と範囲)が
+  // 変わったら取り直す。取り直す間は前の字幕を出し続ける(ちらつかせない)
+  const query = previewQuery({
+    position: subtitlePosition,
+    offsetY: subtitleOffsetY,
+    start: clipStart,
+    end: clipEnd,
+  })
+  const preview = useQuery({
+    queryKey: [
+      'subtitle-preview',
+      mediaId,
+      query,
+      outputOrientation,
+      previewSignature(styleValues),
+      segmentsVersion,
+    ],
+    queryFn: () => api.getSubtitlePreview(mediaId, query),
+    placeholderData: keepPreviousData,
+  })
+  const events = preview.data?.events ?? []
+  const available = preview.data?.available ?? true
+  const active = activeEvent(events, currentTime)
+  const imageUrl = (key: string) => api.subtitlePreviewImageUrl(mediaId, key, query)
 
-  // 採用ジャッジ(選択字幕)と相槌を反映して現在の字幕を選ぶ
-  const active = segments.find(
-    (s) =>
-      !s.is_aizuchi &&
-      (s.subtitle_show === 'auto_show' || s.subtitle_show === 'user_show') &&
-      s.start <= currentTime &&
-      currentTime < s.end,
-  )
-  // 話者ラベル(「はやまる: 」)を外し、書き出しと同じ折返し・禁則を適用する
-  const lines = active ? wrapSubtitle(active.text.replace(/^[^:]+: /, ''), maxChars) : []
-  const { fontSize: fontSizeCq, ...overlayStyle } = overlayGeometry(
-    subtitlePosition,
-    subtitleOffsetY,
-    fontSize,
-  )
+  // この後の字幕を先に読み込む(切り替わる瞬間に描き始めると再生中に遅れる)
+  const upcoming = available ? upcomingKeys(events, currentTime).join(',') : ''
+  useEffect(() => {
+    if (!upcoming) return
+    for (const key of upcoming.split(',')) {
+      new Image().src = api.subtitlePreviewImageUrl(mediaId, key, query)
+    }
+  }, [upcoming, mediaId, query])
+
+  // 描けなかった字幕(ffmpegが無い・失敗)。黙って字幕なしに見せない
+  const [failedKey, setFailedKey] = useState<string | null>(null)
+  const failed = active != null && failedKey === active.key
 
   const isPortrait = outputOrientation === 'portrait'
+  // 枠は書き出される動画と同じ縦横比にする(字幕の画像は枠いっぱいに重ねる)
+  const aspect = preview.data
+    ? `${preview.data.width} / ${preview.data.height}`
+    : isPortrait
+      ? '9 / 16'
+      : '16 / 9'
   // crop: 実映像で切り出し位置を再現。blur_pad/face: 全体表示(書き出し時に背景合成)
   const videoFit =
     convertMethod === 'crop'
@@ -202,9 +236,9 @@ export function VideoPlayer({
         data-testid="player-frame"
         data-orientation={outputOrientation}
         className={`relative mx-auto overflow-hidden rounded-lg bg-black ${
-          isPortrait ? 'aspect-[9/16] max-h-[80vh]' : 'aspect-video w-full'
+          isPortrait ? 'max-h-[80vh]' : 'w-full'
         }`}
-        style={{ containerType: 'inline-size' }}
+        style={{ aspectRatio: aspect }}
       >
         <video
           ref={ref}
@@ -227,35 +261,29 @@ export function VideoPlayer({
               : '書き出し時: 顔検出で自動レイアウト'}
           </p>
         )}
-        {lines.length > 0 && (
-          <p
+        {active && available && !failed && (
+          // 書き出しの解像度で描いた透過画像。枠と同じ縦横比なので、枠いっぱいに
+          // 伸ばせば位置も大きさも書き出しと同じ比率になる
+          <img
+            key={active.key}
             data-testid="subtitle-overlay"
-            className="pointer-events-none absolute text-center font-bold"
-            style={{
-              ...overlayStyle,
-              fontSize: fontSizeCq,
-              fontFamily: `'${fontFamily}', sans-serif`,
-              color: textColor,
-              lineHeight: 1.2,
-              textShadow: bg === 'box' ? 'none' : '0 0 4px rgba(0,0,0,.9), 0 0 8px rgba(0,0,0,.7)',
-            }}
-          >
-            {lines.map((line, i) => (
-              <span
-                key={i}
-                className="mx-auto block w-fit"
-                style={
-                  bg === 'box'
-                    ? { backgroundColor: hexToRgba(bgColor, bgOpacity), padding: '0 0.3em' }
-                    : undefined
-                }
-              >
-                {line}
-              </span>
-            ))}
-          </p>
+            data-key={active.key}
+            className="pointer-events-none absolute inset-0 h-full w-full select-none"
+            src={imageUrl(active.key)}
+            alt={active.text}
+            draggable={false}
+            onError={() => setFailedKey(active.key)}
+          />
         )}
       </div>
+      {(!available || failed) && (
+        <p data-testid="subtitle-preview-unavailable" className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+          字幕のプレビューを表示できません
+          {preview.data?.reason ? `(${preview.data.reason})` : '(字幕を描く処理に失敗しました)'}
+          。書き出しには影響しません。
+          {active && <span className="ml-1 text-neutral-500">いまの字幕: {active.text}</span>}
+        </p>
+      )}
       <PlayerControls video={videoEl} currentTime={currentTime} />
     </div>
   )

@@ -76,6 +76,36 @@ def _fixed_hw_profile(monkeypatch):
     )
 
 
+@pytest.fixture(autouse=True)
+def _isolate_export_dir(tmp_path, monkeypatch):
+    """書き出し先の既定を一時フォルダにする。
+
+    既定は利用者の動画フォルダ(~/Movies/KirinukiStudio など)。そのままだと
+    テストが開発機の動画フォルダにファイルを作ってしまう。
+    """
+    from backend.core import paths
+
+    monkeypatch.setattr(
+        paths, "default_export_dir",
+        lambda home=None, os_name=None, environ=None: tmp_path / "videos" / "KirinukiStudio",
+    )
+
+
+@pytest.fixture(autouse=True)
+def _no_update_check(monkeypatch):
+    """テストからGitHubへ問い合わせない。確認の中身は tests/core/test_update_check.py が
+    通信を差し替えて確かめる"""
+    from backend.core import update_check
+
+    def refuse():
+        raise AssertionError("テストから外部へ通信しようとした(update_check.fetch_latest)")
+
+    monkeypatch.setattr(update_check, "fetch_latest", refuse)
+    update_check.reset_cache()
+    yield
+    update_check.reset_cache()
+
+
 @pytest.fixture
 def client(tmp_path):
     """一時DBのTestClient。DBパスはテストごとに独立する"""

@@ -6,9 +6,11 @@
  */
 import { useQuery } from '@tanstack/react-query'
 import { api, machineQueryOptions } from '../../../api/client'
-import { BASE_RES_X } from '../../../lib/subtitleLayout'
 import { selectCls } from '../../ui'
 import { Row, Section, resetButton, showTier, type SectionProps } from './common'
+
+/** 字幕のpx値の基準(backend/pipeline/subtitle.py の BASE_RES_X) */
+const BASE_RES_X = 1920
 
 /** これ未満は縦動画(1080px幅)で1桁pxになり読めない(1920px幅基準の値) */
 const MIN_READABLE_FONT_SIZE = 20

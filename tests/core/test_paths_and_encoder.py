@@ -8,7 +8,11 @@ Mac/Windowsの実機はここに無いので、純関数として確かめる。
 
 import pytest
 
+from pathlib import Path
+
 from backend.core import paths
+# conftest が書き出し先の既定を一時フォルダに差し替えるので、本物は先に掴んでおく
+from backend.core.paths import default_export_dir
 from backend.pipeline.export import _pick_encoder
 
 
@@ -220,3 +224,61 @@ def test_旧接頭辞が無ければ空(monkeypatch):
         if var.startswith("WL_"):
             monkeypatch.delenv(var)
     assert paths.legacy_env_vars() == []
+
+
+# ---- 書き出し先の既定(動画フォルダの中の KirinukiStudio/) ----
+@pytest.mark.parametrize(
+    "name, os_name, environ, expected",
+    [
+        ("macOSは ムービー", "Darwin", {}, "Movies/KirinukiStudio"),
+        ("Linuxは Videos", "Linux", {}, "Videos/KirinukiStudio"),
+        ("WindowsはUSERPROFILEが無ければホーム", "Windows", {}, "Videos/KirinukiStudio"),
+    ],
+)
+def test_書き出し先の既定は利用者の動画フォルダ(tmp_path, name, os_name, environ, expected):
+    """issue #3: ~/Library/Application Support の中(Finderでは隠れている)に
+    書き出していて、利用者が見つけられなかった"""
+    got = default_export_dir(home=tmp_path, os_name=os_name, environ=environ)
+    assert got == tmp_path / expected, name
+
+
+def test_windowsの動画フォルダはUSERPROFILEから決める(tmp_path):
+    profile = tmp_path / "Users" / "山田"
+    got = paths.videos_dir(
+        home=tmp_path, os_name="Windows", environ={"USERPROFILE": str(profile)}
+    )
+    assert got == profile / "Videos"
+
+
+def test_日本語環境のlinuxは_ビデオ_を使う(tmp_path):
+    """xdg-user-dirs が ~/ビデオ を作る。~/Videos は存在しない"""
+    config = tmp_path / ".config"
+    config.mkdir()
+    (config / "user-dirs.dirs").write_text(
+        '# コメント\nXDG_DESKTOP_DIR="$HOME/デスクトップ"\nXDG_VIDEOS_DIR="$HOME/ビデオ"\n',
+        encoding="utf-8",
+    )
+    assert paths.videos_dir(home=tmp_path, os_name="Linux", environ={}) == tmp_path / "ビデオ"
+    # XDG_CONFIG_HOME を変えている環境でも読む
+    other = tmp_path / "cfg"
+    other.mkdir()
+    (other / "user-dirs.dirs").write_text('XDG_VIDEOS_DIR="/srv/videos/"\n', encoding="utf-8")
+    got = paths.videos_dir(
+        home=tmp_path, os_name="Linux", environ={"XDG_CONFIG_HOME": str(other)}
+    )
+    assert got == Path("/srv/videos")
+
+
+@pytest.mark.parametrize(
+    "name, text, expected",
+    [
+        ("ホームからの相対", 'XDG_VIDEOS_DIR="$HOME/ビデオ"', "/h/ビデオ"),
+        ("絶対パス", 'XDG_VIDEOS_DIR="/data/v"', "/data/v"),
+        ("ホームそのものは「使わない」設定", 'XDG_VIDEOS_DIR="$HOME/"', None),
+        ("項目が無い", 'XDG_MUSIC_DIR="$HOME/Music"', None),
+        ("相対パスは信用しない", 'XDG_VIDEOS_DIR="videos"', None),
+    ],
+)
+def test_parse_user_dirs(name, text, expected):
+    got = paths.parse_user_dirs(text, Path("/h"))
+    assert got == (Path(expected) if expected else None), name

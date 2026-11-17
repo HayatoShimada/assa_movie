@@ -18,6 +18,13 @@ export type UserTerm = components['schemas']['UserTerm']
 /** 動画の概要(主題・登場人物・固有名詞)。すべてのAI処理のプロンプトに入る */
 export type Brief = components['schemas']['Brief']
 export type LlmStatus = components['schemas']['LlmStatus']
+/** 書き出し先のフォルダ(設定が空なら既定の場所に解決済み) */
+export type ExportDir = components['schemas']['ExportDir']
+/** 新しい版が出ているか */
+export type UpdateStatus = components['schemas']['UpdateStatus']
+/** プレビュー用の字幕の時刻表(画像は書き出しと同じ libass で描く) */
+export type SubtitlePreview = components['schemas']['SubtitlePreview']
+export type SubtitlePreviewEvent = components['schemas']['SubtitlePreviewEvent']
 
 declare global {
   interface Window {
@@ -142,6 +149,23 @@ export const api = {
     post<components['schemas']['RevealResult']>(`/api/jobs/${jobId}/reveal`),
   /** 書き出した動画のURL(画面内での再生用) */
   exportOutputUrl: (jobId: number) => `${API_BASE}/api/jobs/${jobId}/output`,
+  /** 書き出し先のフォルダ。変えるのは updateSettings({ export_dir })(空文字で既定に戻る) */
+  getExportDir: () => request<ExportDir>('/api/export-dir'),
+  /** 書き出し先のフォルダをOSのファイラーで開く(まだ無ければ作る) */
+  revealExportDir: () => post<ExportDir>('/api/export-dir/reveal'),
+
+  /** 新しい版が出ているか。force は「今すぐ確認」(自動確認を切っていても尋ねる) */
+  getUpdate: (force = false) =>
+    request<UpdateStatus>(`/api/update${force ? '?force=true' : ''}`),
+  /** ダウンロードページを既定のブラウザで開く(webviewのリンクは外で開かないため) */
+  openUpdatePage: () => post<{ url: string }>('/api/update/open'),
+
+  /** プレビューに出す字幕の時刻表。query は lib/subtitlePreview.ts の previewQuery */
+  getSubtitlePreview: (mediaId: number, query = '') =>
+    request<SubtitlePreview>(`/api/media/${mediaId}/subtitle-preview${query}`),
+  /** 字幕1件の透過画像(書き出しの解像度) */
+  subtitlePreviewImageUrl: (mediaId: number, key: string, query = '') =>
+    `${API_BASE}/api/media/${mediaId}/subtitle-preview/${key}.png${query}`,
 
   listSegments: (mediaId: number, includeAizuchi = true) =>
     request<Segment[]>(

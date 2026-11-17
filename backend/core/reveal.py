@@ -1,4 +1,4 @@
-"""書き出したファイルをOSのファイラーで見せる。
+"""書き出したファイル・フォルダをOSのファイラーで見せる(と、更新のページをブラウザで開く)。
 
 デスクトップ版(Tauri)とブラウザで動かす開発版の両方で同じように動かすため、
 フロント(WebView)ではなくバックエンドが開く。どのパスを開いてよいかは
@@ -29,6 +29,29 @@ def reveal_command(path: PurePath, os_name: str) -> list[str] | str:
     return ["xdg-open", str(path.parent)]
 
 
+def open_folder_command(path: PurePath, os_name: str) -> list[str]:
+    """フォルダそのものを開くコマンド(純関数)。書き出す前の「書き出し先を開く」用"""
+    if os_name == "Darwin":
+        return ["open", str(path)]
+    if os_name == "Windows":
+        return ["explorer", str(path)]
+    return ["xdg-open", str(path)]
+
+
+def open_url_command(url: str, os_name: str) -> list[str]:
+    """URLを既定のブラウザで開くコマンド(純関数)。
+
+    Tauriのwebviewはリンクを外のブラウザで開かないので、ファイラーと同じく
+    バックエンドが開く。Windowsは `start` がcmdの内部コマンドなので、
+    URLの関連付けを直接呼べる rundll32 を使う(シェルを経由しない)。
+    """
+    if os_name == "Darwin":
+        return ["open", url]
+    if os_name == "Windows":
+        return ["rundll32", "url.dll,FileProtocolHandler", url]
+    return ["xdg-open", url]
+
+
 def launch_env(environ: dict[str, str], *, frozen: bool) -> dict[str, str]:
     """外部のGUIアプリへ渡す環境変数(純関数)。
 
@@ -49,7 +72,20 @@ def launch_env(environ: dict[str, str], *, frozen: bool) -> dict[str, str]:
 
 def reveal(path: Path, os_name: str | None = None) -> None:
     """ファイラーを起動する。終わりを待たない(ファイラーは開いたまま残る)"""
-    cmd = reveal_command(path, os_name or platform.system())
+    _launch(reveal_command(path, os_name or platform.system()))
+
+
+def open_folder(path: Path, os_name: str | None = None) -> None:
+    """フォルダをファイラーで開く"""
+    _launch(open_folder_command(path, os_name or platform.system()))
+
+
+def open_url(url: str, os_name: str | None = None) -> None:
+    """URLを既定のブラウザで開く。呼び出し側は決まったURLだけを渡すこと"""
+    _launch(open_url_command(url, os_name or platform.system()))
+
+
+def _launch(cmd: list[str] | str) -> None:
     # 出力は読まない(バイトのまま捨てる)。GUIアプリなので待たない
     subprocess.Popen(
         cmd,

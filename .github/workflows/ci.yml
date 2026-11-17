@@ -36,7 +36,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-14, windows-latest]
+        os: [ubuntu-24.04, macos-15, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -49,6 +49,15 @@ jobs:
       # バックエンドはもうtorchを使わない(配布物と同じ構成になる)
       - name: 依存を入れる
         run: uv sync
+
+      # 字幕プレビューの画素テスト(tests/pipeline/test_subtitle_preview.py)は
+      # libass入りのffmpegで実際に描いて、書き出しと同じ画素になることを確かめる。
+      # ffmpegが無いと黙ってスキップされるので、少なくともLinuxでは必ず走らせる
+      - name: ffmpeg(字幕の画素テスト用)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
 
       # 失敗の要約をアノテーションに出す。ログのダウンロードにはリポジトリの
       # 管理者権限が要るため、それが無い人には「exit code 1」しか見えない。
@@ -93,7 +102,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-14, windows-latest]
+        os: [ubuntu-24.04, macos-15, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -172,7 +181,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-14, windows-latest]
+        os: [ubuntu-24.04, macos-15, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4

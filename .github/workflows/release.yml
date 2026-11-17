@@ -31,7 +31,7 @@ jobs:
           # 22.04で動かすにはVulkan SDKを別途入れる必要がある
           - os: ubuntu-24.04
             name: Linux
-          - os: macos-14 # Apple Silicon
+          - os: macos-15 # Apple Silicon
             name: macOS (Apple Silicon)
           - os: windows-latest
             name: Windows
@@ -170,7 +170,7 @@ jobs:
       # macOSも同梱する。Homebrewのffmpeg 9はlibassが外されていて、
       # 「brewで入れてください」と案内しても字幕の焼き込みが必ず失敗する(実測)
       - name: 同梱ffmpegのキャッシュ(macOS)
-        if: matrix.os == 'macos-14'
+        if: matrix.os == 'macos-15'
         id: ffmpeg-cache-mac
         uses: actions/cache@v4
         with:
@@ -181,7 +181,7 @@ jobs:
           key: ffmpeg-mac-${{ hashFiles('scripts/build_ffmpeg_macos.sh', 'licenses/ffmpeg-NOTICE-macos.md', 'licenses/LGPL-2.1.txt') }}
 
       - name: ffmpegをビルドして同梱(macOS)
-        if: matrix.os == 'macos-14' && steps.ffmpeg-cache-mac.outputs.cache-hit != 'true'
+        if: matrix.os == 'macos-15' && steps.ffmpeg-cache-mac.outputs.cache-hit != 'true'
         run: |
           brew install meson ninja
           ./scripts/build_ffmpeg_macos.sh
@@ -217,7 +217,7 @@ jobs:
       # Tauriのバンドラは APPLE_CERTIFICATE 等の環境変数を見て、
       # 一時キーチェーンへの取り込み→署名→notarytoolでの公証まで自動で行う
       - name: 署名・公証の環境変数(macOS)
-        if: matrix.os == 'macos-14'
+        if: matrix.os == 'macos-15'
         shell: bash
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
@@ -247,7 +247,7 @@ jobs:
       # Tauriは resources/ 内のバイナリを署名しない。公証はバンドル内の
       # 全Mach-Oに署名を要求するので、バンドル前にここで署名する
       - name: 同梱バイナリに署名(macOS)
-        if: matrix.os == 'macos-14'
+        if: matrix.os == 'macos-15'
         shell: bash
         run: ./scripts/sign_macos_binaries.sh
 
@@ -298,7 +298,7 @@ jobs:
           done
 
       - name: パッケージを実機で検証(macOS)
-        if: matrix.os == 'macos-14'
+        if: matrix.os == 'macos-15'
         shell: bash
         run: |
           dmg=$(ls frontend/src-tauri/target/release/bundle/dmg/*.dmg | head -1)

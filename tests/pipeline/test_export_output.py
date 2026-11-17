@@ -31,8 +31,40 @@ def test_export_file_name(name, media, start, end, clip_id, expected):
     assert export_mod.export_file_name(Path(media), start, end, clip_id) == expected, name
 
 
-def test_export_dir_is_next_to_media():
-    assert export_mod.export_dir(Path("/v/対談.mov")) == Path("/v/exports")
+@pytest.mark.parametrize(
+    "name, configured, expected",
+    [
+        ("設定が空なら既定の場所", "", Path("/home/u/Videos/KirinukiStudio")),
+        ("空白だけも空として扱う", "   ", Path("/home/u/Videos/KirinukiStudio")),
+        ("設定したフォルダをそのまま使う", "/mnt/外付け/切り抜き", Path("/mnt/外付け/切り抜き")),
+        ("前後の空白は落とす", "  /mnt/a  ", Path("/mnt/a")),
+    ],
+)
+def test_resolve_export_dir(name, configured, expected):
+    got = export_mod.resolve_export_dir(configured, default=Path("/home/u/Videos/KirinukiStudio"))
+    assert got == expected, name
+
+
+def test_書き出し先はチルダをホームに展開する():
+    assert export_mod.resolve_export_dir("~/切り抜き") == Path.home() / "切り抜き"
+
+
+def test_check_export_dir_は無ければ作る(tmp_path):
+    target = tmp_path / "深い" / "場所"
+    assert export_mod.check_export_dir(str(target)) is None
+    assert target.is_dir()
+
+
+def test_check_export_dir_は相対パスを断る():
+    problem = export_mod.check_export_dir("切り抜き")
+    assert problem and "先頭から" in problem
+
+
+def test_check_export_dir_は作れない場所を直し方つきで断る(tmp_path):
+    blocker = tmp_path / "file.txt"
+    blocker.write_text("x", encoding="utf-8")
+    problem = export_mod.check_export_dir(str(blocker / "sub"))
+    assert problem and "別のフォルダを選んでください" in problem
 
 
 # ---- ジョブ: 書き出し先には完成品だけを置く ----
@@ -91,7 +123,7 @@ def test_書き出し先に字幕の中間ファイルを残さない(client, tm
     mid = _media(client, tmp_path)
     clip, job_id = _export_clip(client, mid)
 
-    exports = tmp_path / "exports"
+    exports = tmp_path / "videos" / "KirinukiStudio"
     assert sorted(p.name for p in exports.iterdir()) == [f"対談_0s-10s_clip{clip['id']}.mp4"]
     # 字幕は焼き込まれている(ffmpegには渡っていた)が、作業用の場所に置かれ後で消える
     assert "こんにちは" in captured[-1]["ass_text"]
@@ -104,7 +136,85 @@ def test_取り込んだ動画の書き出し名に衝突よけが付かない(c
     clip, job_id = _export_clip(client, mid, 9, 55)
     result = client.get(f"/api/jobs/{job_id}").json()["result"]
     assert Path(result["path"]).name == f"smoke_test_9s-55s_clip{clip['id']}.mp4"
-    assert Path(result["path"]).parent == tmp_path / "exports"
+    assert Path(result["path"]).parent == tmp_path / "videos" / "KirinukiStudio"
+
+
+def test_既定の書き出し先は元動画の隣ではなく動画フォルダ(client, tmp_path, captured):
+    """issue #3: 取り込んだ動画はアプリのデータフォルダ(Finderでは隠れている)に
+    コピーされる。その隣の exports/ に書き出していたので見つけられなかった"""
+    mid = _media(client, tmp_path)
+    _, job_id = _export_clip(client, mid)
+    out = Path(client.get(f"/api/jobs/{job_id}").json()["result"]["path"])
+    assert out.parent == tmp_path / "videos" / "KirinukiStudio"
+    assert not (tmp_path / "exports").exists()
+
+
+def test_設定した書き出し先に書き出す(client, tmp_path, captured):
+    target = tmp_path / "自分で選んだ場所"
+    r = client.patch("/api/settings", json={"export_dir": str(target)})
+    assert r.status_code == 200, r.text
+    mid = _media(client, tmp_path)
+    clip, job_id = _export_clip(client, mid)
+    assert [p.name for p in target.iterdir()] == [f"対談_0s-10s_clip{clip['id']}.mp4"]
+
+
+def test_書き出し先はプロジェクトごとには変えられない(client):
+    """「書き出した動画はどこ?」の答えを1つにする"""
+    r = client.post("/api/projects", json={"name": "p", "settings": {"export_dir": "/tmp/x"}})
+    assert r.status_code == 400
+
+
+def test_使えない書き出し先は保存させない(client, tmp_path):
+    blocker = tmp_path / "file.txt"
+    blocker.write_text("x", encoding="utf-8")
+    r = client.patch("/api/settings", json={"export_dir": str(blocker / "sub")})
+    assert r.status_code == 400
+    assert "別のフォルダ" in r.json()["detail"]
+    assert client.get("/api/settings").json()["values"]["export_dir"] == ""
+
+
+def test_書き出し先が使えなくなっていたら直し方つきで失敗する(client, tmp_path, captured):
+    """保存した後に外付けドライブを外した、など"""
+    from backend.core.config import settings
+
+    blocker = tmp_path / "file.txt"
+    blocker.write_text("x", encoding="utf-8")
+    settings.export_dir = str(blocker / "sub")
+    mid = _media(client, tmp_path)
+    clip = client.post(f"/api/media/{mid}/clips", json={"start": 0, "end": 10}).json()
+    r = client.post(f"/api/clips/{clip['id']}/export")
+    job = client.app.state.jobs.wait(r.json()["job_id"], timeout=30)
+    assert job["status"] == "failed"
+    assert "別のフォルダを選んでください" in job["error"]
+
+
+# ---- 書き出し先の表示と、フォルダを開く ----
+
+def test_書き出し先の表示は既定と設定を区別する(client, tmp_path):
+    default = str(tmp_path / "videos" / "KirinukiStudio")
+    assert client.get("/api/export-dir").json() == {
+        "path": default, "default_path": default, "is_default": True,
+    }
+    target = tmp_path / "選んだ場所"
+    client.patch("/api/settings", json={"export_dir": str(target)})
+    assert client.get("/api/export-dir").json() == {
+        "path": str(target), "default_path": default, "is_default": False,
+    }
+    # 空に戻すと既定に戻る
+    client.patch("/api/settings", json={"export_dir": ""})
+    assert client.get("/api/export-dir").json()["is_default"] is True
+
+
+def test_書き出し先のフォルダを書き出す前でも開ける(client, tmp_path, monkeypatch):
+    from backend.core import reveal
+
+    opened: list[Path] = []
+    monkeypatch.setattr(reveal, "open_folder", lambda path, os_name=None: opened.append(path))
+    r = client.post("/api/export-dir/reveal")
+    assert r.status_code == 200, r.text
+    target = tmp_path / "videos" / "KirinukiStudio"
+    assert opened == [target]
+    assert target.is_dir(), "まだ無ければ作ってから開く"
 
 
 # ---- 書き出し先を開く・再生する ----
@@ -156,22 +266,33 @@ def test_存在しないジョブは404(client, revealed):
     assert client.get("/api/jobs/99999/output").status_code == 404
 
 
-def test_書き出し先の外を指す結果は開かない(client, tmp_path, captured, revealed):
+def test_書き出し先を変えた後も前の書き出しを開ける(client, tmp_path, captured, revealed):
+    """開ける範囲をフォルダで縛ると、設定を変えた途端に前の書き出しが開けなくなる"""
+    mid = _media(client, tmp_path)
+    _, job_id = _export_clip(client, mid)
+    client.patch("/api/settings", json={"export_dir": str(tmp_path / "別の場所")})
+    assert client.post(f"/api/jobs/{job_id}/reveal").status_code == 200
+    assert client.get(f"/api/jobs/{job_id}/output").status_code == 200
+
+
+def test_このジョブが作ったのではないファイルは開かない(client, tmp_path, captured, revealed):
     """結果のパスはジョブが書くが、任意のパスを開けるAPIにしないため念のため確かめる"""
     mid = _media(client, tmp_path)
     _, job_id = _export_clip(client, mid)
-    outside = tmp_path / "secret.txt"
-    outside.write_text("x", encoding="utf-8")
-    db = client.app.state.db
     import json
 
-    db.execute(
-        "UPDATE jobs SET result_json=? WHERE id=?",
-        (json.dumps({"path": str(outside)}), job_id),
-    )
-    db.commit()
-    assert client.post(f"/api/jobs/{job_id}/reveal").status_code == 400
-    assert client.get(f"/api/jobs/{job_id}/output").status_code == 400
+    db = client.app.state.db
+    # 別の名前のファイルも、同じフォルダにある別の動画も開かない
+    for name in ("secret.txt", "別の動画_0s-10s.mp4"):
+        outside = tmp_path / "videos" / "KirinukiStudio" / name
+        outside.write_text("x", encoding="utf-8")
+        db.execute(
+            "UPDATE jobs SET result_json=? WHERE id=?",
+            (json.dumps({"path": str(outside)}), job_id),
+        )
+        db.commit()
+        assert client.post(f"/api/jobs/{job_id}/reveal").status_code == 400, name
+        assert client.get(f"/api/jobs/{job_id}/output").status_code == 400, name
     assert revealed == []
 
 

@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "画面(main)に許すシェルの機能。フォルダ選択ダイアログを開くことだけ",
+  "windows": ["main"],
+  "permissions": ["dialog:allow-open"]
+}

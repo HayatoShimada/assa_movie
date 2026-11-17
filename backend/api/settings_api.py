@@ -21,6 +21,7 @@ from backend.core.project_settings import (
     save_global_overrides,
 )
 from backend.engines.llm.status import llm_status
+from backend.pipeline.export import check_export_dir
 from backend.engines.asr.registry import MODELS
 from backend.engines.diarize import registry as diarize
 from backend.api.keys_api import provider_ready
@@ -200,6 +201,12 @@ def update_settings(body: SettingsUpdate, db: sqlite3.Connection = Depends(get_d
         raise HTTPException(400, f"未知のASRモデル: {changes['asr_model']}")
     if "llm_provider" in changes and changes["llm_provider"] not in PROVIDERS:
         raise HTTPException(400, f"未知のLLMプロバイダ: {changes['llm_provider']}")
+    if "export_dir" in changes:
+        # 使えないフォルダを保存させない(書き出しの最後に失敗して初めて気付く、を防ぐ)
+        changes["export_dir"] = changes["export_dir"].strip()
+        problem = check_export_dir(changes["export_dir"])
+        if problem:
+            raise HTTPException(400, problem)
     for key, value in changes.items():
         if key not in MUTABLE_FIELDS:
             raise HTTPException(400, f"変更できない設定です: {key}")

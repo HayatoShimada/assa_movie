@@ -15,9 +15,12 @@ OS標準の場所(Linux は XDG Base Directory)に置く。
 
 import os
 import platform
+import re
 from pathlib import Path
 
 APP_NAME = "kirinuki-studio"
+# 利用者の目に触れるフォルダ名(書き出し先)。画面に出るアプリ名と揃える
+EXPORT_FOLDER_NAME = "KirinukiStudio"
 DB_NAME = f"{APP_NAME}.db"
 # 旧名。これらが残っている環境は移行せずそのまま使う
 LEGACY_DB_NAME = "whisper.db"
@@ -104,6 +107,63 @@ def config_file(
     """APIトークン等のファイル。リポジトリ直下に既にあるならそれを使う"""
     legacy = (repo or PROJECT_ROOT) / name
     return legacy if legacy.exists() else config_dir(home=home, os_name=os_name) / name
+
+
+def parse_user_dirs(text: str, home: Path) -> Path | None:
+    """`~/.config/user-dirs.dirs` から動画フォルダを読む(純関数)。
+
+    日本語環境のLinuxは `~/ビデオ` で、`~/Videos` は存在しない。
+    書式は `XDG_VIDEOS_DIR="$HOME/ビデオ"`(xdg-user-dirs)。
+    `$HOME/` を指すだけの行は「動画フォルダを使わない」設定なので無視する。
+    """
+    for line in text.splitlines():
+        m = re.match(r'\s*XDG_VIDEOS_DIR\s*=\s*"(.*)"\s*$', line)
+        if not m:
+            continue
+        value = m.group(1).rstrip("/")
+        if value.startswith("$HOME"):
+            rest = value[len("$HOME"):].lstrip("/")
+            return home / rest if rest else None
+        return Path(value) if value.startswith("/") else None
+    return None
+
+
+def videos_dir(
+    home: Path | None = None,
+    os_name: str | None = None,
+    environ: dict[str, str] | None = None,
+) -> Path:
+    """利用者の動画フォルダ(Finder・エクスプローラーのサイドバーに出る場所)"""
+    home = home or Path.home()
+    os_name = os_name or platform.system()
+    environ = os.environ if environ is None else environ
+    if os_name == "Darwin":
+        return home / "Movies"
+    if os_name == "Windows":
+        profile = environ.get("USERPROFILE", "").strip()
+        return (Path(profile) if profile else home) / "Videos"
+    config = environ.get("XDG_CONFIG_HOME", "").strip()
+    user_dirs = (Path(config) if config else home / ".config") / "user-dirs.dirs"
+    try:
+        found = parse_user_dirs(user_dirs.read_text(encoding="utf-8"), home)
+    except (OSError, UnicodeDecodeError):
+        found = None
+    return found or home / "Videos"
+
+
+def default_export_dir(
+    home: Path | None = None,
+    os_name: str | None = None,
+    environ: dict[str, str] | None = None,
+) -> Path:
+    """書き出し先の既定。動画フォルダの中の KirinukiStudio/。
+
+    以前は元動画の隣の exports/ だった。ファイル選択で取り込んだ動画は
+    アプリのデータフォルダ(macOSなら ~/Library/Application Support/…)に
+    コピーされるので、書き出しもFinderから見えない場所に入り、
+    「書き出したのにどこにも無い」になっていた(issue #3)。
+    """
+    return videos_dir(home=home, os_name=os_name, environ=environ) / EXPORT_FOLDER_NAME
 
 
 def legacy_env_vars() -> list[str]:

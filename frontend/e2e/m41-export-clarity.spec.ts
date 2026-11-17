@@ -34,8 +34,11 @@ test('クリップの書き出し後に保存先とファイル名が出て、�
   await expect(page.getByTestId('clip-export-result-name')).toHaveText(
     `sample_0s-8s_clip${clip.id}.mp4`,
   )
-  // 保存先はフルパス(元動画の隣の exports/)
-  await expect(page.getByTestId('clip-export-result-folder')).toHaveText(/[\\/]exports$/)
+  // 保存先はフルパス(動画フォルダの中の KirinukiStudio/。書き出す前から出ている場所と同じ)
+  await expect(page.getByTestId('clip-export-result-folder')).toHaveText(/[\\/]KirinukiStudio$/)
+  await expect(page.getByTestId('clip-export-destination-path')).toHaveText(
+    (await page.getByTestId('clip-export-result-folder').textContent())!,
+  )
 
   await page.getByTestId('clip-export-result-reveal').click()
   await expect
@@ -111,7 +114,7 @@ test('プレビューの字幕は再生操作と重ならない', async ({ page,
   await expect(overlay).toBeVisible()
   const sub = (await overlay.boundingBox())!
 
-  // 再生操作は映像の枠の外(下)にあり、字幕は枠の中に収まる
+  // 再生操作は映像の枠の外(下)にあり、字幕(枠いっぱいに重ねた画像)は枠の中に収まる
   expect(controls.y).toBeGreaterThanOrEqual(frame.y + frame.height - 1)
   expect(sub.y + sub.height).toBeLessThanOrEqual(frame.y + frame.height + 1)
   await expect(page.getByTestId('player-play')).toHaveAttribute('aria-label', '再生')

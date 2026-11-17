@@ -893,6 +893,135 @@ export interface paths {
         patch: operations["update_user_term_api_user_terms__term_id__patch"];
         trace?: never;
     };
+    "/api/export-dir": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Export Dir */
+        get: operations["get_export_dir_api_export_dir_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/export-dir/reveal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reveal Export Dir
+         * @description 書き出し先のフォルダをOSのファイラーで開く(まだ無ければ作る)。
+         *
+         *     開くのは設定された書き出し先だけ。任意のパスは受け取らない。
+         */
+        post: operations["reveal_export_dir_api_export_dir_reveal_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Update
+         * @description 新しい版があるか。自動確認を切っているときは force=true(「今すぐ確認」)のときだけ通信する
+         */
+        get: operations["get_update_api_update_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/update/open": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Open Download Page
+         * @description ダウンロードページを既定のブラウザで開く。
+         *
+         *     webviewの中のリンクは外のブラウザで開かないので、バックエンドが開く。
+         *     開くのは決まったページだけ(URLは受け取らない)。
+         */
+        post: operations["open_download_page_api_update_open_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/media/{media_id}/subtitle-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Subtitle Preview
+         * @description プレビューに出す字幕の時刻表。
+         *
+         *     position / offset_y: クリップの字幕位置(省略時は設定の値。書き出しと同じ規則)。
+         *     start / end: クリップの範囲。話者の色は「書き出す範囲に出てくる話者」に
+         *     順に割り当てるので、範囲が違うと色が変わる。クリップを見ているときは渡す。
+         */
+        get: operations["get_subtitle_preview_api_media__media_id__subtitle_preview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/media/{media_id}/subtitle-preview/{key}.png": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Subtitle Preview Image
+         * @description 字幕1件の透過画像(書き出しの解像度)。
+         *
+         *     キーは見た目から決まるので、同じキーの画像は変わらない(長くキャッシュさせる)。
+         *     アプリを再起動して材料を忘れていたら、同じ条件で時刻表を作り直して探す。
+         */
+        get: operations["get_subtitle_preview_image_api_media__media_id__subtitle_preview__key__png_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -1103,6 +1232,15 @@ export interface components {
         EditReject: {
             /** Note */
             note?: string | null;
+        };
+        /** ExportDir */
+        ExportDir: {
+            /** Path */
+            path: string;
+            /** Default Path */
+            default_path: string;
+            /** Is Default */
+            is_default: boolean;
         };
         /** GlossaryCreate */
         GlossaryCreate: {
@@ -1401,6 +1539,8 @@ export interface components {
             convert_method?: string | null;
             /** Diarization Enabled */
             diarization_enabled?: boolean | null;
+            /** Export Dir */
+            export_dir?: string | null;
             /** Female Name */
             female_name?: string | null;
             /** Filler Level */
@@ -1445,6 +1585,8 @@ export interface components {
             subtitle_speaker_colors?: boolean | null;
             /** Subtitle Text Color */
             subtitle_text_color?: string | null;
+            /** Update Check Enabled */
+            update_check_enabled?: boolean | null;
         };
         /** SpeakerRename */
         SpeakerRename: {
@@ -1457,6 +1599,62 @@ export interface components {
         SpeakerRenameResult: {
             /** Changed */
             changed: number;
+        };
+        /** SubtitlePreview */
+        SubtitlePreview: {
+            /** Available */
+            available: boolean;
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
+            /** Width */
+            width: number;
+            /** Height */
+            height: number;
+            /** Events */
+            events: components["schemas"]["SubtitlePreviewEvent"][];
+        };
+        /** SubtitlePreviewEvent */
+        SubtitlePreviewEvent: {
+            /** Start */
+            start: number;
+            /** End */
+            end: number;
+            /** Key */
+            key: string;
+            /** Text */
+            text: string;
+        };
+        /** UpdateStatus */
+        UpdateStatus: {
+            /** Current */
+            current: string;
+            /** Latest */
+            latest?: string | null;
+            /**
+             * Has Update
+             * @default false
+             */
+            has_update: boolean;
+            /**
+             * Notes
+             * @default
+             */
+            notes: string;
+            /**
+             * Checked
+             * @default false
+             */
+            checked: boolean;
+            /**
+             * Error
+             * @default
+             */
+            error: string;
+            /** Url */
+            url: string;
         };
         /** UserTerm */
         UserTerm: {
@@ -3405,6 +3603,172 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserTerm"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_export_dir_api_export_dir_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportDir"];
+                };
+            };
+        };
+    };
+    reveal_export_dir_api_export_dir_reveal_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExportDir"];
+                };
+            };
+        };
+    };
+    get_update_api_update_get: {
+        parameters: {
+            query?: {
+                force?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdateStatus"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    open_download_page_api_update_open_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    get_subtitle_preview_api_media__media_id__subtitle_preview_get: {
+        parameters: {
+            query?: {
+                position?: string | null;
+                offset_y?: number | null;
+                start?: number | null;
+                end?: number | null;
+            };
+            header?: never;
+            path: {
+                media_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubtitlePreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_subtitle_preview_image_api_media__media_id__subtitle_preview__key__png_get: {
+        parameters: {
+            query?: {
+                position?: string | null;
+                offset_y?: number | null;
+                start?: number | null;
+                end?: number | null;
+            };
+            header?: never;
+            path: {
+                media_id: number;
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

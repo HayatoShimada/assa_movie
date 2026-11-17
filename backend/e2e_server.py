@@ -178,8 +178,10 @@ def _fake_export(
 
     from backend.pipeline import export as export_mod
 
+    from backend.core.project_settings import resolve_settings
+
     src = Path(conn.execute("SELECT path FROM media WHERE id=?", (media_id,)).fetchone()["path"])
-    out_dir = export_mod.export_dir(src)
+    out_dir = export_mod.resolve_export_dir(resolve_settings(conn, media_id=media_id).export_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     out = out_dir / export_mod.export_file_name(
         src, float(params.get("start", 0)), float(params.get("end", 0)), params.get("clip_id")
@@ -201,8 +203,11 @@ def _fake_export(
 # 記録だけする(/api/e2e/revealed で読む)
 REVEALED: list[str] = []
 
-# シードする動画の置き場。書き出しはこの隣の exports/ に入る(本物と同じ規則)
+# シードする動画の置き場
 MEDIA_DIR = Path(tempfile.mkdtemp(prefix="ks-e2e-media-"))
+# 書き出し先の「既定の場所」。開発機の動画フォルダに書かないよう一時フォルダにする
+# (フォルダ名は本物と同じ。画面に出るパスを確かめたいため)
+EXPORT_DEFAULT_DIR = Path(tempfile.mkdtemp(prefix="ks-e2e-videos-")) / "KirinukiStudio"
 
 
 def _fake_setup_diarization(
@@ -227,6 +232,21 @@ def _fake_setup_diarization(
 
 
 router = APIRouter(prefix="/api/e2e", tags=["e2e"])
+
+# 更新の確認に返す「GitHubの最新リリース」。既定は今の版と同じ(=更新なし)
+E2E_APP_VERSION = "2.0.0"
+LATEST_RELEASE: dict = {"tag_name": f"v{E2E_APP_VERSION}", "body": ""}
+
+
+@router.post("/latest-release")
+def set_latest_release(body: dict) -> dict:
+    """次の更新確認で返す最新リリースを差し替える(確認済みの結果も捨てる)"""
+    from backend.core import update_check
+
+    LATEST_RELEASE.clear()
+    LATEST_RELEASE.update(body)
+    update_check.reset_cache()
+    return LATEST_RELEASE
 
 # E2E用の使い捨てライセンス発行鍵(プロセスごとに作り直す)
 _E2E_ISSUER = Ed25519PrivateKey.generate()
@@ -296,6 +316,11 @@ def reset(request: Request) -> dict:
     hwprofile.set_current(None)
     hwprofile.ensure_profile(db)
     REVEALED.clear()
+    from backend.core import update_check
+
+    LATEST_RELEASE.clear()
+    LATEST_RELEASE.update({"tag_name": f"v{E2E_APP_VERSION}", "body": ""})
+    update_check.reset_cache()
     return {"status": "reset"}
 
 
@@ -431,6 +456,29 @@ def build_app():
 
     clips_api._require_ffmpeg = lambda: None
     reveal_mod.reveal = lambda path, os_name=None: REVEALED.append(str(path))
+    reveal_mod.open_folder = lambda path, os_name=None: REVEALED.append(str(path))
+    reveal_mod.open_url = lambda url, os_name=None: REVEALED.append(url)
+    # 更新の確認はGitHubへ行かせない。specが /api/e2e/latest-release で応答を仕込む
+    from backend.core import update_check
+
+    # 字幕のプレビューは本物なら ffmpeg(libass) で描く。E2Eの機体にffmpegが
+    # あるとは限らないので、透明な1枚を返す(描いた中身は pytest が画素で確かめる。
+    # E2Eは「どの字幕の画像を、いつ出すか」を見る)
+    import numpy as np
+
+    from backend.api import preview as preview_api
+    from backend.pipeline import subtitle_preview
+
+    subtitle_preview.render_overlay = lambda job, ffmpeg=None: np.zeros(
+        (job.height // 20, job.width // 20, 4), dtype=np.uint8
+    )
+    preview_api.ffmpeg_path = lambda: "ffmpeg"
+
+    update_check.fetch_latest = lambda: dict(LATEST_RELEASE)
+    update_check.current_version = lambda environ=None: E2E_APP_VERSION
+    from backend.core import paths as paths_mod
+
+    paths_mod.default_export_dir = lambda home=None, os_name=None, environ=None: EXPORT_DEFAULT_DIR
     # 差し替えまで済んだ全ジョブに関所を付ける
     for job_type, handler in list(job_queue._HANDLERS.items()):
         job_queue._HANDLERS[job_type] = _gated(job_type, handler)
