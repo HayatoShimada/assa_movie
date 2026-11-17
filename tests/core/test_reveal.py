@@ -65,3 +65,30 @@ def test_reveal_はコマンドを起動するだけで待たない(monkeypatch,
     reveal.reveal(target, os_name="Linux")
     assert calls[0][0] == ["xdg-open", str(target.parent)]
     assert calls[0][1]["stdout"] is reveal.subprocess.DEVNULL
+
+
+@pytest.mark.parametrize(
+    "os_name, expected",
+    [
+        ("Linux", ["xdg-open", "/home/u/ビデオ/KirinukiStudio"]),
+        ("Darwin", ["open", "/home/u/ビデオ/KirinukiStudio"]),
+        ("Windows", ["explorer", "/home/u/ビデオ/KirinukiStudio"]),
+    ],
+)
+def test_open_folder_command(os_name, expected):
+    """書き出す前でも「書き出し先を開く」でフォルダそのものを開ける"""
+    target = PurePosixPath("/home/u/ビデオ/KirinukiStudio")
+    assert reveal.open_folder_command(target, os_name) == expected
+
+
+@pytest.mark.parametrize(
+    "os_name, expected",
+    [
+        ("Linux", ["xdg-open", "https://example.com/releases"]),
+        ("Darwin", ["open", "https://example.com/releases"]),
+        # start はcmdの内部コマンド。シェルを経由せずURLの関連付けを呼ぶ
+        ("Windows", ["rundll32", "url.dll,FileProtocolHandler", "https://example.com/releases"]),
+    ],
+)
+def test_open_url_command(os_name, expected):
+    assert reveal.open_url_command("https://example.com/releases", os_name) == expected

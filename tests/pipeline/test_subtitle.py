@@ -20,9 +20,8 @@ from backend.pipeline.subtitle import (
 # ---- 折返し・禁則 ----
 #
 # ケース表は tests/fixtures/subtitle_wrap_cases.json にある。
-# フロント(frontend/src/lib/subtitle.test.ts)が同じ表を読むので、
-# **両実装の見た目が必ず揃う**。以前は手でコピーしており、
-# Python 25件 / TS 15件と気付かないうちに乖離していた
+# 以前はフロントにも同じ折返しの実装があり、同じ表を読んで揃えていた。
+# いまはプレビューの字幕もバックエンドが描くので、実装はここだけ
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures"
 WRAP_CASES = json.loads(
     (FIXTURES / "subtitle_wrap_cases.json").read_text(encoding="utf-8")

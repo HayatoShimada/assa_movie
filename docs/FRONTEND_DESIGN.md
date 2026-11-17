@@ -160,8 +160,16 @@ cd frontend && npm run gen:api   # APIを変えたら型を再生成
 - `OpenSourcePanel`: 同梱物のライセンス表記(LGPLのFFmpegはここに出す義務がある)
 
 ### 3. 字幕プレビューの方式
-- 編集中のプレビューは **CSSオーバーレイ**で近似(位置・フォント・色・背景・最大文字数での折返し・禁則はフロントで再現)
-- 最終出力はバックエンドのASS焼き込み。「プレビュー=近似、書き出し=正」と明示し、書き出し前に1クリップだけ試し書き出しできる「プレビュー書き出し」ボタンを設ける
+- プレビューの字幕は、**書き出しと同じASSを同じffmpeg(libass)で描いた透過画像**を映像に重ねる
+  (`backend/pipeline/subtitle_preview.py`、`GET /api/media/{id}/subtitle-preview`)。
+  画面側は見た目を計算しない。枠を書き出しと同じ縦横比にして、時刻表のとおりに
+  画像を枠いっぱいに重ねるだけ(`lib/subtitlePreview.ts`、`VideoPlayer`)
+- 以前は **CSSオーバーレイ**で近似していた(位置・折返し・禁則をフロントで再現)。
+  規則は揃っていたが、ASSのFontsize(行の高さ)とCSSのfont-size(文字の大きさ)の違いで
+  プレビューが約1.45倍大きく、縁取り・フォントの代替・行間・表示時間も別物だった(issue #4)
+- 透過画像は、黒地と白地に同じ字幕を焼いた差から作る(libassが出す画素そのもの)。
+  字幕1件につき1枚で、見た目が同じなら使い回す。再生中はこの後の数件を先に読み込む
+- 映像のレイアウト(ぼかし背景・顔に合わせた切り出し)と中抜きは、プレビューでは近似のまま
 
 ## ディレクトリ構成
 
@@ -188,8 +196,8 @@ frontend/
 │   │   ├── ui.tsx      Button など最小限の共通部品
 │   │   └── icons.tsx
 │   ├── hooks/          useHashRoute, useSplitPane, useJobProgress, useTrackedJob
-│   ├── lib/            subtitle.ts(折返し・禁則), subtitleLayout.ts, userTerms.ts,
-│   │                   jobs.ts(操作とジョブの対応・進捗の文言)
+│   ├── lib/            subtitlePreview.ts(字幕画像の時刻表), nativeDialog.ts(フォルダ選択),
+│   │                   update.ts, userTerms.ts, jobs.ts(操作とジョブの対応・進捗の文言)
 │   └── pages/          Home, Editor, GlobalSettings
 ├── e2e/                Playwright
 └── src-tauri/          デスクトップシェル(Rust)。画面は持たない
@@ -210,7 +218,7 @@ frontend/
 
 ## 日本語特化のUI考慮
 
-- 字幕折返し・禁則処理のロジックはフロントでも実装(`useSubtitleLayout`)し、プレビューと書き出しの見た目差を最小化。バックエンドと同一のテストケースを共有する
+- 字幕折返し・禁則処理はバックエンドだけが持つ(`backend/pipeline/subtitle.py`)。プレビューは書き出しと同じlibassの画像なので、フロントに同じロジックを置かない
 - フォントは Noto Sans JP / M PLUS 等の日本語Webフォントを同梱(オフライン動作のためローカル配信)
 - セグメント検索は正規化(全half/角・かな/カナ)を吸収したあいまい検索
 

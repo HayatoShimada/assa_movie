@@ -14,7 +14,7 @@ from backend.core import reveal as reveal_mod
 from backend.jobs.progress import job_events
 from backend.jobs.queue import JobQueue
 from backend.models.dto import Job, JobCreate
-from backend.pipeline.export import export_dir
+from backend.pipeline.export import export_file_name
 
 router = APIRouter(prefix="/api", tags=["jobs"])
 
@@ -87,10 +87,12 @@ async def job_progress_events(job_id: int, jobs: JobQueue = Depends(get_jobs)):
 
 
 def _export_output(db: sqlite3.Connection, jobs: JobQueue, job_id: int) -> Path:
-    """書き出しジョブの出力ファイル。書き出し先(元動画の隣の exports/)の中に限る。
+    """書き出しジョブの出力ファイル。このジョブが作るはずの名前のmp4に限る。
 
     結果のパスはジョブ自身が書くものだが、任意のパスを開いたり返したりできる
-    APIにしないため、書き出し先の中にあることを毎回確かめる。
+    APIにしないため毎回確かめる。書き出し先は利用者が変えられる(後から変えても
+    前の書き出しは開けるべき)ので、フォルダではなくファイル名で照合する:
+    ジョブのパラメータ(元動画・範囲・クリップ番号)から決まる名前と一致するものだけ。
     """
     job = jobs.get(job_id)
     if job is None:
@@ -98,13 +100,24 @@ def _export_output(db: sqlite3.Connection, jobs: JobQueue, job_id: int) -> Path:
     if job["type"] != "export":
         raise HTTPException(400, "書き出しのジョブではありません")
     result = json.loads(job.get("result_json") or "null") or {}
-    media = db.execute("SELECT path FROM media WHERE id=?", (job["media_id"],)).fetchone()
+    media = db.execute(
+        "SELECT path, duration FROM media WHERE id=?", (job["media_id"],)
+    ).fetchone()
     if job["status"] != "completed" or not result.get("path") or media is None:
         raise HTTPException(400, "書き出しがまだ完了していません")
     out = Path(result["path"])
-    allowed = export_dir(Path(media["path"])).resolve()
-    if out.resolve().parent != allowed:
-        raise HTTPException(400, "書き出し先の外のファイルは開けません")
+    params = json.loads(job.get("params_json") or "null") or {}
+    try:
+        expected = export_file_name(
+            Path(media["path"]),
+            float(params.get("start", 0.0)),
+            float(params.get("end", media["duration"] or 0.0)),
+            params.get("clip_id"),
+        )
+    except (TypeError, ValueError):
+        expected = None
+    if not out.is_absolute() or out.name != expected:
+        raise HTTPException(400, "この書き出しで作ったファイルではないので開けません")
     if not out.is_file():
         raise HTTPException(
             404, f"書き出したファイルが見つかりません(移動または削除された可能性があります): {out}"

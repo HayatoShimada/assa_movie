@@ -12,6 +12,7 @@ import { useTrackedJob } from '../../hooks/useTrackedJob'
 import { jobSlots } from '../../lib/jobs'
 import { JobStatus } from '../JobStatus'
 import { Button, formatTime } from '../ui'
+import { ExportDestination } from './ExportDestination'
 import { ExportResult } from './ExportResult'
 
 function JobButton({
@@ -173,6 +174,7 @@ export function ExportTab({
           <input type="checkbox" checked={burn} onChange={(e) => setBurn(e.target.checked)} />
           字幕を焼き込む(指示語注釈・フィラー除去・採用ジャッジを反映)
         </label>
+        <ExportDestination testId="export-destination" />
         <Button
           data-testid="export-run"
           disabled={running || end <= start}

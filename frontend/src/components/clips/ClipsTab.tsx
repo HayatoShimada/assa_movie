@@ -8,6 +8,7 @@ import { CONVERT_METHOD_LABELS } from '../../lib/catalogs'
 import { jobSlots } from '../../lib/jobs'
 import { clipStatusLabel } from '../../lib/media'
 import type { SettingsValues } from '../../lib/settings'
+import { ExportDestination } from '../export/ExportDestination'
 import { ExportResult } from '../export/ExportResult'
 import { TrashIcon } from '../icons'
 import { usePlayback } from '../../stores/playback'
@@ -163,6 +164,9 @@ function ClipEditor({
           書き出し
         </Button>
       </div>
+
+      {/* 書き出す前に「どこに保存されるか」を見せ、その場で変えられるようにする */}
+      <ExportDestination testId="clip-export-destination" />
 
       <JobStatus
         progress={resolveJob.progress}

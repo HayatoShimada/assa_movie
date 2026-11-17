@@ -49,9 +49,10 @@ UIで実行・操作できる、自動切り抜き動画作成アプリ。
 ```
 ┌─ デスクトップシェル: Tauri v2(Rust)
 │   ・画面は持たない。Pythonを空きポートで子プロセス起動し、webviewにURLを渡すだけ
+│     (例外: 書き出し先を選ぶOSのフォルダ選択ダイアログだけ貸す)
 │   ・終了時に子プロセスを確実に殺す(WindowsはJob Object、UNIXはプロセスグループ)
 ├─ フロントエンド: React + TypeScript(webview内)
-│   ・動画プレビュー: HTML5 <video> + CSSオーバーレイ字幕
+│   ・動画プレビュー: HTML5 <video> + 書き出しと同じlibassで描いた字幕画像
 │   ・進捗表示: SSEでバックエンドから受信
 ├─ バックエンド: Python + FastAPI(配布時はPyInstallerで1ファイル)
 │   ・文字起こし: whisper.cpp(GPU機)/ faster-whisper(CPU機)

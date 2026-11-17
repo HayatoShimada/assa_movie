@@ -1,8 +1,8 @@
 {
   "_comment": [
-    "字幕の改行(文節単位)のケース表。Python(backend/pipeline/subtitle.py の wrap_subtitle)と",
-    "TypeScript(frontend/src/lib/subtitle.ts の wrapSubtitle)が同じ結果になることを担保する。",
-    "文節の区切りはGoogleのBudouX(Python/npmとも同じバージョン)で決める。",
+    "字幕の改行(文節単位)のケース表。backend/pipeline/subtitle.py の wrap_subtitle が対象。",
+    "プレビューの字幕もバックエンドが描くので、フロントに同じ実装は無い。",
+    "文節の区切りはGoogleのBudouXで決める。",
     "文節が1行に収まらないときだけ、文字数での折返し(subtitle_wrap_cases.json)に任せる。",
     "日本語特有の判定なのでケースは削らない・短縮しない(CLAUDE.md)。",
     "cases の各要素は [入力, 1行の最大文字数, 期待する行の配列]。"

@@ -144,24 +144,43 @@ test('クリップ: 上下微調整がプレビューに即反映される(中�
   await page.getByTestId('tab-clips').click()
   await page.getByText('オフセット反映テスト').click()
 
-  // 再生位置0秒の字幕が出ている状態で、スライダーを動かして位置が動くか見る
+  // 再生位置0秒の字幕が出ている状態で、位置とずらしを変えて字幕が描き直されるか見る。
+  // 字幕は書き出しと同じ libass で描いた画像(E2Eでは透明な画像に差し替え)。
+  // どの画像かは data-key(見た目から決まる)で分かる。実際に上下へ動くことは
+  // tests/pipeline/test_subtitle_preview.py が画素で確かめている
   const overlay = page.getByTestId('subtitle-overlay')
   await expect(overlay).toBeVisible()
-  const topOf = async () => (await overlay.boundingBox())!.y
+  // このクリップの位置・ずらし・範囲で描いた画像になっている(APIの答えと同じキー)
+  const expectKey = async (position: string, offset: number) => {
+    const preview = await (
+      await request.get(
+        `${API}/api/media/${mediaId}/subtitle-preview?position=${position}&offset_y=${offset}&start=0&end=8`,
+      )
+    ).json()
+    await expect(overlay).toHaveAttribute('data-key', preview.events[0].key)
+    return preview.events[0].key as string
+  }
 
+  const seen = new Set<string>()
   for (const position of ['bottom', 'center'] as const) {
     await page.getByTestId('clip-subtitle-position').selectOption(position)
     await page.getByTestId('clip-subtitle-offset').fill('-100')
     await expect(page.getByTestId('clip-subtitle-offset')).toHaveValue('-100')
-    const up = await topOf()
+    const up = await expectKey(position, -100)
 
     await page.getByTestId('clip-subtitle-offset').fill('100')
     await expect(page.getByTestId('clip-subtitle-offset')).toHaveValue('100')
-    const down = await topOf()
+    const down = await expectKey(position, 100)
 
-    // +は下方向。中央配置でもオフセットが効く(書き出しでは \pos で表現)
-    expect(down, `位置=${position} でプレビューが動いていない`).toBeGreaterThan(up)
+    // 中央配置でもオフセットが効く(書き出しでは \pos で表現)
+    expect(down, `位置=${position} でプレビューが変わっていない`).not.toBe(up)
+    seen.add(up).add(down)
   }
+  expect(seen.size, '位置×ずらしの4通りがすべて別の見た目').toBe(4)
+  // 画像は実際に読み込めている
+  await expect
+    .poll(() => overlay.evaluate((img: HTMLImageElement) => img.naturalWidth))
+    .toBeGreaterThan(0)
 })
 
 test('クリップ: 「既定の位置に戻す」でプロジェクト(未設定なら全体)の字幕位置に戻る', async ({

@@ -8,6 +8,8 @@ import { useState } from 'react'
 import { api } from '../../api/client'
 import type { SettingsValues } from '../../lib/settings'
 import { ApiKeysPanel } from './ApiKeysPanel'
+import { ExportDestinationPanel } from '../export/ExportDestination'
+import { AboutPanel } from '../update/UpdateNotice'
 import { SetupPanel } from './SetupPanel'
 import { EnvironmentPanel } from './EnvironmentPanel'
 import { LicensePanel } from './LicensePanel'
@@ -45,6 +47,10 @@ export function SettingsForm() {
       {/* 上から「この端末の状態」→「全体設定」の順。まず動く状態かを示す */}
       <EnvironmentPanel />
       <SetupPanel />
+      {/* 今の版と更新。古い版のまま使い続けないよう、状態の並びに置く */}
+      <AboutPanel />
+      {/* 書き出した動画の置き場所(その場で保存) */}
+      <ExportDestinationPanel />
       <LicensePanel />
       <ApiKeysPanel />
       {/* 利用者が育てるデータ(その場で保存)。下書き→保存の設定項目とは分けて置く */}

@@ -16,6 +16,13 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = [] }
+# 書き出し先のフォルダを、OSのフォルダ選択(Finder / エクスプローラー)で選ばせる。
+# 画面(webview)からは絶対パスを取れないので、ここだけシェルの機能を使う。
+# 版を固定しているのは、2.8以降が tauri 2.12 を要求し、足すだけで本体の版まで
+# 上がってしまうため(tauri-plugin-fs はこのプラグインの依存。同じ理由で固定)。
+# tauri本体を上げるときに一緒に上げる
+tauri-plugin-dialog = "=2.7.3"
+tauri-plugin-fs = "=2.5.2"
 
 # 親プロセスが死んだらバックエンドも道連れにするため(prctl PR_SET_PDEATHSIG)。
 # Dropだけではシグナルで殺されたときに走らず、Pythonが残ってポートを掴み続ける
